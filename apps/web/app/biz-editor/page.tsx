@@ -1,0 +1,1084 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "@/src/lib/useAuth";
+import {
+  DEFAULT_POSTER_DESIGN,
+  POSTER_STYLES,
+  POSTER_STYLE_META,
+  PosterDesign,
+  PosterStyle,
+  PosterStyleSwatch,
+  PosterTemplate,
+} from "@/src/components/poster/PosterTemplate";
+
+type BusinessProfile = {
+  businessName?: string;
+  businessType?: string;
+  city?: string;
+  country?: string;
+  productsOrServices?: string[] | string;
+  targetCustomers?: string;
+  businessGoals?: string;
+  monthlyMarketingBudget?: string;
+  monthlyBusinessBudget?: string;
+  language?: string;
+};
+
+type DayPlan = {
+  dayNumber: number;
+  mainActionTitle?: string;
+  businessGrowthAction?: string;
+  postIdea?: string;
+  caption?: string;
+  posterHint?: string;
+  hashtags?: string[];
+};
+
+function parseCaptionAndHashtags(text: string): { caption: string; hashtags: string[] } {
+  const safe = (text || "").replace(/\r\n/g, "\n").trim();
+  const captionMatch = safe.match(/Caption:\s*([\s\S]*?)(?:\n\s*Hashtags:|$)/i);
+  const hashtagsMatch = safe.match(/Hashtags:\s*([\s\S]*)$/i);
+
+  const captionRaw = captionMatch?.[1]?.trim() ?? safe;
+  const hashtagsRaw = hashtagsMatch?.[1]?.trim() ?? "";
+
+  const hashtagTokens = hashtagsRaw
+    .split(/\s+|,|\n/)
+    .map((token) => token.trim())
+    .filter(Boolean)
+    .map((token) => (token.startsWith("#") ? token : `#${token}`))
+    .slice(0, 6);
+
+  return {
+    caption: captionRaw.replace(/^"+|"+$/g, "").trim(),
+    hashtags: hashtagTokens,
+  };
+}
+
+function buildBusinessDetailsPayload(
+  business: BusinessProfile | null,
+  offerText: string,
+  dayPlanSummary: string,
+  photoContext: string,
+  finalCaption: string,
+): {
+  ok: true;
+  payload: {
+    businessName: string;
+    businessType: string;
+    location: string;
+    productsOrServices: string;
+    targetCustomers: string;
+    businessGoal: string;
+    budget: string;
+    language: string;
+    offer: string;
+    dayPlan: string;
+    photoContext: string;
+    finalCaption?: string;
+    tone: string;
+  };
+} | { ok: false; missing: string[] } {
+  const businessName = business?.businessName?.trim() || "";
+  const businessType = business?.businessType?.trim() || "";
+  const location = [business?.city?.trim(), business?.country?.trim()].filter(Boolean).join(", ");
+  const productsOrServices = Array.isArray(business?.productsOrServices)
+    ? business?.productsOrServices.filter((item) => typeof item === "string" && item.trim().length > 0).join(", ")
+    : typeof business?.productsOrServices === "string"
+      ? business.productsOrServices.trim()
+      : "";
+  const targetCustomers = business?.targetCustomers?.trim() || "";
+  const businessGoal = offerText.trim() || business?.businessGoals?.trim() || "";
+  const budget = business?.monthlyMarketingBudget?.trim() || business?.monthlyBusinessBudget?.trim() || "";
+  const language = business?.language?.trim() || "English";
+
+  const missing: string[] = [];
+  if (!businessName) missing.push("businessName");
+  if (!businessType) missing.push("businessType");
+  if (!location) missing.push("location");
+  if (!productsOrServices) missing.push("productsOrServices");
+  if (!targetCustomers) missing.push("targetCustomers");
+
+  if (missing.length > 0) {
+    return { ok: false, missing };
+  }
+
+  return {
+    ok: true,
+    payload: {
+      businessName,
+      businessType,
+      location,
+      productsOrServices,
+      targetCustomers,
+      businessGoal,
+      budget,
+      language,
+      offer: offerText.trim(),
+      dayPlan: dayPlanSummary,
+      photoContext,
+      finalCaption: finalCaption || undefined,
+      tone: "Friendly and professional",
+    },
+  };
+}
+
+type LatestPlanResponse = {
+  ok?: boolean;
+  data?: {
+    planData?: DayPlan[];
+  };
+  error?: string;
+};
+
+export default function BizEditorPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { user, loading: authLoading } = useAuth();
+
+  const editorContext = useMemo(() => {
+    const fromQuery = {
+      day: Number(searchParams.get("day") ?? 0),
+      caption: searchParams.get("caption") ?? "",
+      postIdea: searchParams.get("postIdea") ?? "",
+      mainActionTitle: searchParams.get("mainActionTitle") ?? "",
+      posterHint: searchParams.get("posterHint") ?? "",
+      reelScript: searchParams.get("reelScript") ?? "",
+      storyFrames: searchParams.get("storyFrames") ?? "",
+      backTo: searchParams.get("backTo") ?? "",
+    };
+    const hasQuery =
+      fromQuery.day > 0 ||
+      fromQuery.caption.trim() ||
+      fromQuery.postIdea.trim() ||
+      fromQuery.mainActionTitle.trim() ||
+      fromQuery.posterHint.trim() ||
+      fromQuery.reelScript.trim() ||
+      fromQuery.storyFrames.trim() ||
+      fromQuery.backTo.trim();
+    if (hasQuery) return fromQuery;
+    if (typeof window === "undefined") return fromQuery;
+    try {
+      const raw = sessionStorage.getItem("bizboost:editorDayContext");
+      if (!raw) return fromQuery;
+      const parsed = JSON.parse(raw) as {
+        dayNumber?: number;
+        caption?: string;
+        postIdea?: string;
+        mainActionTitle?: string;
+        posterHint?: string;
+        reelScript?: string;
+        storyFrames?: string;
+        backTo?: string;
+      };
+      return {
+        day: Number(parsed.dayNumber ?? 0),
+        caption: typeof parsed.caption === "string" ? parsed.caption : "",
+        postIdea: typeof parsed.postIdea === "string" ? parsed.postIdea : "",
+        mainActionTitle: typeof parsed.mainActionTitle === "string" ? parsed.mainActionTitle : "",
+        posterHint: typeof parsed.posterHint === "string" ? parsed.posterHint : "",
+        reelScript: typeof parsed.reelScript === "string" ? parsed.reelScript : "",
+        storyFrames: typeof parsed.storyFrames === "string" ? parsed.storyFrames : "",
+        backTo: typeof parsed.backTo === "string" ? parsed.backTo : "",
+      };
+    } catch {
+      return fromQuery;
+    }
+  }, [searchParams]);
+
+  const dayParam = editorContext.day;
+  const queryCaption = editorContext.caption;
+  const queryPostIdea = editorContext.postIdea;
+  const queryActionTitle = editorContext.mainActionTitle;
+  const queryPosterHint = editorContext.posterHint;
+  const queryReelScript = editorContext.reelScript;
+  const queryStoryFrames = editorContext.storyFrames;
+  const backToHref = useMemo(() => {
+    const raw = editorContext.backTo;
+    if (typeof raw === "string" && raw.trim().length > 0) return raw;
+    if (dayParam > 0) return `/marketing-plan/day/${dayParam}`;
+    return "/marketing-plan";
+  }, [editorContext.backTo, dayParam]);
+
+  const [loading, setLoading] = useState(true);
+  const [showMissingBusinessModal, setShowMissingBusinessModal] = useState(false);
+
+  const [business, setBusiness] = useState<BusinessProfile | null>(null);
+  const [offerText, setOfferText] = useState(() => queryPostIdea || queryActionTitle || "");
+  const [caption, setCaption] = useState(() => queryCaption);
+  const [hashtags, setHashtags] = useState<string[]>([]);
+  const [imageName, setImageName] = useState<string>("");
+
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [inlineError, setInlineError] = useState<string>("");
+  const [copied, setCopied] = useState(false);
+  const [generated, setGenerated] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [generatingAi, setGeneratingAi] = useState(false);
+  const [suggestingCaption, setSuggestingCaption] = useState(false);
+  const [dayPlanSummary, setDayPlanSummary] = useState("");
+  const [captionAutoSuggested, setCaptionAutoSuggested] = useState(false);
+  const [posterDesign, setPosterDesign] = useState<PosterDesign>(DEFAULT_POSTER_DESIGN);
+  const [designLoading, setDesignLoading] = useState(false);
+
+  useEffect(() => {
+    if (!queryPostIdea && !queryActionTitle && !queryCaption && !queryPosterHint && !queryReelScript && !queryStoryFrames) return;
+    const parsedReel = (() => {
+      try {
+        return queryReelScript ? JSON.parse(queryReelScript) as { hook?: string; beats?: string[]; cta?: string } : null;
+      } catch {
+        return null;
+      }
+    })();
+    const parsedStory = (() => {
+      try {
+        return queryStoryFrames ? (JSON.parse(queryStoryFrames) as string[]) : [];
+      } catch {
+        return [];
+      }
+    })();
+    const socialAppendix = [
+      parsedReel?.hook ? `Reel hook: ${parsedReel.hook}` : "",
+      Array.isArray(parsedReel?.beats) && parsedReel?.beats?.length ? `Reel beats: ${parsedReel?.beats.join(" | ")}` : "",
+      parsedReel?.cta ? `Reel CTA: ${parsedReel.cta}` : "",
+      parsedStory.length ? `Story frames: ${parsedStory.join(" | ")}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+    setOfferText((prev) => (prev.trim() ? prev : queryPostIdea || queryActionTitle || prev));
+    setCaption((prev) => {
+      const base = prev.trim() ? prev : queryCaption || prev;
+      if (!socialAppendix) return base;
+      return `${base}${base ? "\n\n" : ""}${socialAppendix}`;
+    });
+    setPosterDesign((prev) => ({
+      ...prev,
+      headline: queryActionTitle || prev.headline,
+      subheadline: queryPostIdea || prev.subheadline,
+      offerBadge: queryPosterHint || prev.offerBadge,
+    }));
+    setDayPlanSummary((prev) => {
+      if (prev.trim()) return prev;
+      const chunks = [
+        queryActionTitle ? `Main action: ${queryActionTitle}` : "",
+        queryPostIdea ? `Post idea: ${queryPostIdea}` : "",
+        queryPosterHint ? `Poster hint: ${queryPosterHint}` : "",
+      ].filter(Boolean);
+      return chunks.join(". ");
+    });
+  }, [queryActionTitle, queryCaption, queryPostIdea, queryPosterHint, queryReelScript, queryStoryFrames]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user?.uid) {
+      router.replace("/login");
+      return;
+    }
+
+    const load = async () => {
+      setLoading(true);
+      try {
+        const businessRes = await fetch(`/api/business-profile?firebase_uid=${encodeURIComponent(user.uid)}`, { cache: "no-store" });
+        const businessJson = await businessRes.json();
+
+        if (businessRes.status === 404 || businessJson?.error === "business_profile_not_found") {
+          setShowMissingBusinessModal(true);
+          return;
+        }
+        if (!businessRes.ok || !businessJson?.ok) {
+          setShowMissingBusinessModal(true);
+          return;
+        }
+
+        setBusiness(businessJson.data ?? {});
+
+        if (dayParam > 0) {
+          const latestRes = await fetch(`/api/marketing-plan/latest?firebase_uid=${encodeURIComponent(user.uid)}`, { cache: "no-store" });
+          const latestJson = (await latestRes.json()) as LatestPlanResponse;
+
+          if (latestRes.ok && latestJson?.ok) {
+            const safePlan = Array.isArray(latestJson?.data?.planData) ? latestJson?.data?.planData : [];
+            const dayItem = safePlan.find((item) => Number(item.dayNumber) === dayParam);
+            if (dayItem) {
+              setOfferText((prev) => prev || dayItem.mainActionTitle || dayItem.postIdea || "");
+              setHashtags(Array.isArray(dayItem.hashtags) ? dayItem.hashtags : []);
+              setCaption((prev) => prev || dayItem.caption || "");
+              setPosterDesign((prev) => ({
+                ...prev,
+                headline: prev.headline || dayItem.mainActionTitle || prev.headline,
+                subheadline: prev.subheadline || dayItem.postIdea || prev.subheadline,
+                offerBadge: prev.offerBadge || dayItem.posterHint || prev.offerBadge,
+              }));
+              const summaryParts = [
+                dayItem.mainActionTitle ? `Main action: ${dayItem.mainActionTitle}` : "",
+                dayItem.businessGrowthAction ? `Business action: ${dayItem.businessGrowthAction}` : "",
+                dayItem.postIdea ? `Post idea: ${dayItem.postIdea}` : "",
+                `Day: ${dayItem.dayNumber}`,
+              ].filter(Boolean);
+              setDayPlanSummary(summaryParts.join(". "));
+            }
+          }
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void load();
+  }, [authLoading, user?.uid, router, dayParam]);
+
+  useEffect(() => {
+    if (loading || authLoading) return;
+    if (!business) return;
+    if (captionAutoSuggested) return;
+    if (caption.trim().length > 0) {
+      setCaptionAutoSuggested(true);
+      return;
+    }
+
+    const prepared = buildBusinessDetailsPayload(
+      business,
+      offerText,
+      dayPlanSummary,
+      "A real photo uploaded by the business owner",
+      "",
+    );
+    if (!prepared.ok) return;
+
+    let cancelled = false;
+
+    const run = async () => {
+      try {
+        setSuggestingCaption(true);
+        const res = await fetch("/api/ai/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "poster-caption",
+            businessDetails: prepared.payload,
+          }),
+        });
+        const json = await res.json();
+        if (cancelled) return;
+        if (!res.ok || !json?.ok || typeof json?.text !== "string") return;
+
+        const parsed = parseCaptionAndHashtags(json.text);
+        if (parsed.caption) {
+          setCaption(parsed.caption);
+          setCaptionAutoSuggested(true);
+        }
+        if ((hashtags?.length ?? 0) === 0 && parsed.hashtags.length > 0) {
+          setHashtags(parsed.hashtags);
+        }
+      } catch {
+      } finally {
+        if (!cancelled) setSuggestingCaption(false);
+      }
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, authLoading, business, offerText, dayPlanSummary, caption, captionAutoSuggested, hashtags]);
+
+  useEffect(() => {
+    if (loading || authLoading) return;
+    if (!business) return;
+
+    const prepared = buildBusinessDetailsPayload(
+      business,
+      offerText,
+      dayPlanSummary,
+      "A real photo uploaded by the business owner",
+      "",
+    );
+    if (!prepared.ok) return;
+
+    let cancelled = false;
+
+    const run = async () => {
+      try {
+        setDesignLoading(true);
+        const res = await fetch("/api/ai/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "poster-design",
+            businessDetails: prepared.payload,
+          }),
+        });
+        const json = await res.json();
+        if (cancelled) return;
+        if (!res.ok || !json?.ok || !json?.design) return;
+        setPosterDesign(json.design as PosterDesign);
+      } catch {
+      } finally {
+        if (!cancelled) setDesignLoading(false);
+      }
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, authLoading, business, offerText, dayPlanSummary]);
+
+  function readFile(file: File) {
+    const url = URL.createObjectURL(file);
+    setImageUrl(url);
+    setImageName(file.name);
+    setInlineError("");
+  }
+
+  function onFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    readFile(file);
+  }
+
+  function onDrop(event: React.DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    setDragOver(false);
+    const file = event.dataTransfer.files?.[0];
+    if (!file) return;
+    readFile(file);
+  }
+
+  async function generateContent() {
+    if (!imageUrl) {
+      setInlineError("Please upload an image first.");
+      return;
+    }
+
+    const fallbackHashtags = ["#SmallBusiness", "#BusinessGrowth", "#SupportLocal", "#BizBoostAI"];
+
+    const prepared = buildBusinessDetailsPayload(
+      business,
+      offerText,
+      dayPlanSummary,
+      imageName ? `Uploaded photo: ${imageName}` : "A real photo uploaded by the business owner",
+      caption.trim(),
+    );
+
+    if (!prepared.ok) {
+      setInlineError(
+        `Missing business details: ${prepared.missing.join(", ")}. Please complete your business profile first.`,
+      );
+      return;
+    }
+
+    try {
+      setGeneratingAi(true);
+      setInlineError("");
+
+      const aiResponse = await fetch("/api/ai/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "final-post",
+          businessDetails: prepared.payload,
+        }),
+      });
+
+      const aiJson = await aiResponse.json();
+      if (!aiResponse.ok || !aiJson?.ok || typeof aiJson?.text !== "string" || !aiJson.text.trim()) {
+        const message = typeof aiJson?.error === "string" ? aiJson.error : "Post generation failed.";
+        setInlineError(message);
+        return;
+      }
+
+      const parsed = parseCaptionAndHashtags(aiJson.text);
+      const finalCaption = parsed.caption || caption.trim();
+      const mergedHashtags =
+        parsed.hashtags.length > 0
+          ? parsed.hashtags
+          : Array.isArray(hashtags) && hashtags.length > 0
+            ? hashtags
+            : fallbackHashtags;
+
+      setCaption(finalCaption);
+      setHashtags(mergedHashtags);
+      setGenerated(true);
+
+      if (!user?.uid) return;
+
+      setSavingDraft(true);
+      const response = await fetch("/api/caption-drafts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          firebase_uid: user.uid,
+          dayNumber: Number.isFinite(dayParam) && dayParam > 0 ? dayParam : null,
+          caption: finalCaption,
+          hashtags: mergedHashtags,
+          imageName: imageName || "uploaded-image",
+          offerText: offerText.trim(),
+          imageDataUrl: imageUrl,
+          posterDesign,
+          posterStyle: posterDesign.style,
+        }),
+      });
+
+      const result = await response.json();
+      if (response.ok && result?.ok) {
+        const draftId = String(result?.data?.draftId ?? "");
+        if (draftId) {
+          router.push(`/poster-preview?draftId=${encodeURIComponent(draftId)}`);
+        }
+      } else {
+        setInlineError("Post generated, but saving draft failed. Please try again.");
+      }
+    } catch {
+      setInlineError("Failed to generate post content. Please try again.");
+    } finally {
+      setGeneratingAi(false);
+      setSavingDraft(false);
+    }
+  }
+
+  async function copyCaption() {
+    if (!caption) return;
+    try {
+      await navigator.clipboard.writeText(caption);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  const previewCaption = useMemo(() => caption || "Caption preview will appear here after generation.", [caption]);
+
+  return (
+    <div className="editorPage">
+      <div className="editorShell">
+        <section className="editorHeader">
+          <div>
+            <p className="eyebrow">Biz Editor</p>
+            <h1>Creative Editor</h1>
+            <p className="sub">Upload an image, generate a business-ready caption, and prepare your post output.</p>
+          </div>
+          <button type="button" className="backBtn" onClick={() => router.push(backToHref)}>
+            Back
+          </button>
+        </section>
+
+        <section className="editorGrid">
+          <div className="glassCard">
+            <h2>Image Upload</h2>
+            <label
+              className={`dropZone ${dragOver ? "dragOver" : ""}`}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOver(true);
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={onDrop}
+            >
+              <input type="file" accept="image/*" onChange={onFileChange} />
+              {imageUrl ? (
+                <img src={imageUrl} alt="Uploaded preview" className="uploaded" />
+              ) : (
+                <div className="dropText">
+                  <strong>Drag & drop an image</strong>
+                  <span>or click to upload</span>
+                </div>
+              )}
+            </label>
+            {inlineError && <p className="errorText">{inlineError}</p>}
+          </div>
+
+          <div className="glassCard">
+            <h2>Content</h2>
+            <label className="fieldLabel">Offer / Post Idea</label>
+            <input
+              value={offerText}
+              onChange={(e) => setOfferText(e.target.value)}
+              className="textInput"
+              placeholder="e.g. Weekend combo offer"
+            />
+
+            <label className="fieldLabel">
+              Caption{suggestingCaption ? " (suggesting...)" : captionAutoSuggested ? " (suggested - you can edit)" : ""}
+            </label>
+            <textarea
+              value={caption}
+              onChange={(e) => {
+                setCaption(e.target.value);
+                setCaptionAutoSuggested(true);
+              }}
+              className="textArea"
+              placeholder={
+                suggestingCaption
+                  ? "Suggesting a caption based on your day plan..."
+                  : "A simple caption will be suggested automatically. You can edit it before generating the final post."
+              }
+              rows={7}
+            />
+
+            <label className="fieldLabel">Hashtags</label>
+            <div className="tagWrap">
+              {(hashtags ?? []).length > 0 ? (
+                (hashtags ?? []).map((tag) => (
+                  <span key={tag} className="tag">
+                    {tag}
+                  </span>
+                ))
+              ) : (
+                <span className="tagEmpty">Hashtags will appear after generation.</span>
+              )}
+            </div>
+
+            <div className="btnRow">
+              <button
+                type="button"
+                className="primaryBtn"
+                onClick={generateContent}
+                disabled={loading || generatingAi || savingDraft || suggestingCaption}
+              >
+                {generatingAi || savingDraft ? "Generating post..." : "Generate Final Post"}
+              </button>
+              <button type="button" className="secondaryBtn" onClick={() => void copyCaption()} disabled={!caption}>
+                {copied ? "Copied" : "Copy Caption"}
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section className="glassCard previewCard">
+          <div className="previewHeader">
+            <div>
+              <h2>Poster Preview</h2>
+              <p className="previewHint">
+                Pick a design style. Your photo stays — only the typography & layout change.
+              </p>
+            </div>
+            {designLoading ? <span className="designBadge">Designing...</span> : null}
+          </div>
+
+          <div className="stylePicker">
+            {POSTER_STYLES.map((style) => (
+              <PosterStyleSwatch
+                key={style}
+                style={style as PosterStyle}
+                active={posterDesign.style === style}
+                onClick={() =>
+                  setPosterDesign((prev) => ({ ...prev, style: style as PosterStyle }))
+                }
+              />
+            ))}
+          </div>
+
+          <div className="activeStyleInfo">
+            <span className="dot" style={{ background: POSTER_STYLE_META[posterDesign.style].vibeColor }} />
+            <strong>{POSTER_STYLE_META[posterDesign.style].label}</strong>
+            <span className="activeStyleDesc">{POSTER_STYLE_META[posterDesign.style].description}</span>
+          </div>
+
+          <div className="posterStage">
+            <PosterTemplate imageUrl={imageUrl} design={posterDesign} />
+          </div>
+
+          <details className="designTuning">
+            <summary>Fine-tune poster text</summary>
+            <div className="tuningGrid">
+              <label className="tuneField">
+                <span>Brand name</span>
+                <input
+                  value={posterDesign.brandName}
+                  onChange={(e) => setPosterDesign((prev) => ({ ...prev, brandName: e.target.value }))}
+                />
+              </label>
+              <label className="tuneField">
+                <span>Headline</span>
+                <input
+                  value={posterDesign.headline}
+                  onChange={(e) => setPosterDesign((prev) => ({ ...prev, headline: e.target.value }))}
+                />
+              </label>
+              <label className="tuneField">
+                <span>Subheadline</span>
+                <input
+                  value={posterDesign.subheadline}
+                  onChange={(e) => setPosterDesign((prev) => ({ ...prev, subheadline: e.target.value }))}
+                />
+              </label>
+              <label className="tuneField">
+                <span>Offer badge</span>
+                <input
+                  value={posterDesign.offerBadge}
+                  onChange={(e) => setPosterDesign((prev) => ({ ...prev, offerBadge: e.target.value }))}
+                />
+              </label>
+              <label className="tuneField">
+                <span>CTA label</span>
+                <input
+                  value={posterDesign.ctaLabel}
+                  onChange={(e) => setPosterDesign((prev) => ({ ...prev, ctaLabel: e.target.value }))}
+                />
+              </label>
+              <label className="tuneField">
+                <span>Accent color</span>
+                <input
+                  type="color"
+                  value={posterDesign.accentColor}
+                  onChange={(e) => setPosterDesign((prev) => ({ ...prev, accentColor: e.target.value }))}
+                />
+              </label>
+            </div>
+          </details>
+
+          {generated ? <p className="previewCaptionHint">Caption: {previewCaption}</p> : null}
+        </section>
+      </div>
+
+      {showMissingBusinessModal && (
+        <div className="modalOverlay">
+          <div className="modalCard">
+            <h3>Fill business details first</h3>
+            <p>Please complete your business details before using Biz Editor.</p>
+            <button type="button" className="modalPrimary" onClick={() => router.push("/onboarding/business-details")}>
+              Go to Business Details
+            </button>
+          </div>
+        </div>
+      )}
+
+      <style jsx>{`
+        .editorPage {
+          min-height: 100vh;
+          padding: 28px 16px 12px;
+          background: var(--page-bg);
+        }
+        .editorShell {
+          max-width: 1120px;
+          margin: 0 auto;
+          display: grid;
+          gap: 14px;
+        }
+        .editorHeader,
+        .glassCard {
+          border-radius: 22px;
+          border: 1px solid rgba(148, 163, 184, 0.28);
+          background: rgba(255, 255, 255, 0.78);
+          box-shadow: 0 16px 42px rgba(15, 23, 42, 0.1);
+          backdrop-filter: blur(12px);
+          padding: 18px;
+        }
+        .editorHeader {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          align-items: flex-start;
+          flex-wrap: wrap;
+        }
+        .eyebrow {
+          margin: 0;
+          font-size: 11px;
+          letter-spacing: 0.2em;
+          text-transform: uppercase;
+          color: #64748b;
+          font-weight: 700;
+        }
+        h1 {
+          margin: 8px 0 0;
+          color: #0f172a;
+          font-size: clamp(28px, 4vw, 42px);
+          line-height: 1.1;
+        }
+        .sub {
+          margin: 8px 0 0;
+          color: #64748b;
+          font-size: 14px;
+        }
+        .backBtn,
+        .primaryBtn,
+        .modalPrimary {
+          border: 1px solid rgba(16, 185, 129, 0.3);
+          background: linear-gradient(145deg, #10b981, #059669);
+          color: #fff;
+          border-radius: 10px;
+          padding: 9px 12px;
+          font-size: 13px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+        .secondaryBtn {
+          border: 1px solid rgba(148, 163, 184, 0.5);
+          background: #fff;
+          color: #334155;
+          border-radius: 10px;
+          padding: 9px 12px;
+          font-size: 13px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+        .secondaryBtn:disabled,
+        .primaryBtn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+        .editorGrid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+        }
+        h2 {
+          margin: 0 0 10px;
+          color: #0f172a;
+          font-size: 18px;
+        }
+        .dropZone {
+          position: relative;
+          min-height: 280px;
+          border-radius: 14px;
+          border: 1px dashed rgba(148, 163, 184, 0.52);
+          background: rgba(248, 250, 252, 0.9);
+          display: grid;
+          place-items: center;
+          overflow: hidden;
+          cursor: pointer;
+          transition: border-color 0.15s ease, background 0.15s ease;
+        }
+        .dropZone.dragOver {
+          border-color: rgba(16, 185, 129, 0.55);
+          background: rgba(236, 253, 245, 0.92);
+        }
+        .dropZone input {
+          position: absolute;
+          inset: 0;
+          opacity: 0;
+          cursor: pointer;
+        }
+        .dropText {
+          display: grid;
+          gap: 4px;
+          text-align: center;
+          color: #64748b;
+        }
+        .dropText strong {
+          color: #334155;
+        }
+        .uploaded {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+        .errorText {
+          margin: 8px 0 0;
+          color: #be123c;
+          font-size: 13px;
+        }
+        .fieldLabel {
+          display: block;
+          margin: 8px 0 6px;
+          font-size: 12px;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          color: #64748b;
+          font-weight: 700;
+        }
+        .textInput,
+        .textArea {
+          width: 100%;
+          border-radius: 12px;
+          border: 1px solid rgba(148, 163, 184, 0.42);
+          background: rgba(255, 255, 255, 0.92);
+          color: #0f172a;
+          padding: 10px 12px;
+          font-size: 14px;
+          outline: none;
+        }
+        .textArea {
+          resize: vertical;
+          min-height: 120px;
+          font-family: inherit;
+          line-height: 1.5;
+        }
+        .tagWrap {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+        .tag {
+          border-radius: 999px;
+          border: 1px solid rgba(148, 163, 184, 0.34);
+          background: #fff;
+          color: #475569;
+          font-size: 12px;
+          padding: 5px 10px;
+        }
+        .tagEmpty {
+          font-size: 12px;
+          color: #94a3b8;
+        }
+        .btnRow {
+          margin-top: 12px;
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        .previewCard {
+          padding-top: 14px;
+        }
+        .previewHeader {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 10px;
+          margin-bottom: 12px;
+        }
+        .previewHeader h2 {
+          margin: 0;
+        }
+        .previewHint {
+          margin: 4px 0 0;
+          font-size: 12px;
+          color: #64748b;
+          line-height: 1.4;
+          max-width: 380px;
+        }
+        .designBadge {
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: #0369a1;
+          background: rgba(14, 165, 233, 0.12);
+          border: 1px solid rgba(14, 165, 233, 0.35);
+          padding: 4px 8px;
+          border-radius: 999px;
+          flex-shrink: 0;
+        }
+        .stylePicker {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 10px;
+          margin-bottom: 12px;
+        }
+        @media (max-width: 720px) {
+          .stylePicker {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+        }
+        .activeStyleInfo {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          background: rgba(241, 245, 249, 0.8);
+          border: 1px solid rgba(148, 163, 184, 0.35);
+          border-radius: 10px;
+          padding: 8px 12px;
+          margin-bottom: 12px;
+          font-size: 12px;
+          color: #334155;
+          flex-wrap: wrap;
+        }
+        .activeStyleInfo strong {
+          color: #0f172a;
+          font-size: 13px;
+        }
+        .activeStyleInfo .dot {
+          width: 10px;
+          height: 10px;
+          border-radius: 999px;
+          box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.6);
+          flex-shrink: 0;
+        }
+        .activeStyleDesc {
+          color: #64748b;
+        }
+        .posterStage {
+          border-radius: 16px;
+          overflow: hidden;
+        }
+        .designTuning {
+          margin-top: 14px;
+          border-radius: 12px;
+          border: 1px solid rgba(148, 163, 184, 0.4);
+          background: rgba(255, 255, 255, 0.7);
+          padding: 10px 12px;
+        }
+        .designTuning summary {
+          cursor: pointer;
+          font-size: 13px;
+          font-weight: 700;
+          color: #334155;
+          user-select: none;
+        }
+        .tuningGrid {
+          margin-top: 10px;
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 10px;
+        }
+        .tuneField {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+        .tuneField span {
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: #64748b;
+        }
+        .tuneField input {
+          border: 1px solid rgba(148, 163, 184, 0.42);
+          border-radius: 8px;
+          padding: 7px 10px;
+          font-size: 13px;
+          background: #fff;
+          color: #0f172a;
+          outline: none;
+        }
+        .previewCaptionHint {
+          margin: 12px 0 0;
+          font-size: 13px;
+          color: #475569;
+          white-space: pre-wrap;
+        }
+        .modalOverlay {
+          position: fixed;
+          inset: 0;
+          z-index: 50;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 16px;
+          background: rgba(15, 23, 42, 0.26);
+          backdrop-filter: blur(2px);
+        }
+        .modalCard {
+          width: 100%;
+          max-width: 460px;
+          border-radius: 16px;
+          border: 1px solid rgba(148, 163, 184, 0.34);
+          background: rgba(255, 255, 255, 0.9);
+          box-shadow: 0 24px 60px rgba(15, 23, 42, 0.24);
+          padding: 18px;
+        }
+        .modalCard h3 {
+          margin: 0;
+          color: #0f172a;
+        }
+        .modalCard p {
+          margin: 10px 0 14px;
+          color: #64748b;
+        }
+        @media (max-width: 900px) {
+          .editorGrid {
+            grid-template-columns: 1fr;
+          }
+        }
+      `}</style>
+    </div>
+  );
+}

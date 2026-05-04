@@ -70,6 +70,10 @@ web_modules/
 .env.*
 !.env.example
 
+# Monorepo convention: keep runtime env only in apps/web/.env.local.
+/.env.local
+/.env.local.*
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache
