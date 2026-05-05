@@ -11,12 +11,19 @@ export const POSTER_STYLES = [
   "luxury-dark",
   "neon-tech",
   "festival-vibrant",
+  /** Distinct structural families beyond the originals */
+  "testimonial-quote",
+  "image-first",
+  "offer-card",
+  "social-stack",
 ] as const;
 
 export type PosterStyle = (typeof POSTER_STYLES)[number];
 
 export type PosterDesign = {
   style: PosterStyle;
+  /** BizBoost catalog id — optional; layout still uses `style`. */
+  templateId?: string;
   brandName: string;
   headline: string;
   subheadline: string;
@@ -83,6 +90,26 @@ export const POSTER_STYLE_META: Record<
     description: "Warm, celebratory Sri Lanka vibe.",
     vibeColor: "#F59E0B",
   },
+  "testimonial-quote": {
+    label: "Testimonial quote",
+    description: "Trust-first quote block, stars, calm hierarchy.",
+    vibeColor: "#0D9488",
+  },
+  "image-first": {
+    label: "Image first",
+    description: "Large photo field with compact lower story band.",
+    vibeColor: "#2563EB",
+  },
+  "offer-card": {
+    label: "Offer card",
+    description: "Glassmorphism card frame on top of the photo.",
+    vibeColor: "#DB2777",
+  },
+  "social-stack": {
+    label: "Social stack",
+    description: "Story-style vertical stack with sticker CTA.",
+    vibeColor: "#7C3AED",
+  },
 };
 
 function overlayStyle(overlay: PosterDesign["overlay"]): CSSProperties {
@@ -124,6 +151,10 @@ export function PosterTemplate({ imageUrl, design }: PosterTemplateProps) {
       {design.style === "luxury-dark" && <LuxuryDarkLayout design={design} />}
       {design.style === "neon-tech" && <NeonTechLayout design={design} />}
       {design.style === "festival-vibrant" && <FestivalVibrantLayout design={design} />}
+      {design.style === "testimonial-quote" && <TestimonialQuoteLayout design={design} />}
+      {design.style === "image-first" && <ImageFirstLayout design={design} />}
+      {design.style === "offer-card" && <OfferCardLayout design={design} />}
+      {design.style === "social-stack" && <SocialStackLayout design={design} />}
 
       <style jsx>{`
         .posterWrap {
@@ -181,7 +212,7 @@ export function PosterStyleSwatch({
       aria-label={`Use ${meta.label} style`}
     >
       <div className="miniPoster" style={{ background: swatchBackground(style) }}>
-        <MiniPreview style={style} />
+        <PosterLayoutThumbnail style={style} />
       </div>
       <div className="labels">
         <span className="label">{meta.label}</span>
@@ -257,7 +288,20 @@ function swatchBackground(style: PosterStyle): string {
       return "linear-gradient(135deg, #020617, #0891b2)";
     case "festival-vibrant":
       return "linear-gradient(135deg, #7c2d12, #f59e0b)";
+    case "testimonial-quote":
+      return "linear-gradient(145deg, #0f766e, #ccfbf1)";
+    case "image-first":
+      return "linear-gradient(180deg, #1e3a5f, #60a5fa)";
+    case "offer-card":
+      return "linear-gradient(135deg, #9d174d, #fda4af)";
+    case "social-stack":
+      return "linear-gradient(160deg, #1e1b4b, #a78bfa)";
   }
+}
+
+/** Tiny layout preview for template browser (Biz Editor picker). */
+export function PosterLayoutThumbnail({ style }: { style: PosterStyle }) {
+  return <MiniPreview style={style} />;
 }
 
 function MiniPreview({ style }: { style: PosterStyle }) {
@@ -337,6 +381,40 @@ function MiniPreview({ style }: { style: PosterStyle }) {
           <div className="fsTop">AVURUDU 🎉</div>
           <div className="fsTitle">SPECIAL</div>
           <div className="fsCta" style={{ background: meta.vibeColor }}>SHOP NOW</div>
+        </>
+      )}
+      {style === "testimonial-quote" && (
+        <>
+          <div className="tqBrand">BRAND</div>
+          <div className="tqQuote">“WOW”</div>
+          <div className="tqStars">★★★★★</div>
+          <div className="tqCta">READ MORE</div>
+        </>
+      )}
+      {style === "image-first" && (
+        <>
+          <div className="ifPhoto" />
+          <div className="ifBand">
+            <span className="ifH">HEADLINE</span>
+            <span className="ifCta">SHOP</span>
+          </div>
+        </>
+      )}
+      {style === "offer-card" && (
+        <>
+          <div className="ocCard">
+            <span className="ocBadge">20% OFF</span>
+            <span className="ocH">SALE</span>
+            <span className="ocBtn">GET IT</span>
+          </div>
+        </>
+      )}
+      {style === "social-stack" && (
+        <>
+          <div className="ssAccent" />
+          <div className="ssTop">@brand</div>
+          <div className="ssBlock">DROP</div>
+          <div className="ssStick">LINK IN BIO</div>
         </>
       )}
       <style jsx>{`
@@ -533,6 +611,134 @@ function MiniPreview({ style }: { style: PosterStyle }) {
           padding: 3px 6px;
           border-radius: 999px;
           letter-spacing: 0.16em;
+        }
+        .tqBrand {
+          font-size: 5px;
+          letter-spacing: 0.26em;
+          font-weight: 800;
+          color: rgba(255, 255, 255, 0.92);
+          text-align: center;
+        }
+        .tqQuote {
+          font-family: var(--font-playfair), Georgia, serif;
+          font-style: italic;
+          font-size: 26px;
+          text-align: center;
+          font-weight: 700;
+          line-height: 0.95;
+        }
+        .tqStars {
+          text-align: center;
+          font-size: 10px;
+          color: ${meta.vibeColor};
+          letter-spacing: 0.1em;
+        }
+        .tqCta {
+          align-self: center;
+          padding: 3px 8px;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.22);
+          font-size: 5px;
+          font-weight: 900;
+          letter-spacing: 0.2em;
+        }
+        .ifPhoto {
+          flex: 1;
+          border-radius: 6px;
+          background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.05));
+          border: 1px solid rgba(255, 255, 255, 0.25);
+        }
+        .ifBand {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding-top: 4px;
+          gap: 4px;
+        }
+        .ifH {
+          font-size: 10px;
+          font-weight: 900;
+          letter-spacing: 0.06em;
+        }
+        .ifCta {
+          font-size: 5px;
+          font-weight: 900;
+          background: rgba(255, 255, 255, 0.18);
+          padding: 4px 6px;
+          border-radius: 4px;
+        }
+        .ocCard {
+          position: absolute;
+          inset: 12%;
+          border-radius: 10px;
+          background: rgba(15, 23, 42, 0.45);
+          border: 2px solid ${meta.vibeColor};
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          backdrop-filter: blur(4px);
+        }
+        .ocBadge {
+          font-size: 5px;
+          font-weight: 900;
+          background: ${meta.vibeColor};
+          color: #0f172a;
+          padding: 2px 6px;
+          border-radius: 999px;
+        }
+        .ocH {
+          font-size: 20px;
+          font-weight: 900;
+          font-family: var(--font-archivo-black), Impact, sans-serif;
+        }
+        .ocBtn {
+          font-size: 5px;
+          font-weight: 900;
+          letter-spacing: 0.22em;
+          border: 1px solid rgba(255, 255, 255, 0.85);
+          padding: 3px 7px;
+          border-radius: 999px;
+        }
+        .ssAccent {
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          width: 14%;
+          background: linear-gradient(180deg, ${meta.vibeColor}, #4c1d95);
+          border-radius: 0 4px 4px 0;
+        }
+        .ssTop {
+          margin-left: 18%;
+          font-size: 5px;
+          font-weight: 800;
+          font-family: var(--font-mono), monospace;
+          color: rgba(255, 255, 255, 0.9);
+        }
+        .ssBlock {
+          margin-left: 18%;
+          margin-right: 4%;
+          background: rgba(255, 255, 255, 0.14);
+          border-radius: 6px;
+          padding: 8px 10px;
+          font-size: 18px;
+          font-weight: 900;
+          font-family: var(--font-archivo-black), Impact, sans-serif;
+          line-height: 0.95;
+        }
+        .ssStick {
+          margin-left: 18%;
+          margin-top: auto;
+          text-align: center;
+          padding: 4px;
+          border-radius: 999px;
+          font-size: 5px;
+          font-weight: 900;
+          letter-spacing: 0.22em;
+          background: rgba(255, 255, 255, 0.95);
+          color: #1e1b4b;
         }
       `}</style>
     </div>
@@ -1233,6 +1439,497 @@ function FestivalVibrantLayout({ design }: { design: PosterDesign }) {
           text-transform: uppercase;
           font-size: clamp(11px, 1.4vw, 14px);
           box-shadow: 0 14px 28px rgba(245, 158, 11, 0.35);
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function TestimonialQuoteLayout({ design }: { design: PosterDesign }) {
+  const a = design.accentColor;
+  return (
+    <div className="layer">
+      <div className="wash" aria-hidden />
+      <div className="top">
+        <span className="brand">{design.brandName}</span>
+        {design.offerBadge && <span className="pill">{design.offerBadge}</span>}
+      </div>
+      <div className="quoteBlock">
+        <span className="mark" aria-hidden>
+          “
+        </span>
+        <h1 className="headline">{design.headline}</h1>
+        {design.subheadline && <p className="sub">{design.subheadline}</p>}
+        <div className="stars" aria-hidden>
+          ★★★★★
+        </div>
+      </div>
+      <div className="bottom">
+        <span className="cta">{design.ctaLabel}</span>
+      </div>
+      <style jsx>{`
+        .layer {
+          position: absolute;
+          inset: 0;
+          padding: 7% 6%;
+          color: ${design.textColor};
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          font-family: var(--font-sans), system-ui;
+          background: linear-gradient(165deg, rgba(15, 118, 110, 0.25) 0%, rgba(15, 23, 42, 0.65) 45%, rgba(15, 23, 42, 0.88) 100%);
+        }
+        .wash {
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(circle at 50% 20%, ${a}22, transparent 55%);
+          pointer-events: none;
+        }
+        .top {
+          position: relative;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          z-index: 1;
+        }
+        .brand {
+          font-size: clamp(11px, 1.4vw, 13px);
+          letter-spacing: 0.28em;
+          text-transform: uppercase;
+          font-weight: 700;
+          opacity: 0.92;
+        }
+        .pill {
+          font-size: clamp(10px, 1.25vw, 12px);
+          font-weight: 800;
+          padding: 7px 14px;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.16);
+          border: 1px solid rgba(255, 255, 255, 0.35);
+          letter-spacing: 0.12em;
+        }
+        .quoteBlock {
+          position: relative;
+          z-index: 1;
+          text-align: center;
+          max-width: 92%;
+          margin: 0 auto;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 10px;
+        }
+        .mark {
+          font-family: var(--font-playfair), Georgia, serif;
+          font-size: clamp(72px, 18vw, 160px);
+          line-height: 0.65;
+          color: ${a};
+          opacity: 0.35;
+          user-select: none;
+        }
+        .headline {
+          margin: 0;
+          font-family: var(--font-playfair), Georgia, serif;
+          font-style: italic;
+          font-weight: 700;
+          font-size: clamp(28px, 6vw, 56px);
+          line-height: 1.06;
+          text-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+        }
+        .sub {
+          margin: 0;
+          font-size: clamp(13px, 1.85vw, 17px);
+          font-weight: 500;
+          max-width: 88%;
+          opacity: 0.9;
+          line-height: 1.4;
+        }
+        .stars {
+          font-size: clamp(13px, 2vw, 18px);
+          letter-spacing: 0.35em;
+          color: ${a};
+          opacity: 0.95;
+        }
+        .bottom {
+          display: flex;
+          justify-content: center;
+          z-index: 1;
+          position: relative;
+        }
+        .cta {
+          padding: 12px 24px;
+          border-radius: 999px;
+          font-weight: 800;
+          letter-spacing: 0.22em;
+          text-transform: uppercase;
+          font-size: clamp(10px, 1.35vw, 13px);
+          background: rgba(255, 255, 255, 0.12);
+          border: 2px solid ${a};
+          color: ${design.textColor};
+          box-shadow: 0 10px 32px rgba(0, 0, 0, 0.25);
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function ImageFirstLayout({ design }: { design: PosterDesign }) {
+  const a = design.accentColor;
+  return (
+    <div className="layer">
+      <div className="frame">
+        <div className="frameInner" />
+      </div>
+      <div className="dock">
+        <div className="accentBar" />
+        <div className="dockText">
+          <div className="rowTop">
+            <span className="brand">{design.brandName}</span>
+            {design.offerBadge && <span className="badge">{design.offerBadge}</span>}
+          </div>
+          <h1 className="headline">{design.headline}</h1>
+          {design.subheadline && <p className="sub">{design.subheadline}</p>}
+        </div>
+        <span className="cta" aria-hidden={false}>
+          {design.ctaLabel}
+        </span>
+      </div>
+      <style jsx>{`
+        .layer {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          flex-direction: column;
+          justify-content: flex-end;
+          color: ${design.textColor};
+          font-family: var(--font-sans), system-ui;
+        }
+        .frame {
+          position: absolute;
+          inset: 0;
+          bottom: 30%;
+          padding: 6% 7% 0;
+        }
+        .frameInner {
+          width: 100%;
+          height: 100%;
+          border-radius: 22px 22px 0 0;
+          border: 3px solid rgba(255, 255, 255, 0.22);
+          border-bottom: none;
+          box-shadow: inset 0 -40px 80px rgba(0, 0, 0, 0.28);
+          background: linear-gradient(
+            180deg,
+            rgba(255, 255, 255, 0.08) 0%,
+            rgba(15, 23, 42, 0.12) 100%
+          );
+        }
+        .dock {
+          position: relative;
+          min-height: 30%;
+          margin-top: auto;
+          padding: 5% 7% 6%;
+          display: grid;
+          grid-template-columns: 6px 1fr auto;
+          gap: 14px;
+          align-items: center;
+          background: linear-gradient(180deg, rgba(2, 6, 23, 0.2) 0%, rgba(2, 6, 23, 0.88) 85%);
+          border-top: 2px solid ${a};
+        }
+        .accentBar {
+          width: 100%;
+          height: 76%;
+          border-radius: 999px;
+          background: linear-gradient(180deg, ${a}, ${a}aa);
+          box-shadow: 0 0 24px ${a}55;
+        }
+        .dockText {
+          min-width: 0;
+        }
+        .rowTop {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 8px;
+        }
+        .brand {
+          font-size: clamp(11px, 1.35vw, 13px);
+          letter-spacing: 0.34em;
+          text-transform: uppercase;
+          font-weight: 700;
+          opacity: 0.92;
+        }
+        .badge {
+          font-size: clamp(10px, 1.2vw, 12px);
+          font-weight: 900;
+          background: ${a};
+          color: #0f172a;
+          padding: 6px 12px;
+          border-radius: 8px;
+          letter-spacing: 0.1em;
+        }
+        .headline {
+          margin: 0;
+          font-family: var(--font-archivo-black), Impact, sans-serif;
+          font-size: clamp(26px, 6.4vw, 58px);
+          line-height: 0.94;
+          text-transform: uppercase;
+          letter-spacing: -0.02em;
+        }
+        .sub {
+          margin: 8px 0 0;
+          font-size: clamp(11px, 1.55vw, 14px);
+          opacity: 0.88;
+          line-height: 1.38;
+          max-width: 95%;
+        }
+        .cta {
+          align-self: end;
+          border: none;
+          cursor: default;
+          font: inherit;
+          padding: 12px 16px;
+          border-radius: 14px;
+          font-weight: 900;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          font-size: clamp(9px, 1.25vw, 12px);
+          background: rgba(255, 255, 255, 0.12);
+          color: ${design.textColor};
+          border: 2px solid rgba(255, 255, 255, 0.35);
+          box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
+          white-space: nowrap;
+          max-width: 34vw;
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function OfferCardLayout({ design }: { design: PosterDesign }) {
+  const a = design.accentColor;
+  return (
+    <div className="layer">
+      <div className="backdrop" aria-hidden />
+      <div className="card">
+        <span className="brand">{design.brandName}</span>
+        {design.offerBadge && <span className="ribbon">{design.offerBadge}</span>}
+        <h1 className="headline">{design.headline}</h1>
+        {design.subheadline && <p className="sub">{design.subheadline}</p>}
+        <span className="cta">{design.ctaLabel}</span>
+      </div>
+      <style jsx>{`
+        .layer {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          padding: 6%;
+          color: ${design.textColor};
+          font-family: var(--font-sans), system-ui;
+        }
+        .backdrop {
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(circle at 30% 20%, ${a}30, transparent 50%),
+            radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.1), transparent 45%);
+          pointer-events: none;
+        }
+        .card {
+          position: relative;
+          width: min(94%, 420px);
+          padding: clamp(18px, 4.5vw, 32px) clamp(16px, 4vw, 28px);
+          border-radius: 28px;
+          background: rgba(15, 23, 42, 0.5);
+          border: 3px solid ${a};
+          box-shadow:
+            0 24px 60px rgba(0, 0, 0, 0.45),
+            inset 0 1px 0 rgba(255, 255, 255, 0.12);
+          backdrop-filter: blur(10px);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          text-align: center;
+          gap: clamp(12px, 2.5vw, 18px);
+        }
+        .brand {
+          font-size: clamp(11px, 1.4vw, 13px);
+          letter-spacing: 0.42em;
+          text-transform: uppercase;
+          font-weight: 700;
+          opacity: 0.92;
+        }
+        .ribbon {
+          font-weight: 900;
+          letter-spacing: 0.18em;
+          font-size: clamp(10px, 1.3vw, 12px);
+          background: linear-gradient(90deg, ${a}, rgba(255, 255, 255, 0.92));
+          color: #0f172a;
+          padding: 8px 20px;
+          border-radius: 999px;
+          text-transform: uppercase;
+        }
+        .headline {
+          margin: 0;
+          font-family: var(--font-anton), Impact, sans-serif;
+          font-size: clamp(36px, 9vw, 96px);
+          line-height: 0.93;
+          text-transform: uppercase;
+          letter-spacing: -0.01em;
+        }
+        .sub {
+          margin: 0;
+          font-size: clamp(12px, 1.6vw, 16px);
+          max-width: 92%;
+          line-height: 1.45;
+          opacity: 0.9;
+        }
+        .cta {
+          padding: 14px 28px;
+          border-radius: 16px;
+          font-weight: 900;
+          letter-spacing: 0.26em;
+          text-transform: uppercase;
+          font-size: clamp(10px, 1.35vw, 13px);
+          background: ${a};
+          color: #0f172a;
+          box-shadow: 0 16px 32px rgba(0, 0, 0, 0.28);
+          border: none;
+          margin-top: 4px;
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function SocialStackLayout({ design }: { design: PosterDesign }) {
+  const a = design.accentColor;
+  return (
+    <div className="layer">
+      <div className="rail" aria-hidden />
+      <div className="content">
+        <div className="top">
+          <span className="handle">{design.brandName}</span>
+          {design.offerBadge && (
+            <span className="tag">
+              <span className="tagDot" />
+              {design.offerBadge}
+            </span>
+          )}
+        </div>
+        <div className="bubble">
+          <h1 className="headline">{design.headline}</h1>
+          {design.subheadline && <p className="sub">{design.subheadline}</p>}
+        </div>
+        <div className="dock">
+          <span className="sticker">{design.ctaLabel}</span>
+        </div>
+      </div>
+      <style jsx>{`
+        .layer {
+          position: absolute;
+          inset: 0;
+          color: ${design.textColor};
+          font-family: var(--font-sans), system-ui;
+          padding: 0;
+          overflow: hidden;
+        }
+        .rail {
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          width: 13%;
+          background: linear-gradient(180deg, ${a}, rgba(139, 92, 246, 0.85));
+          box-shadow: 8px 0 36px rgba(0, 0, 0, 0.25);
+          z-index: 0;
+        }
+        .content {
+          position: relative;
+          z-index: 1;
+          margin-left: 13%;
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          padding: 6% 6% 7% 5%;
+          background: linear-gradient(135deg, rgba(30, 27, 75, 0.35) 0%, rgba(15, 23, 42, 0.7) 100%);
+        }
+        .top {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 10px;
+        }
+        .handle {
+          font-family: var(--font-mono), monospace;
+          font-size: clamp(12px, 1.65vw, 15px);
+          font-weight: 700;
+          letter-spacing: -0.01em;
+        }
+        .tag {
+          font-size: clamp(10px, 1.25vw, 12px);
+          font-weight: 800;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 12px;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.1);
+          border: 1px solid rgba(255, 255, 255, 0.26);
+          letter-spacing: 0.1em;
+        }
+        .tagDot {
+          width: 7px;
+          height: 7px;
+          border-radius: 999px;
+          background: ${a};
+          box-shadow: 0 0 10px ${a};
+        }
+        .bubble {
+          flex: 1;
+          margin-top: clamp(22px, 5vw, 36px);
+          padding: clamp(22px, 5vw, 36px);
+          border-radius: 22px;
+          background: rgba(255, 255, 255, 0.1);
+          border: 2px solid rgba(255, 255, 255, 0.18);
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          gap: 12px;
+        }
+        .headline {
+          margin: 0;
+          font-family: var(--font-archivo-black), Impact, sans-serif;
+          font-size: clamp(30px, 7.8vw, 72px);
+          line-height: 0.93;
+          text-transform: uppercase;
+          letter-spacing: -0.02em;
+        }
+        .sub {
+          margin: 0;
+          font-size: clamp(12px, 1.6vw, 16px);
+          line-height: 1.4;
+          opacity: 0.9;
+          max-width: 95%;
+        }
+        .dock {
+          padding-top: 6%;
+          display: flex;
+          justify-content: center;
+        }
+        .sticker {
+          display: inline-block;
+          padding: 14px clamp(26px, 8vw, 44px);
+          border-radius: 999px;
+          font-weight: 900;
+          letter-spacing: 0.34em;
+          text-transform: uppercase;
+          font-size: clamp(9px, 1.35vw, 12px);
+          background: rgba(255, 255, 255, 0.95);
+          color: #1e1b4b;
+          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.32);
+          border: 3px dashed rgba(139, 92, 246, 0.45);
         }
       `}</style>
     </div>

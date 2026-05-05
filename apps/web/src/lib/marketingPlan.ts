@@ -4,18 +4,28 @@ export type MarketingPlanDay = {
   dayNumber: number;
   dateISO: string;
   dateLabel: string;
+  /** Promo | ProductHighlight | Testimonial | BTS | Engagement | WeekendSpecial | GrowthPush — per-day poster campaign tag */
+  dayTheme?: string;
   mainActionTitle: string;
   businessGrowthAction: string;
   marketingActivation?: {
+    platform?: "Instagram" | "Facebook" | "Both";
+    format?: "Reel" | "Story" | "Feed" | "Carousel";
+    bestTime?: string;
+    goal?: "DMs" | "Orders" | "Bookings" | "Footfall" | "Leads";
+    postBrief?: string;
+    hook?: string;
+    visualGuide?: string[];
+    posterHeadlineHint?: string;
     channel?: "instagram" | "facebook" | "both";
     formatPlan?: Array<"Reel" | "Story" | "FeedPost" | "Carousel">;
     contentBrief?: string;
-    visualGuide?: string;
     postIdea: string;
     caption: string;
     hashtags: string[];
     postingTime?: string;
     cta?: string;
+    matchNote?: string;
     storyFrames?: string[];
     reelScript?: {
       hook: string;
@@ -23,6 +33,7 @@ export type MarketingPlanDay = {
       cta: string;
     };
     posterHint?: string;
+    offerDeadlineHint?: string;
   };
   executionSteps: string[];
   postIdea: string;
@@ -90,10 +101,15 @@ export function buildLifecyclePlanDays(
     const date = new Date(start);
     date.setDate(start.getDate() + index);
     const raw = rawPlanDays[index] ?? {};
+    const dayTheme =
+      typeof (raw as { dayTheme?: unknown }).dayTheme === "string" && String((raw as { dayTheme: string }).dayTheme).trim()
+        ? String((raw as { dayTheme: string }).dayTheme).trim()
+        : "";
     return {
       dayNumber,
       dateISO: toISODateString(date),
       dateLabel: typeof raw.dateLabel === "string" && raw.dateLabel.trim() ? raw.dateLabel : toDateLabel(date),
+      ...(dayTheme ? { dayTheme } : {}),
       mainActionTitle: typeof raw.mainActionTitle === "string" ? raw.mainActionTitle : `Day ${dayNumber} Growth Action`,
       businessGrowthAction: typeof raw.businessGrowthAction === "string" ? raw.businessGrowthAction : "",
       marketingActivation:
@@ -114,8 +130,43 @@ export function buildLifecyclePlanDays(
                     "Reel" | "Story" | "FeedPost" | "Carousel"
                   >)
                 : [],
+              platform: ["Instagram", "Facebook", "Both"].includes(
+                String((raw.marketingActivation as Record<string, unknown>).platform ?? ""),
+              )
+                ? (String((raw.marketingActivation as Record<string, unknown>).platform ?? "") as
+                    | "Instagram"
+                    | "Facebook"
+                    | "Both")
+                : "Both",
+              format: ["Reel", "Story", "Feed", "Carousel"].includes(
+                String((raw.marketingActivation as Record<string, unknown>).format ?? ""),
+              )
+                ? (String((raw.marketingActivation as Record<string, unknown>).format ?? "") as
+                    | "Reel"
+                    | "Story"
+                    | "Feed"
+                    | "Carousel")
+                : "Feed",
+              bestTime: String((raw.marketingActivation as Record<string, unknown>).bestTime ?? ""),
+              goal: ["DMs", "Orders", "Bookings", "Footfall", "Leads"].includes(
+                String((raw.marketingActivation as Record<string, unknown>).goal ?? ""),
+              )
+                ? (String((raw.marketingActivation as Record<string, unknown>).goal ?? "") as
+                    | "DMs"
+                    | "Orders"
+                    | "Bookings"
+                    | "Footfall"
+                    | "Leads")
+                : "Leads",
+              postBrief: String((raw.marketingActivation as Record<string, unknown>).postBrief ?? ""),
+              hook: String((raw.marketingActivation as Record<string, unknown>).hook ?? ""),
               contentBrief: String((raw.marketingActivation as Record<string, unknown>).contentBrief ?? ""),
-              visualGuide: String((raw.marketingActivation as Record<string, unknown>).visualGuide ?? ""),
+              visualGuide: Array.isArray((raw.marketingActivation as Record<string, unknown>).visualGuide)
+                ? ((raw.marketingActivation as Record<string, unknown>).visualGuide as unknown[])
+                    .map((s) => String(s))
+                    .slice(0, 2)
+                : [],
+              posterHeadlineHint: String((raw.marketingActivation as Record<string, unknown>).posterHeadlineHint ?? ""),
               postIdea: String((raw.marketingActivation as Record<string, unknown>).postIdea ?? ""),
               caption: String((raw.marketingActivation as Record<string, unknown>).caption ?? ""),
               hashtags: Array.isArray((raw.marketingActivation as Record<string, unknown>).hashtags)
@@ -123,6 +174,7 @@ export function buildLifecyclePlanDays(
                 : [],
               postingTime: String((raw.marketingActivation as Record<string, unknown>).postingTime ?? ""),
               cta: String((raw.marketingActivation as Record<string, unknown>).cta ?? ""),
+              matchNote: String((raw.marketingActivation as Record<string, unknown>).matchNote ?? ""),
               storyFrames: Array.isArray((raw.marketingActivation as Record<string, unknown>).storyFrames)
                 ? ((raw.marketingActivation as Record<string, unknown>).storyFrames as unknown[]).map((s) => String(s))
                 : [],
@@ -150,6 +202,11 @@ export function buildLifecyclePlanDays(
                     }
                   : undefined,
               posterHint: String((raw.marketingActivation as Record<string, unknown>).posterHint ?? ""),
+              ...(String((raw.marketingActivation as Record<string, unknown>).offerDeadlineHint ?? "").trim()
+                ? {
+                    offerDeadlineHint: String((raw.marketingActivation as Record<string, unknown>).offerDeadlineHint ?? "").trim(),
+                  }
+                : {}),
             }
           : undefined,
       executionSteps: Array.isArray(raw.executionSteps) ? raw.executionSteps.map((s) => String(s)) : [],

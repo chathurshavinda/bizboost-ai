@@ -449,7 +449,7 @@ export default function Home() {
           </section>
         </FadeUp>
 
-        <footer id="contact" className="homeFooter">
+        <footer className="homeFooter">
           <div className="homeFooterTop">
             <div className="homeFooterBrand">
               <Image src="/bizboost-mark.png" alt="BizBoost mark" width={36} height={36} className="homeFooterLogo" />
@@ -459,7 +459,13 @@ export default function Home() {
               <Link href="/">Home</Link>
               <Link href="/#features">Features</Link>
               <Link href="/#about">About</Link>
-              <Link href="/#contact">Contact</Link>
+              <a
+                href="https://docs.google.com/forms/d/e/1FAIpQLSdcpfUEm9IjNt_b8HuKxofOL5L4i0OBwukpgiQSHe7P1fsEEg/viewform?usp=publish-editor"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Contact
+              </a>
             </nav>
             <nav className="homeFooterLegal" aria-label="Legal">
               <Link href="/terms">Terms</Link>

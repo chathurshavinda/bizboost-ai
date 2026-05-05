@@ -5,13 +5,15 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/src/lib/useAuth";
 import {
   DEFAULT_POSTER_DESIGN,
-  POSTER_STYLES,
   POSTER_STYLE_META,
   PosterDesign,
   PosterStyle,
-  PosterStyleSwatch,
   PosterTemplate,
 } from "@/src/components/poster/PosterTemplate";
+import { PosterTemplatePicker } from "@/src/components/poster/PosterTemplatePicker";
+import { getPosterTemplateById } from "@/src/lib/posterTemplateCatalog";
+import { pickPosterTemplateForContext } from "@/src/lib/posterTemplateSelection";
+import { buildPosterSeedFromPlan, pickBrandAccentHex } from "@/src/lib/posterDayTheme";
 
 type BusinessProfile = {
   businessName?: string;
@@ -26,15 +28,76 @@ type BusinessProfile = {
   language?: string;
 };
 
+type MarketingActivationBrief = {
+  postBrief?: string;
+  contentBrief?: string;
+  hook?: string;
+  cta?: string;
+  format?: string;
+  platform?: string;
+  visualGuide?: string[];
+  posterHeadlineHint?: string;
+  postIdea?: string;
+  caption?: string;
+  posterHint?: string;
+  offerDeadlineHint?: string;
+};
+
 type DayPlan = {
   dayNumber: number;
+  dayTheme?: string;
   mainActionTitle?: string;
   businessGrowthAction?: string;
   postIdea?: string;
   caption?: string;
   posterHint?: string;
   hashtags?: string[];
+  marketingActivation?: MarketingActivationBrief;
 };
+
+function mapActivationToApi(ma: MarketingActivationBrief | null): {
+  activationPostBrief: string;
+  activationHook: string;
+  activationCta: string;
+  activationFormat: string;
+  activationPlatform: string;
+  activationVisualSummary: string;
+  activationPosterHint: string;
+  activationOfferDeadline: string;
+} {
+  if (!ma) {
+    return {
+      activationPostBrief: "",
+      activationHook: "",
+      activationCta: "",
+      activationFormat: "",
+      activationPlatform: "",
+      activationVisualSummary: "",
+      activationPosterHint: "",
+      activationOfferDeadline: "",
+    };
+  }
+  const visual = Array.isArray(ma.visualGuide)
+    ? ma.visualGuide.filter((x) => typeof x === "string" && x.trim()).slice(0, 3).join(" | ")
+    : "";
+  return {
+    activationPostBrief: (ma.postBrief || ma.contentBrief || "").trim(),
+    activationHook: (ma.hook || "").trim(),
+    activationCta: (ma.cta || "").trim(),
+    activationFormat: String(ma.format ?? "").trim(),
+    activationPlatform: String(ma.platform ?? "").trim(),
+    activationVisualSummary: visual,
+    activationPosterHint: (ma.posterHeadlineHint || "").trim(),
+    activationOfferDeadline: (ma.offerDeadlineHint || "").trim(),
+  };
+}
+
+function buildPhotoContextLine(hasImage: boolean, imageFileName: string): string {
+  if (hasImage && imageFileName.trim())
+    return `Owner-uploaded photo (${imageFileName.trim()}) for today's planned post — keep typography readable on this image.`;
+  if (hasImage) return `Owner-uploaded photo for today's planned post — keep typography readable on this image.`;
+  return "A real photo uploaded by the business owner";
+}
 
 function parseCaptionAndHashtags(text: string): { caption: string; hashtags: string[] } {
   const safe = (text || "").replace(/\r\n/g, "\n").trim();
@@ -57,12 +120,48 @@ function parseCaptionAndHashtags(text: string): { caption: string; hashtags: str
   };
 }
 
+function mergePosterWithBrandLocks(
+  style: PosterStyle,
+  accentHex: string,
+  ai: PosterDesign | null | undefined,
+  fallback: PosterDesign,
+): PosterDesign {
+  const base = { ...fallback };
+  if (!ai) {
+    return { ...base, style, accentColor: accentHex };
+  }
+  return {
+    ...ai,
+    style,
+    accentColor: accentHex,
+    templateId: fallback.templateId,
+  };
+}
+
+/** Short hint for Gemini from catalog entry (poster-design prompts). */
+function aiPosterCatalogMeta(templateId?: string): { posterTemplateId?: string; posterTemplateHint?: string } {
+  const def = templateId ? getPosterTemplateById(templateId) : null;
+  if (!def) return {};
+  return {
+    posterTemplateId: def.id,
+    posterTemplateHint: `${def.name} — ${def.recommendedUse} Layout renderer: "${def.layoutType}". Tags: ${def.styleTags.join(", ")}.`,
+  };
+}
+
 function buildBusinessDetailsPayload(
   business: BusinessProfile | null,
   offerText: string,
   dayPlanSummary: string,
   photoContext: string,
   finalCaption: string,
+  activation: MarketingActivationBrief | null,
+  posterMeta?: {
+    /** Promo | … | GrowthPush — matches today's generator field */
+    dayTheme?: string;
+    brandAccentLocked?: string;
+    posterTemplateId?: string;
+    posterTemplateHint?: string;
+  },
 ): {
   ok: true;
   payload: {
@@ -79,6 +178,18 @@ function buildBusinessDetailsPayload(
     photoContext: string;
     finalCaption?: string;
     tone: string;
+    activationPostBrief: string;
+    activationHook: string;
+    activationCta: string;
+    activationFormat: string;
+    activationPlatform: string;
+    activationVisualSummary: string;
+    activationPosterHint: string;
+    activationOfferDeadline: string;
+    dayTheme?: string;
+    brandAccentLocked?: string;
+    posterTemplateId?: string;
+    posterTemplateHint?: string;
   };
 } | { ok: false; missing: string[] } {
   const businessName = business?.businessName?.trim() || "";
@@ -105,6 +216,9 @@ function buildBusinessDetailsPayload(
     return { ok: false, missing };
   }
 
+  const activationFields = mapActivationToApi(activation);
+  const trimmedTheme = posterMeta?.dayTheme?.trim() ?? "";
+
   return {
     ok: true,
     payload: {
@@ -121,6 +235,13 @@ function buildBusinessDetailsPayload(
       photoContext,
       finalCaption: finalCaption || undefined,
       tone: "Friendly and professional",
+      ...activationFields,
+      ...(trimmedTheme ? { dayTheme: trimmedTheme } : {}),
+      ...(posterMeta?.brandAccentLocked && /^#[0-9a-fA-F]{6}$/i.test(posterMeta.brandAccentLocked)
+        ? { brandAccentLocked: posterMeta.brandAccentLocked }
+        : {}),
+      ...(posterMeta?.posterTemplateId?.trim() ? { posterTemplateId: posterMeta.posterTemplateId.trim() } : {}),
+      ...(posterMeta?.posterTemplateHint?.trim() ? { posterTemplateHint: posterMeta.posterTemplateHint.trim() } : {}),
     },
   };
 }
@@ -145,6 +266,8 @@ export default function BizEditorPage() {
       postIdea: searchParams.get("postIdea") ?? "",
       mainActionTitle: searchParams.get("mainActionTitle") ?? "",
       posterHint: searchParams.get("posterHint") ?? "",
+      dayTheme: searchParams.get("dayTheme") ?? "",
+      offerDeadlineHint: searchParams.get("offerDeadlineHint") ?? "",
       reelScript: searchParams.get("reelScript") ?? "",
       storyFrames: searchParams.get("storyFrames") ?? "",
       backTo: searchParams.get("backTo") ?? "",
@@ -155,6 +278,8 @@ export default function BizEditorPage() {
       fromQuery.postIdea.trim() ||
       fromQuery.mainActionTitle.trim() ||
       fromQuery.posterHint.trim() ||
+      fromQuery.dayTheme.trim() ||
+      fromQuery.offerDeadlineHint.trim() ||
       fromQuery.reelScript.trim() ||
       fromQuery.storyFrames.trim() ||
       fromQuery.backTo.trim();
@@ -169,6 +294,8 @@ export default function BizEditorPage() {
         postIdea?: string;
         mainActionTitle?: string;
         posterHint?: string;
+        dayTheme?: string;
+        offerDeadlineHint?: string;
         reelScript?: string;
         storyFrames?: string;
         backTo?: string;
@@ -179,6 +306,8 @@ export default function BizEditorPage() {
         postIdea: typeof parsed.postIdea === "string" ? parsed.postIdea : "",
         mainActionTitle: typeof parsed.mainActionTitle === "string" ? parsed.mainActionTitle : "",
         posterHint: typeof parsed.posterHint === "string" ? parsed.posterHint : "",
+        dayTheme: typeof parsed.dayTheme === "string" ? parsed.dayTheme : "",
+        offerDeadlineHint: typeof parsed.offerDeadlineHint === "string" ? parsed.offerDeadlineHint : "",
         reelScript: typeof parsed.reelScript === "string" ? parsed.reelScript : "",
         storyFrames: typeof parsed.storyFrames === "string" ? parsed.storyFrames : "",
         backTo: typeof parsed.backTo === "string" ? parsed.backTo : "",
@@ -202,6 +331,12 @@ export default function BizEditorPage() {
     return "/marketing-plan";
   }, [editorContext.backTo, dayParam]);
 
+  const [planDayThemeFromApi, setPlanDayThemeFromApi] = useState("");
+  const campaignDayTheme = useMemo(() => editorContext.dayTheme.trim() || planDayThemeFromApi.trim(), [
+    editorContext.dayTheme,
+    planDayThemeFromApi,
+  ]);
+
   const [loading, setLoading] = useState(true);
   const [showMissingBusinessModal, setShowMissingBusinessModal] = useState(false);
 
@@ -220,12 +355,44 @@ export default function BizEditorPage() {
   const [generatingAi, setGeneratingAi] = useState(false);
   const [suggestingCaption, setSuggestingCaption] = useState(false);
   const [dayPlanSummary, setDayPlanSummary] = useState("");
+  const [marketingActivation, setMarketingActivation] = useState<MarketingActivationBrief | null>(null);
   const [captionAutoSuggested, setCaptionAutoSuggested] = useState(false);
   const [posterDesign, setPosterDesign] = useState<PosterDesign>(DEFAULT_POSTER_DESIGN);
+  /** Catalog id from `pickPosterTemplateForContext` at hydration — shown as “Recommended” on the picker. */
+  const [recommendedTemplateId, setRecommendedTemplateId] = useState<string | null>(null);
   const [designLoading, setDesignLoading] = useState(false);
+  const [posterVariantChoices, setPosterVariantChoices] = useState<[PosterDesign | null, PosterDesign | null]>([
+    null,
+    null,
+  ]);
+  const [variantGenerating, setVariantGenerating] = useState(false);
+
+  const lockedBrandAccent = useMemo(
+    () => pickBrandAccentHex(business?.businessName ?? ""),
+    [business?.businessName],
+  );
+
+  const activationForPoster = useMemo((): MarketingActivationBrief | null => {
+    const hint = editorContext.offerDeadlineHint.trim();
+    if (!marketingActivation && !hint) return null;
+    if (!marketingActivation) return { offerDeadlineHint: hint };
+    if (!hint) return marketingActivation;
+    const existing = marketingActivation.offerDeadlineHint?.trim();
+    return existing ? marketingActivation : { ...marketingActivation, offerDeadlineHint: hint };
+  }, [marketingActivation, editorContext.offerDeadlineHint]);
 
   useEffect(() => {
-    if (!queryPostIdea && !queryActionTitle && !queryCaption && !queryPosterHint && !queryReelScript && !queryStoryFrames) return;
+    if (
+      !queryPostIdea &&
+      !queryActionTitle &&
+      !queryCaption &&
+      !queryPosterHint &&
+      !editorContext.dayTheme.trim() &&
+      !editorContext.offerDeadlineHint.trim() &&
+      !queryReelScript &&
+      !queryStoryFrames
+    )
+      return;
     const parsedReel = (() => {
       try {
         return queryReelScript ? JSON.parse(queryReelScript) as { hook?: string; beats?: string[]; cta?: string } : null;
@@ -254,12 +421,35 @@ export default function BizEditorPage() {
       if (!socialAppendix) return base;
       return `${base}${base ? "\n\n" : ""}${socialAppendix}`;
     });
-    setPosterDesign((prev) => ({
-      ...prev,
-      headline: queryActionTitle || prev.headline,
-      subheadline: queryPostIdea || prev.subheadline,
-      offerBadge: queryPosterHint || prev.offerBadge,
-    }));
+    if (dayParam <= 0) {
+      const themeForStandalone = editorContext.dayTheme.trim() || undefined;
+      const bn = business?.businessName?.trim() || "";
+      const bt = business?.businessType?.trim() || "";
+      const shouldPickTheme = !!(bn || themeForStandalone);
+      const picked = shouldPickTheme
+        ? pickPosterTemplateForContext({ dayTheme: themeForStandalone, dayNumber: 1, businessType: bt })
+        : null;
+      const stylePick = picked?.layoutType ?? DEFAULT_POSTER_DESIGN.style;
+      const accent = bn ? pickBrandAccentHex(bn) : DEFAULT_POSTER_DESIGN.accentColor;
+      const hint = editorContext.offerDeadlineHint.trim();
+      const standaloneMa = hint ? ({ offerDeadlineHint: hint } as MarketingActivationBrief) : null;
+      const seed = buildPosterSeedFromPlan({
+        businessName: bn || "Your Brand",
+        caption: queryCaption || queryPostIdea || "",
+        marketingActivation: standaloneMa,
+        mainActionTitle: queryActionTitle,
+        posterHintFallback: queryPosterHint,
+      });
+      setPosterDesign((prev) => ({
+        ...DEFAULT_POSTER_DESIGN,
+        ...prev,
+        ...seed,
+        style: stylePick as PosterDesign["style"],
+        ...(picked ? { templateId: picked.id } : {}),
+        accentColor: accent,
+      }));
+      setRecommendedTemplateId(picked?.id ?? null);
+    }
     setDayPlanSummary((prev) => {
       if (prev.trim()) return prev;
       const chunks = [
@@ -269,7 +459,19 @@ export default function BizEditorPage() {
       ].filter(Boolean);
       return chunks.join(". ");
     });
-  }, [queryActionTitle, queryCaption, queryPostIdea, queryPosterHint, queryReelScript, queryStoryFrames]);
+  }, [
+    queryActionTitle,
+    queryCaption,
+    queryPostIdea,
+    queryPosterHint,
+    queryReelScript,
+    queryStoryFrames,
+    dayParam,
+    business?.businessName,
+    editorContext.dayTheme,
+    editorContext.offerDeadlineHint,
+    business?.businessType,
+  ]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -281,6 +483,7 @@ export default function BizEditorPage() {
     const load = async () => {
       setLoading(true);
       try {
+        setPlanDayThemeFromApi("");
         const businessRes = await fetch(`/api/business-profile?firebase_uid=${encodeURIComponent(user.uid)}`, { cache: "no-store" });
         const businessJson = await businessRes.json();
 
@@ -303,15 +506,40 @@ export default function BizEditorPage() {
             const safePlan = Array.isArray(latestJson?.data?.planData) ? latestJson?.data?.planData : [];
             const dayItem = safePlan.find((item) => Number(item.dayNumber) === dayParam);
             if (dayItem) {
+              const bizNameSeed = String(businessJson?.data?.businessName ?? "").trim();
+              const ma = dayItem.marketingActivation && typeof dayItem.marketingActivation === "object" ? dayItem.marketingActivation : null;
+              const themeForStyle =
+                editorContext.dayTheme.trim() ||
+                (typeof dayItem.dayTheme === "string" ? dayItem.dayTheme.trim() : "") ||
+                "";
+              setPlanDayThemeFromApi(typeof dayItem.dayTheme === "string" ? dayItem.dayTheme.trim() : "");
+              const bizTypeSeed = String(businessJson?.data?.businessType ?? "").trim();
+              const pickedTpl = pickPosterTemplateForContext({
+                dayTheme: themeForStyle || undefined,
+                dayNumber: dayParam,
+                businessType: bizTypeSeed,
+              });
+              const accent = pickBrandAccentHex(bizNameSeed || "bizboost");
+              const captionSeed = ma?.caption || dayItem.caption || "";
+              const seed = buildPosterSeedFromPlan({
+                businessName: bizNameSeed || "Your Brand",
+                caption: captionSeed,
+                marketingActivation: ma,
+                mainActionTitle: dayItem.mainActionTitle,
+                businessGrowthAction: dayItem.businessGrowthAction,
+                posterHintFallback: ma?.posterHint || dayItem.posterHint || "",
+              });
               setOfferText((prev) => prev || dayItem.mainActionTitle || dayItem.postIdea || "");
               setHashtags(Array.isArray(dayItem.hashtags) ? dayItem.hashtags : []);
               setCaption((prev) => prev || dayItem.caption || "");
-              setPosterDesign((prev) => ({
-                ...prev,
-                headline: prev.headline || dayItem.mainActionTitle || prev.headline,
-                subheadline: prev.subheadline || dayItem.postIdea || prev.subheadline,
-                offerBadge: prev.offerBadge || dayItem.posterHint || prev.offerBadge,
+              setPosterDesign(() => ({
+                ...DEFAULT_POSTER_DESIGN,
+                ...seed,
+                style: pickedTpl.layoutType,
+                templateId: pickedTpl.id,
+                accentColor: accent,
               }));
+              setRecommendedTemplateId(pickedTpl.id);
               const summaryParts = [
                 dayItem.mainActionTitle ? `Main action: ${dayItem.mainActionTitle}` : "",
                 dayItem.businessGrowthAction ? `Business action: ${dayItem.businessGrowthAction}` : "",
@@ -319,8 +547,17 @@ export default function BizEditorPage() {
                 `Day: ${dayItem.dayNumber}`,
               ].filter(Boolean);
               setDayPlanSummary(summaryParts.join(". "));
+              setMarketingActivation(ma);
+            } else {
+              setMarketingActivation(null);
+              setRecommendedTemplateId(null);
             }
+          } else {
+            setMarketingActivation(null);
+            setRecommendedTemplateId(null);
           }
+        } else {
+          setMarketingActivation(null);
         }
       } finally {
         setLoading(false);
@@ -328,7 +565,7 @@ export default function BizEditorPage() {
     };
 
     void load();
-  }, [authLoading, user?.uid, router, dayParam]);
+  }, [authLoading, user?.uid, router, dayParam, editorContext.dayTheme]);
 
   useEffect(() => {
     if (loading || authLoading) return;
@@ -343,8 +580,10 @@ export default function BizEditorPage() {
       business,
       offerText,
       dayPlanSummary,
-      "A real photo uploaded by the business owner",
+      buildPhotoContextLine(!!imageUrl, imageName),
       "",
+      activationForPoster,
+      { dayTheme: campaignDayTheme, ...aiPosterCatalogMeta(posterDesign.templateId) },
     );
     if (!prepared.ok) return;
 
@@ -384,7 +623,21 @@ export default function BizEditorPage() {
     return () => {
       cancelled = true;
     };
-  }, [loading, authLoading, business, offerText, dayPlanSummary, caption, captionAutoSuggested, hashtags]);
+  }, [
+    loading,
+    authLoading,
+    business,
+    offerText,
+    dayPlanSummary,
+    caption,
+    captionAutoSuggested,
+    hashtags,
+    activationForPoster,
+    imageUrl,
+    imageName,
+    campaignDayTheme,
+    posterDesign.templateId,
+  ]);
 
   useEffect(() => {
     if (loading || authLoading) return;
@@ -394,8 +647,14 @@ export default function BizEditorPage() {
       business,
       offerText,
       dayPlanSummary,
-      "A real photo uploaded by the business owner",
-      "",
+      buildPhotoContextLine(!!imageUrl, imageName),
+      caption.trim(),
+      activationForPoster,
+      {
+        dayTheme: campaignDayTheme,
+        brandAccentLocked: lockedBrandAccent,
+        ...aiPosterCatalogMeta(posterDesign.templateId),
+      },
     );
     if (!prepared.ok) return;
 
@@ -409,13 +668,17 @@ export default function BizEditorPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             type: "poster-design",
-            businessDetails: prepared.payload,
+            businessDetails: {
+              ...prepared.payload,
+              lockedStyle: posterDesign.style,
+            },
           }),
         });
         const json = await res.json();
         if (cancelled) return;
         if (!res.ok || !json?.ok || !json?.design) return;
-        setPosterDesign(json.design as PosterDesign);
+        const designRaw = json.design as PosterDesign;
+        setPosterDesign((prev) => mergePosterWithBrandLocks(prev.style, lockedBrandAccent, designRaw, prev));
       } catch {
       } finally {
         if (!cancelled) setDesignLoading(false);
@@ -427,7 +690,84 @@ export default function BizEditorPage() {
     return () => {
       cancelled = true;
     };
-  }, [loading, authLoading, business, offerText, dayPlanSummary]);
+  }, [
+    loading,
+    authLoading,
+    business,
+    offerText,
+    dayPlanSummary,
+    activationForPoster,
+    caption,
+    imageUrl,
+    imageName,
+    posterDesign.style,
+    posterDesign.templateId,
+    lockedBrandAccent,
+    campaignDayTheme,
+  ]);
+
+  async function regeneratePosterVariants() {
+    if (!business) return;
+    const prepared = buildBusinessDetailsPayload(
+      business,
+      offerText,
+      dayPlanSummary,
+      buildPhotoContextLine(!!imageUrl, imageName),
+      caption.trim(),
+      activationForPoster,
+      {
+        dayTheme: campaignDayTheme,
+        brandAccentLocked: lockedBrandAccent,
+        ...aiPosterCatalogMeta(posterDesign.templateId),
+      },
+    );
+    if (!prepared.ok) return;
+
+    try {
+      setVariantGenerating(true);
+      const snapshotStyle = posterDesign.style;
+      const base = {
+        ...prepared.payload,
+        lockedStyle: snapshotStyle,
+      };
+      async function fetchOne(seed: string) {
+        const res = await fetch("/api/ai/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "poster-design",
+            businessDetails: {
+              ...base,
+              avoidHeadline: posterDesign.headline.trim(),
+              avoidSubheadline: posterDesign.subheadline.trim(),
+              variationHint: seed,
+            },
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok || !json?.ok || !json?.design) return null;
+        return json.design as PosterDesign;
+      }
+      const results = await Promise.all([
+        fetchOne("Variant A: tighten urgency and one credible proof cue — still one coherent campaign."),
+        fetchOne("Variant B: warmer benefit-led angle and conversational CTA — same offer, different tone."),
+      ]);
+      const [a, b] = results;
+      setPosterVariantChoices([
+        a ? mergePosterWithBrandLocks(snapshotStyle, lockedBrandAccent, a, posterDesign) : null,
+        b ? mergePosterWithBrandLocks(snapshotStyle, lockedBrandAccent, b, posterDesign) : null,
+      ]);
+    } finally {
+      setVariantGenerating(false);
+    }
+  }
+
+  function applyPosterVariant(ix: 0 | 1) {
+    const choice = posterVariantChoices[ix];
+    if (!choice) return;
+    setPosterDesign(choice);
+    setPosterVariantChoices([null, null]);
+  }
 
   function readFile(file: File) {
     const url = URL.createObjectURL(file);
@@ -464,6 +804,8 @@ export default function BizEditorPage() {
       dayPlanSummary,
       imageName ? `Uploaded photo: ${imageName}` : "A real photo uploaded by the business owner",
       caption.trim(),
+      activationForPoster,
+      { dayTheme: campaignDayTheme, ...aiPosterCatalogMeta(posterDesign.templateId) },
     );
 
     if (!prepared.ok) {
@@ -656,29 +998,63 @@ export default function BizEditorPage() {
             <div>
               <h2>Poster Preview</h2>
               <p className="previewHint">
-                Pick a design style. Your photo stays — only the typography & layout change.
+                Browse templates by category below — typography uses the shared BizBoost layout system so branding stays cohesive.
               </p>
+              {campaignDayTheme ? (
+                <p className="themeBadge">Poster theme from plan · {campaignDayTheme}</p>
+              ) : null}
             </div>
-            {designLoading ? <span className="designBadge">Designing...</span> : null}
+            {designLoading || variantGenerating ? (
+              <span className="designBadge">{variantGenerating ? "Variants…" : "Designing…"}</span>
+            ) : null}
           </div>
 
-          <div className="stylePicker">
-            {POSTER_STYLES.map((style) => (
-              <PosterStyleSwatch
-                key={style}
-                style={style as PosterStyle}
-                active={posterDesign.style === style}
-                onClick={() =>
-                  setPosterDesign((prev) => ({ ...prev, style: style as PosterStyle }))
-                }
-              />
-            ))}
+          <PosterTemplatePicker
+            selectedTemplateId={posterDesign.templateId}
+            selectedStyle={posterDesign.style}
+            recommendedTemplateId={recommendedTemplateId}
+            onPick={(id, layoutStyle) =>
+              setPosterDesign((prev) => ({ ...prev, templateId: id, style: layoutStyle }))
+            }
+          />
+
+          <div className="posterActionsRow">
+            <button
+              type="button"
+              className="secondaryBtn slimBtn"
+              onClick={() => void regeneratePosterVariants()}
+              disabled={loading || suggestingCaption || variantGenerating || designLoading || !business}
+            >
+              {variantGenerating ? "Generating variants…" : "Regenerate variation"}
+            </button>
+            {posterVariantChoices[0] || posterVariantChoices[1] ? (
+              <span className="variantPick">
+                {posterVariantChoices[0] ? (
+                  <button type="button" className="ghostMini" onClick={() => applyPosterVariant(0)}>
+                    Use option 1
+                  </button>
+                ) : null}
+                {posterVariantChoices[1] ? (
+                  <button type="button" className="ghostMini" onClick={() => applyPosterVariant(1)}>
+                    Use option 2
+                  </button>
+                ) : null}
+              </span>
+            ) : null}
           </div>
 
           <div className="activeStyleInfo">
             <span className="dot" style={{ background: POSTER_STYLE_META[posterDesign.style].vibeColor }} />
-            <strong>{POSTER_STYLE_META[posterDesign.style].label}</strong>
-            <span className="activeStyleDesc">{POSTER_STYLE_META[posterDesign.style].description}</span>
+            <div className="activeStyleTexts">
+              {posterDesign.templateId ? (
+                <strong className="templateLine">
+                  Template:{" "}
+                  {getPosterTemplateById(posterDesign.templateId)?.name ?? posterDesign.templateId}
+                </strong>
+              ) : null}
+              <strong className="layoutLine">{POSTER_STYLE_META[posterDesign.style].label}</strong>
+              <span className="activeStyleDesc">{POSTER_STYLE_META[posterDesign.style].description}</span>
+            </div>
           </div>
 
           <div className="posterStage">
@@ -724,7 +1100,7 @@ export default function BizEditorPage() {
                 />
               </label>
               <label className="tuneField">
-                <span>Accent color</span>
+                <span>Accent color (manual — AI regenerate restores brand accent)</span>
                 <input
                   type="color"
                   value={posterDesign.accentColor}
@@ -944,6 +1320,38 @@ export default function BizEditorPage() {
           line-height: 1.4;
           max-width: 380px;
         }
+        .themeBadge {
+          margin: 6px 0 0;
+          font-size: 11px;
+          font-weight: 600;
+          color: #0369a1;
+        }
+        .posterActionsRow {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 12px;
+        }
+        .slimBtn {
+          padding: 8px 12px !important;
+          font-size: 13px;
+        }
+        .variantPick {
+          display: inline-flex;
+          gap: 6px;
+          flex-wrap: wrap;
+        }
+        .ghostMini {
+          padding: 6px 12px;
+          border-radius: 999px;
+          border: 1px solid rgba(148, 163, 184, 0.55);
+          background: transparent;
+          font-weight: 600;
+          cursor: pointer;
+          font-size: 12px;
+          color: #334155;
+        }
         .designBadge {
           font-size: 11px;
           font-weight: 700;
@@ -956,20 +1364,9 @@ export default function BizEditorPage() {
           border-radius: 999px;
           flex-shrink: 0;
         }
-        .stylePicker {
-          display: grid;
-          grid-template-columns: repeat(4, minmax(0, 1fr));
-          gap: 10px;
-          margin-bottom: 12px;
-        }
-        @media (max-width: 720px) {
-          .stylePicker {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-          }
-        }
         .activeStyleInfo {
           display: flex;
-          align-items: center;
+          align-items: flex-start;
           gap: 8px;
           background: rgba(241, 245, 249, 0.8);
           border: 1px solid rgba(148, 163, 184, 0.35);
@@ -980,7 +1377,18 @@ export default function BizEditorPage() {
           color: #334155;
           flex-wrap: wrap;
         }
-        .activeStyleInfo strong {
+        .activeStyleTexts {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          min-width: 0;
+          flex: 1;
+        }
+        .activeStyleInfo .templateLine {
+          color: #0369a1;
+          font-size: 12px;
+        }
+        .activeStyleInfo .layoutLine {
           color: #0f172a;
           font-size: 13px;
         }
@@ -990,6 +1398,7 @@ export default function BizEditorPage() {
           border-radius: 999px;
           box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.6);
           flex-shrink: 0;
+          margin-top: 4px;
         }
         .activeStyleDesc {
           color: #64748b;

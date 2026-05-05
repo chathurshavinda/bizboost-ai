@@ -14,7 +14,12 @@ const NAV_LINKS = [
   { href: "/", label: "Home", match: (p: string) => p === "/" },
   { href: "/#features", label: "Features", match: () => false },
   { href: "/#about", label: "About", match: () => false },
-  { href: "/#contact", label: "Contact", match: () => false },
+  {
+    href: "https://docs.google.com/forms/d/e/1FAIpQLSdcpfUEm9IjNt_b8HuKxofOL5L4i0OBwukpgiQSHe7P1fsEEg/viewform?usp=publish-editor",
+    label: "Contact",
+    match: () => false,
+    external: true,
+  },
 ];
 
 const getInitial = (email?: string | null) =>
@@ -137,6 +142,19 @@ export default function Navbar() {
           <div className="navLinks" aria-label="Primary">
             {NAV_LINKS.map((link) => {
               const isActive = link.match(pathname ?? "");
+              if (link.external) {
+                return (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`navLink${isActive ? " navLink--active" : ""}`}
+                  >
+                    {link.label}
+                  </a>
+                );
+              }
               return (
                 <Link
                   key={link.href}
@@ -200,16 +218,29 @@ export default function Navbar() {
 
           {mobileOpen && (
             <div className="navMobileMenu" role="menu">
-              {NAV_LINKS.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="navMobileItem"
-                  onClick={() => setMobileOpen(false)}
-                >
-                  {link.label}
-                </Link>
-              ))}
+              {NAV_LINKS.map((link) =>
+                link.external ? (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="navMobileItem"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    {link.label}
+                  </a>
+                ) : (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="navMobileItem"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    {link.label}
+                  </Link>
+                ),
+              )}
 
               <span className="navMobileDivider" aria-hidden />
 

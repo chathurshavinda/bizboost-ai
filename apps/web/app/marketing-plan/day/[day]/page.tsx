@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/src/lib/useAuth";
 
@@ -8,21 +8,30 @@ type DayPlan = {
   dayNumber: number;
   dateISO?: string;
   dateLabel?: string;
+  dayTheme?: string;
   mainActionTitle?: string;
   businessGrowthAction?: string;
   executionSteps?: string[];
   postIdea?: string;
   caption?: string;
   marketingActivation?: {
+    platform?: "Instagram" | "Facebook" | "Both";
+    format?: "Reel" | "Story" | "Feed" | "Carousel";
+    bestTime?: string;
+    goal?: "DMs" | "Orders" | "Bookings" | "Footfall" | "Leads";
+    postBrief?: string;
+    hook?: string;
+    visualGuide?: string[];
+    posterHeadlineHint?: string;
     channel?: "instagram" | "facebook" | "both";
     formatPlan?: Array<"Reel" | "Story" | "FeedPost" | "Carousel">;
     contentBrief?: string;
-    visualGuide?: string;
     postIdea?: string;
     caption?: string;
     hashtags?: string[];
     postingTime?: string;
     cta?: string;
+    matchNote?: string;
     storyFrames?: string[];
     reelScript?: {
       hook?: string;
@@ -30,6 +39,7 @@ type DayPlan = {
       cta?: string;
     };
     posterHint?: string;
+    offerDeadlineHint?: string;
   };
   hashtags?: string[];
   successMetric?: string;
@@ -310,16 +320,6 @@ export default function MarketingPlanDayPage() {
     return null;
   }, [modalType, router]);
 
-  async function copyCaption() {
-    try {
-      await navigator.clipboard.writeText(currentDay?.marketingActivation?.caption ?? currentDay?.caption ?? "");
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1200);
-    } catch {
-      setCopied(false);
-    }
-  }
-
   async function toggleDayCompleted() {
     if (!user?.uid) return;
 
@@ -348,6 +348,112 @@ export default function MarketingPlanDayPage() {
   }
 
   const isCompleted = completedDays.includes(dayNumber);
+
+  const activationView = useMemo(() => {
+    if (!currentDay) return null;
+    const ma = currentDay.marketingActivation;
+    const squash = (s: string, max: number) => {
+      const t = (s || "").replace(/\s+/g, " ").trim();
+      if (!t) return "";
+      return t.length <= max ? t : `${t.slice(0, max - 1).trim()}…`;
+    };
+    const platform = ma?.platform ?? "Both";
+    const format = ma?.format ?? "Feed";
+    const bestTime = ma?.bestTime || ma?.postingTime || "7:30 PM";
+    const goal = ma?.goal ?? "Leads";
+    const whatToPost = squash(ma?.postBrief || ma?.contentBrief || ma?.postIdea || currentDay.postIdea || "", 200);
+    const hookLine = squash(ma?.hook || "", 160);
+    const whyWorks = squash(
+      ma?.matchNote || `Lines up with today's task and nudges people toward ${goal.toLowerCase()}.`,
+      190,
+    );
+    const defaultVisuals = [
+      "Show your product or service clearly with good light.",
+      "Add one short on-image line with the main benefit.",
+      "End the visual with your contact or next step.",
+    ];
+    const visuals = (ma?.visualGuide?.length ? ma.visualGuide : defaultVisuals)
+      .map((line) => squash(String(line), 150))
+      .filter(Boolean)
+      .slice(0, 3);
+    const captionText = (ma?.caption || currentDay.caption || "").trim();
+    const cta = squash(ma?.cta || "DM us to book or order.", 140);
+    const hashtags = (ma?.hashtags ?? currentDay.hashtags ?? []) as string[];
+    const storyFrames = ma?.storyFrames ?? [];
+    const reelScript = ma?.reelScript;
+    return {
+      platform,
+      format,
+      bestTime,
+      whatToPost,
+      hookLine,
+      whyWorks,
+      visuals,
+      captionText,
+      cta,
+      hashtags,
+      storyFrames,
+      reelScript,
+    };
+  }, [currentDay]);
+
+  const openBizEditor = useCallback(() => {
+    if (!currentDay) return;
+    const backTo = `/marketing-plan/day/${dayNumber}`;
+    const postIdea = currentDay.marketingActivation?.postIdea ?? currentDay.postIdea ?? "";
+    const cap = currentDay.marketingActivation?.caption ?? currentDay.caption ?? "";
+    const title = currentDay.mainActionTitle ?? "";
+    const posterHint = currentDay.marketingActivation?.posterHint ?? currentDay.posterHint ?? "";
+    const reelScript = currentDay.marketingActivation?.reelScript
+      ? JSON.stringify(currentDay.marketingActivation.reelScript)
+      : "";
+    const storyFrames = Array.isArray(currentDay.marketingActivation?.storyFrames)
+      ? JSON.stringify(currentDay.marketingActivation.storyFrames)
+      : "";
+    const businessGrowthAction = currentDay.businessGrowthAction ?? "";
+    const hashtags = (currentDay.marketingActivation?.hashtags ?? currentDay.hashtags ?? []) as string[];
+    const dayTheme = typeof currentDay.dayTheme === "string" ? currentDay.dayTheme.trim() : "";
+    const offerDeadlineHint = (currentDay.marketingActivation?.offerDeadlineHint ?? "").trim();
+    try {
+      sessionStorage.setItem(
+        "bizboost:editorDayContext",
+        JSON.stringify({
+          dayNumber,
+          backTo,
+          caption: cap,
+          postIdea,
+          mainActionTitle: title,
+          posterHint,
+          reelScript,
+          storyFrames,
+          businessGrowthAction,
+          hashtags,
+          dayTheme,
+          ...(offerDeadlineHint ? { offerDeadlineHint } : {}),
+          savedAt: Date.now(),
+        }),
+      );
+    } catch {
+      /* ignore */
+    }
+    const themeParam = dayTheme ? `&dayTheme=${encodeURIComponent(dayTheme)}` : "";
+    const deadlineParam = offerDeadlineHint ? `&offerDeadlineHint=${encodeURIComponent(offerDeadlineHint)}` : "";
+    router.push(
+      `/biz-editor?day=${dayNumber}&backTo=${encodeURIComponent(backTo)}&caption=${encodeURIComponent(cap)}&postIdea=${encodeURIComponent(postIdea)}&mainActionTitle=${encodeURIComponent(title)}&posterHint=${encodeURIComponent(posterHint)}&reelScript=${encodeURIComponent(reelScript)}&storyFrames=${encodeURIComponent(storyFrames)}${themeParam}${deadlineParam}`,
+    );
+  }, [currentDay, dayNumber, router]);
+
+  async function copyCaption() {
+    try {
+      const text = activationView?.captionText ?? currentDay?.marketingActivation?.caption ?? currentDay?.caption ?? "";
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    } catch {
+      setCopied(false);
+    }
+  }
+
   const dayDateLabel = currentDay?.dateLabel
     ? `${currentDay.dateLabel} • Day ${dayNumber}${planDays > 0 ? ` of ${planDays}` : ""}`
     : `Day ${dayNumber}`;
@@ -413,141 +519,129 @@ export default function MarketingPlanDayPage() {
             </section>
 
             <section className="card sectionActivation">
-              <div className="sectionTitleRow activationHeader">
-                <span className="pill pillActivation">2 · Marketing activation</span>
-                <h2 className="sectionH">Support your task in-market</h2>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const backTo = `/marketing-plan/day/${dayNumber}`;
-                    const postIdea = currentDay?.marketingActivation?.postIdea ?? currentDay?.postIdea ?? "";
-                    const cap = currentDay?.marketingActivation?.caption ?? currentDay?.caption ?? "";
-                    const title = currentDay?.mainActionTitle ?? "";
-                    const posterHint = currentDay?.marketingActivation?.posterHint ?? currentDay?.posterHint ?? "";
-                    const reelScript = currentDay?.marketingActivation?.reelScript
-                      ? JSON.stringify(currentDay.marketingActivation.reelScript)
-                      : "";
-                    const storyFrames = Array.isArray(currentDay?.marketingActivation?.storyFrames)
-                      ? JSON.stringify(currentDay.marketingActivation.storyFrames)
-                      : "";
-                    const businessGrowthAction = currentDay?.businessGrowthAction ?? "";
-                    const hashtags = (currentDay?.marketingActivation?.hashtags ?? currentDay?.hashtags ?? []) as string[];
-                    try {
-                      sessionStorage.setItem(
-                        "bizboost:editorDayContext",
-                        JSON.stringify({
-                          dayNumber,
-                          backTo,
-                          caption: cap,
-                          postIdea,
-                          mainActionTitle: title,
-                          posterHint,
-                          reelScript,
-                          storyFrames,
-                          businessGrowthAction,
-                          hashtags,
-                          savedAt: Date.now(),
-                        }),
-                      );
-                    } catch {
-                    }
-                    router.push(
-                      `/biz-editor?day=${dayNumber}&backTo=${encodeURIComponent(backTo)}&caption=${encodeURIComponent(cap)}&postIdea=${encodeURIComponent(postIdea)}&mainActionTitle=${encodeURIComponent(title)}&posterHint=${encodeURIComponent(posterHint)}&reelScript=${encodeURIComponent(reelScript)}&storyFrames=${encodeURIComponent(storyFrames)}`,
-                    );
-                  }}
-                  className="editorBtn"
-                  aria-label="Open Biz Editor"
-                  title="Open Biz Editor"
-                >
-                  <span className="editorBtnIcon">↗</span>
-                  <span className="editorBtnText">Go to Biz Editor</span>
-                </button>
-              </div>
-              <p className="hintLine">
-                Social media only: publish this plan on Instagram/Facebook today.
-              </p>
-              <div className="activationBlock">
-                <h3 className="miniH">Channel</h3>
-                <div className="formatChips">
-                  <span className="formatChip channel">{(currentDay.marketingActivation?.channel || "both").toUpperCase()}</span>
-                </div>
-                <h3 className="miniH">Format plan</h3>
-                <div className="formatChips">
-                  {(currentDay.marketingActivation?.formatPlan ?? ["FeedPost"]).map((format) => (
-                    <span key={format} className="formatChip">
-                      {format}
-                    </span>
-                  ))}
-                </div>
-                <h3 className="miniH">Content brief</h3>
-                <p className="bodyP">{currentDay.marketingActivation?.contentBrief || currentDay.marketingActivation?.postIdea || currentDay.postIdea || ""}</p>
-                <h3 className="miniH">Visual guide</h3>
-                <p className="bodyP">{currentDay.marketingActivation?.visualGuide || "Use a clear product visual with one strong headline."}</p>
-                <h3 className="miniH">Content idea</h3>
-                <p className="bodyP">{currentDay.marketingActivation?.postIdea || currentDay.postIdea || ""}</p>
-                {(currentDay.marketingActivation?.posterHint || currentDay.posterHint) ? (
-                  <>
-                    <h3 className="miniH">Poster headline hint</h3>
-                    <p className="posterHint">{currentDay.marketingActivation?.posterHint || currentDay.posterHint}</p>
-                  </>
-                ) : null}
-              </div>
-
-              <div className="capTop">
-                <h3 className="miniH">Caption</h3>
-                <button type="button" className="copyBtn" onClick={() => void copyCaption()}>
-                  {copied ? "Copied" : "Copy"}
-                </button>
-              </div>
-              <pre className="caption">{currentDay.marketingActivation?.caption || currentDay.caption || ""}</pre>
-              <h3 className="miniH">Posting time</h3>
-              <p className="bodyP">{currentDay.marketingActivation?.postingTime || "7:30 PM"}</p>
-              <h3 className="miniH">CTA</h3>
-              <p className="bodyP">{currentDay.marketingActivation?.cta || "DM us now to order/book."}</p>
-
-              {(currentDay.marketingActivation?.storyFrames ?? []).length > 0 ? (
+              {activationView ? (
                 <>
-                  <h3 className="miniH">Story frames</h3>
-                  <ul className="plainList">
-                    {(currentDay.marketingActivation?.storyFrames ?? []).map((frame, index) => (
-                      <li key={`${index}-${frame}`}>{frame}</li>
-                    ))}
-                  </ul>
-                </>
-              ) : null}
-
-              {currentDay.marketingActivation?.reelScript ? (
-                <>
-                  <h3 className="miniH">Reel script</h3>
-                  <div className="reelScriptBox">
-                    <p>
-                      <strong>Hook:</strong> {currentDay.marketingActivation.reelScript.hook || ""}
-                    </p>
-                    <p><strong>Beats:</strong></p>
-                    <ul className="plainList">
-                      {(currentDay.marketingActivation.reelScript.beats ?? []).map((beat, index) => (
-                        <li key={`${index}-${beat}`}>{beat}</li>
-                      ))}
-                    </ul>
-                    <p>
-                      <strong>CTA:</strong> {currentDay.marketingActivation.reelScript.cta || ""}
-                    </p>
+                  <div className="activationHeadRow">
+                    <div className="activationHeadLeft">
+                      <span className="pill pillActivation">2 · Marketing activation</span>
+                      <h2 className="sectionH activationMainTitle">{"Today's social post"}</h2>
+                      <p className="activationSub">One post on Instagram or Facebook that matches your task above.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => openBizEditor()}
+                      className="editorBtn editorBtnHeader"
+                      aria-label="Open Biz Editor"
+                      title="Open Biz Editor with today’s context"
+                    >
+                      <span className="editorBtnIcon">↗</span>
+                      <span className="editorBtnText">Go to Biz Editor</span>
+                    </button>
                   </div>
+
+                  <div className="activationSummaryStrip" role="group" aria-label="Post format summary">
+                    <div className="summaryCell">
+                      <span className="summaryLabel">{"Today's platform"}</span>
+                      <span className="summaryValue">{activationView.platform}</span>
+                    </div>
+                    <div className="summaryCell">
+                      <span className="summaryLabel">Format</span>
+                      <span className="summaryValue">{activationView.format}</span>
+                    </div>
+                    <div className="summaryCell">
+                      <span className="summaryLabel">Best time</span>
+                      <span className="summaryValue">{activationView.bestTime}</span>
+                    </div>
+                  </div>
+
+                  <div className="activationStack">
+                    <div className="activationCard">
+                      <h3 className="activationCardLabel">What to post</h3>
+                      <p className="activationOneLiner">{activationView.whatToPost || "—"}</p>
+                      {activationView.hookLine ? (
+                        <>
+                          <p className="activationSubLabel">Hook line</p>
+                          <p className="activationHookLine">{activationView.hookLine}</p>
+                        </>
+                      ) : null}
+                    </div>
+
+                    <div className="activationCard">
+                      <h3 className="activationCardLabel">Why this works</h3>
+                      <p className="activationOneLiner">{activationView.whyWorks}</p>
+                    </div>
+
+                    <div className="activationCard">
+                      <h3 className="activationCardLabel">What to show (visual guide)</h3>
+                      <ul className="activationBulletList">
+                        {activationView.visuals.map((item, index) => (
+                          <li key={`${index}-${item.slice(0, 24)}`}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div className="activationCard activationCardCaption">
+                      <div className="activationCardCaptionHead">
+                        <h3 className="activationCardLabel">
+                          Caption <span className="readyBadge">Ready to paste</span>
+                        </h3>
+                        <button type="button" className="copyBtn" onClick={() => void copyCaption()}>
+                          {copied ? "Copied" : "Copy"}
+                        </button>
+                      </div>
+                      <pre className="caption activationCaptionPre">{activationView.captionText}</pre>
+                    </div>
+
+                    <div className="activationCard">
+                      <h3 className="activationCardLabel">CTA</h3>
+                      <p className="activationOneLiner">{activationView.cta}</p>
+                    </div>
+
+                    <div className="activationCard activationCardTags">
+                      <h3 className="activationCardLabel">Hashtags</h3>
+                      <div className="tags">
+                        {activationView.hashtags.length > 0 ? (
+                          activationView.hashtags.map((tag) => (
+                            <span key={tag} className="tag">
+                              {tag}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="noTag">No hashtags</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {activationView.storyFrames.length > 0 || activationView.reelScript ? (
+                    <details className="activationMore">
+                      <summary>Story or Reel outline (optional)</summary>
+                      {activationView.storyFrames.length > 0 ? (
+                        <ul className="activationBulletList tight">
+                          {activationView.storyFrames.slice(0, 3).map((frame, index) => (
+                            <li key={`sf-${index}`}>{frame}</li>
+                          ))}
+                        </ul>
+                      ) : null}
+                      {activationView.reelScript ? (
+                        <div className="reelScriptCompact">
+                          <p className="activationOneLiner">
+                            <strong>Reel:</strong> {activationView.reelScript.hook || ""}
+                          </p>
+                          <ul className="activationBulletList tight">
+                            {(activationView.reelScript.beats ?? []).slice(0, 3).map((beat, index) => (
+                              <li key={`rb-${index}`}>{beat}</li>
+                            ))}
+                          </ul>
+                          <p className="activationOneLiner">
+                            <strong>CTA:</strong> {activationView.reelScript.cta || ""}
+                          </p>
+                        </div>
+                      ) : null}
+                    </details>
+                  ) : null}
                 </>
               ) : null}
-
-              <h3 className="miniH">Hashtags</h3>
-              <div className="tags">
-                {(currentDay.marketingActivation?.hashtags ?? currentDay.hashtags ?? []).length > 0 ? (
-                  (currentDay.marketingActivation?.hashtags ?? currentDay.hashtags ?? []).map((tag) => (
-                    <span key={tag} className="tag">
-                      {tag}
-                    </span>
-                  ))
-                ) : (
-                  <span className="noTag">No hashtags</span>
-                )}
-              </div>
             </section>
 
             <section className="card scoreCard">
@@ -746,8 +840,174 @@ export default function MarketingPlanDayPage() {
           gap: 8px;
           margin-bottom: 10px;
         }
-        .activationHeader .editorBtn {
+        .activationHeadRow {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 16px;
+          flex-wrap: wrap;
+          margin-bottom: 14px;
+        }
+        .activationHeadLeft {
+          flex: 1;
+          min-width: 200px;
+        }
+        .activationMainTitle {
+          margin-top: 6px;
+        }
+        .activationSub {
+          margin: 6px 0 0;
+          font-size: 14px;
+          color: #64748b;
+          line-height: 1.45;
+          max-width: 52ch;
+        }
+        .editorBtnHeader {
+          flex-shrink: 0;
           align-self: flex-start;
+        }
+        .activationSummaryStrip {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 12px;
+          padding: 14px 16px;
+          border-radius: 16px;
+          border: 1px solid rgba(59, 130, 246, 0.22);
+          background: linear-gradient(135deg, rgba(239, 246, 255, 0.95), rgba(248, 250, 252, 0.88));
+          margin-bottom: 16px;
+        }
+        .summaryCell {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          min-width: 0;
+        }
+        .summaryLabel {
+          font-size: 10px;
+          font-weight: 800;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: #64748b;
+        }
+        .summaryValue {
+          font-size: 16px;
+          font-weight: 800;
+          color: #0f172a;
+          line-height: 1.25;
+        }
+        .activationStack {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+        .activationCard {
+          border-radius: 16px;
+          border: 1px solid rgba(148, 163, 184, 0.28);
+          background: rgba(255, 255, 255, 0.78);
+          padding: 14px 16px;
+          box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset;
+        }
+        .activationCardLabel {
+          margin: 0 0 8px;
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: #475569;
+        }
+        .activationOneLiner {
+          margin: 0;
+          font-size: 15px;
+          font-weight: 600;
+          color: #0f172a;
+          line-height: 1.5;
+        }
+        .activationSubLabel {
+          margin: 12px 0 4px;
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          color: #64748b;
+        }
+        .activationHookLine {
+          margin: 0;
+          font-size: 15px;
+          font-weight: 700;
+          color: #1e40af;
+          line-height: 1.45;
+        }
+        .activationBulletList {
+          margin: 0;
+          padding-left: 1.1rem;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          color: #334155;
+          font-size: 14px;
+          line-height: 1.45;
+        }
+        .activationBulletList.tight {
+          margin-top: 6px;
+          gap: 4px;
+        }
+        .activationBulletList li {
+          padding-left: 2px;
+        }
+        .activationCardCaption {
+          border-color: rgba(16, 185, 129, 0.28);
+          background: rgba(240, 253, 250, 0.55);
+        }
+        .activationCardCaptionHead {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          flex-wrap: wrap;
+          margin-bottom: 10px;
+        }
+        .activationCardCaptionHead .activationCardLabel {
+          margin-bottom: 0;
+        }
+        .readyBadge {
+          display: inline-block;
+          margin-left: 8px;
+          padding: 3px 8px;
+          border-radius: 999px;
+          font-size: 10px;
+          font-weight: 800;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          vertical-align: middle;
+          background: rgba(16, 185, 129, 0.18);
+          color: #047857;
+          border: 1px solid rgba(16, 185, 129, 0.35);
+        }
+        .activationCaptionPre {
+          margin: 0;
+        }
+        .activationCardTags .tags {
+          margin-top: 2px;
+        }
+        .activationMore {
+          margin-top: 14px;
+          padding: 10px 12px;
+          border-radius: 12px;
+          border: 1px dashed rgba(148, 163, 184, 0.45);
+          background: rgba(248, 250, 252, 0.65);
+          font-size: 13px;
+          color: #475569;
+        }
+        .activationMore summary {
+          cursor: pointer;
+          font-weight: 700;
+          color: #334155;
+        }
+        .reelScriptCompact {
+          margin-top: 8px;
+        }
+        .reelScriptCompact p {
+          margin: 0 0 6px;
         }
         .sectionH {
           margin: 0;
@@ -903,15 +1163,6 @@ export default function MarketingPlanDayPage() {
           font-weight: 700;
           font-size: 14px;
         }
-        .hintLine {
-          margin: 0 0 14px;
-          font-size: 13px;
-          color: #64748b;
-          line-height: 1.5;
-        }
-        .activationBlock {
-          margin-bottom: 6px;
-        }
         .bodyP {
           margin: 0;
           color: #334155;
@@ -977,13 +1228,6 @@ export default function MarketingPlanDayPage() {
           gap: 12px;
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
-        .capTop {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-          margin-bottom: 8px;
-        }
         .caption {
           margin: 0;
           white-space: pre-wrap;
@@ -999,32 +1243,6 @@ export default function MarketingPlanDayPage() {
           display: flex;
           flex-wrap: wrap;
           gap: 8px;
-        }
-        .formatChips {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
-          margin-bottom: 4px;
-        }
-        .formatChip {
-          border-radius: 999px;
-          border: 1px solid rgba(59, 130, 246, 0.3);
-          background: rgba(219, 234, 254, 0.6);
-          color: #1d4ed8;
-          font-size: 12px;
-          font-weight: 700;
-          padding: 5px 10px;
-        }
-        .formatChip.channel {
-          border-color: rgba(16, 185, 129, 0.35);
-          background: rgba(209, 250, 229, 0.66);
-          color: #047857;
-        }
-        .reelScriptBox {
-          border-radius: 12px;
-          border: 1px solid rgba(148, 163, 184, 0.24);
-          background: rgba(248, 250, 252, 0.85);
-          padding: 10px 12px;
         }
         .tag {
           border-radius: 999px;
@@ -1090,9 +1308,20 @@ export default function MarketingPlanDayPage() {
           .heroActions > :global(span) {
             min-height: 42px;
           }
-          .activationHeader .editorBtn {
+          .activationSummaryStrip {
+            grid-template-columns: 1fr;
+          }
+          .activationHeadRow {
+            flex-direction: column;
+          }
+          .editorBtnHeader {
             width: 100%;
             justify-content: center;
+          }
+        }
+        @media (max-width: 560px) {
+          .activationSummaryStrip {
+            grid-template-columns: 1fr;
           }
         }
       `}</style>

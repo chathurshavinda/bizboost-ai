@@ -2,22 +2,34 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { buildDateRange, buildLifecyclePlanDays, computeProgress, startOfLocalDay } from "@/src/lib/marketingPlan";
+import { deriveDayThemeForPlan } from "@/src/lib/posterDayTheme";
 
 type DayPlan = {
   dayNumber: number;
   dateLabel?: string;
+  /** Promo | ProductHighlight | Testimonial | BTS | Engagement | WeekendSpecial | GrowthPush */
+  dayTheme?: string;
   mainActionTitle: string;
   businessGrowthAction: string;
   marketingActivation?: {
-    channel?: "instagram" | "facebook" | "both";
-    formatPlan?: Array<"Reel" | "Story" | "FeedPost" | "Carousel">;
-    contentBrief?: string;
-    visualGuide?: string;
+    platform?: "Instagram" | "Facebook" | "Both";
+    format?: "Reel" | "Story" | "Feed" | "Carousel";
+    bestTime?: string;
+    goal?: "DMs" | "Orders" | "Bookings" | "Footfall" | "Leads";
+    postBrief?: string;
+    hook?: string;
+    visualGuide?: string[];
+    posterHeadlineHint?: string;
     postIdea: string;
     caption: string;
     hashtags: string[];
-    postingTime?: string;
     cta?: string;
+    matchNote?: string;
+    // Legacy compatibility fields (kept for old pages/data readers)
+    channel?: "instagram" | "facebook" | "both";
+    formatPlan?: Array<"Reel" | "Story" | "FeedPost" | "Carousel">;
+    contentBrief?: string;
+    postingTime?: string;
     storyFrames?: string[];
     reelScript?: {
       hook: string;
@@ -25,6 +37,7 @@ type DayPlan = {
       cta: string;
     };
     posterHint?: string;
+    offerDeadlineHint?: string;
   };
   executionSteps: string[];
   postIdea: string;
@@ -64,8 +77,10 @@ type TemplateContext = {
   preferredChannels: string[];
 };
 
-const PLAN_TEMPLATE_VERSION = "growth-action-cycle-v7";
-const baseHashtags = ["#SmallBusiness", "#BusinessGrowth", "#SupportLocal", "#BizBoostAI"];
+const PLAN_TEMPLATE_VERSION = "growth-action-cycle-v10";
+const SPAM_HASHTAG = /like4like|follow4follow|followforfollow|f4f|l4l|followers|growthhack/i;
+/** Legacy helpers only — main plan hashtags come from finalizeCaptions.themeHashtagSet */
+const baseHashtags = ["#BizBoostAI"];
 
 function normalizeCategoryFromText(...parts: string[]): CategoryKey {
   const value = parts
@@ -395,6 +410,19 @@ Hard rules (must follow):
 - caption: ready-to-post only if needed for activation.
 - successMetric: measurable KPI.
 - notes optional.
+
+3.1) MarketingActivation must be social-only (Instagram/Facebook) and easy at a glance:
+- Use exactly ONE primary format per day: Reel OR Story OR Feed OR Carousel.
+- Return these fields in order:
+  platform, format, bestTime, goal, postBrief, hook, visualGuide, posterHeadlineHint, caption, hashtags, cta, matchNote.
+- Do not repeat the same sentence across postBrief/caption/hook.
+- Caption must include: Hook -> Value/Reason -> Specific detail -> CTA.
+- Make caption format-aware:
+  Reel: include "Watch till the end" or "Quick demo" tone.
+  Story: include a question sticker prompt.
+  Feed: informative and slightly longer.
+  Carousel: include Slide 1/2/3 style mini structure.
+- Keep language simple. Emojis max 3.
 
 4) Quality constraints:
 - Never use repetitive filler like "growth focus".
@@ -772,15 +800,25 @@ function normalizeDayOutput(output: DayBuilderOutput): DayBuilderOutput {
     hashtags: Array.isArray(output.hashtags) ? output.hashtags : [],
     posterHint: typeof output.posterHint === "string" ? output.posterHint : "",
     marketingActivation: {
+      platform: output.marketingActivation?.platform ?? "Both",
+      format: output.marketingActivation?.format ?? "Feed",
+      bestTime: String(output.marketingActivation?.bestTime ?? "7:30 PM"),
+      goal: output.marketingActivation?.goal ?? "Leads",
+      postBrief: String(output.marketingActivation?.postBrief ?? output.postIdea ?? ""),
+      hook: String(output.marketingActivation?.hook ?? `Need better ${output.postIdea || "results"}?`),
+      visualGuide: Array.isArray(output.marketingActivation?.visualGuide)
+        ? output.marketingActivation?.visualGuide.slice(0, 2).map((item) => String(item))
+        : [],
+      posterHeadlineHint: String(output.marketingActivation?.posterHeadlineHint ?? output.posterHint ?? ""),
+      postIdea: String(output.postIdea ?? ""),
+      caption: String(output.caption ?? ""),
+      hashtags: Array.isArray(output.hashtags) ? output.hashtags.slice(0, 10) : [],
+      cta: String(output.marketingActivation?.cta ?? "DM us now"),
+      matchNote: String(output.marketingActivation?.matchNote ?? ""),
       channel: output.marketingActivation?.channel ?? "both",
       formatPlan: output.marketingActivation?.formatPlan ?? ["FeedPost"],
       contentBrief: String(output.marketingActivation?.contentBrief ?? output.postIdea ?? ""),
-      visualGuide: String(output.marketingActivation?.visualGuide ?? ""),
-      postIdea: String(output.postIdea ?? ""),
-      caption: String(output.caption ?? ""),
-      hashtags: Array.isArray(output.hashtags) ? output.hashtags : [],
-      postingTime: String(output.marketingActivation?.postingTime ?? "7:30 PM"),
-      cta: String(output.marketingActivation?.cta ?? "DM us now"),
+      postingTime: String(output.marketingActivation?.postingTime ?? output.marketingActivation?.bestTime ?? "7:30 PM"),
       storyFrames: Array.isArray(output.marketingActivation?.storyFrames) ? output.marketingActivation?.storyFrames : [],
       reelScript:
         output.marketingActivation?.reelScript && typeof output.marketingActivation.reelScript === "object"
@@ -793,6 +831,9 @@ function normalizeDayOutput(output: DayBuilderOutput): DayBuilderOutput {
             }
           : undefined,
       posterHint: typeof output.posterHint === "string" ? output.posterHint : "",
+      ...(typeof output.marketingActivation?.offerDeadlineHint === "string" && output.marketingActivation.offerDeadlineHint.trim()
+        ? { offerDeadlineHint: output.marketingActivation.offerDeadlineHint.trim() }
+        : {}),
     },
   };
 }
@@ -805,6 +846,711 @@ function conciseStep(text: string): string {
   if (!cleaned) return "";
   const sentence = cleaned.length > 110 ? `${cleaned.slice(0, 107).trim()}...` : cleaned;
   return sentence;
+}
+
+function toHashTag(value: string): string {
+  const clean = value.replace(/[^a-zA-Z0-9]/g, "");
+  return clean ? `#${clean}` : "";
+}
+
+function dedupeKeepOrder(values: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    const key = value.toLowerCase();
+    if (!value || seen.has(key)) continue;
+    seen.add(key);
+    result.push(value);
+  }
+  return result;
+}
+
+function themeSpecificHashtagCandidates(
+  category: CategoryKey,
+  theme: ThemeKey,
+  businessType: string,
+  city: string,
+  product: string,
+): string[] {
+  const byTheme: Record<ThemeKey, string[]> = {
+    promo_offer: ["#LimitedOffer", "#DealToday"],
+    highlight: ["#TopPick", "#WhyUs"],
+    review_collection: ["#CustomerStory", "#RealTalk"],
+    behind_scenes: ["#BehindTheScenes", "#Craft"],
+    engagement: ["#Poll", "#YourSay"],
+    growth_push: ["#BookNow", "#LimitedRun"],
+    track_improve: ["#WeeklyWins", "#ShopUpdate"],
+  };
+  const categoryTag = toHashTag(
+    category === "food"
+      ? "FoodieLK"
+      : category === "retail"
+        ? "ShopLK"
+        : category === "salon"
+          ? "BeautyLK"
+          : category === "services"
+            ? "ServicesLK"
+            : "LKBusiness",
+  );
+  const businessTypeTag = toHashTag(businessType || "LocalBiz");
+  const cityTag = toHashTag(city || "");
+  const productTag = toHashTag(product || "");
+  return dedupeKeepOrder(
+    [
+      categoryTag,
+      businessTypeTag,
+      cityTag,
+      productTag,
+      ...byTheme[theme],
+      "#BizBoost",
+      "#MadeInLK",
+    ].filter(Boolean),
+  ).filter((t) => !SPAM_HASHTAG.test(t));
+}
+
+function sanitizeHashtagList(tags: string[], minCount = 6, maxCount = 10): string[] {
+  const cleaned = dedupeKeepOrder(tags.filter(Boolean))
+    .map((t) => (t.startsWith("#") ? t : `#${t.replace(/^#+/, "")}`))
+    .filter((t) => !SPAM_HASHTAG.test(t));
+  const padPool = ["#SmallBizLK", "#ColomboFood", "#Entrepreneurs", "#ShopSmall", "#LocalFirst", "#SriLanka"];
+  const out = [...cleaned];
+  let pad = 0;
+  while (out.length < minCount && pad < padPool.length) {
+    if (!out.some((x) => x.toLowerCase() === padPool[pad].toLowerCase())) out.push(padPool[pad]);
+    pad += 1;
+  }
+  return out.slice(0, maxCount);
+}
+
+function activationToPostBrief(marketingActivation: string, product: string, businessName: string): string {
+  const t0 = marketingActivation.trim();
+  if (!t0) {
+    return `Today’s story keeps ${product} honest and easy to act on for ${businessName}.`;
+  }
+  const low = t0.toLowerCase();
+  if (/post\s+one\s+real\s+review\s+screenshot/i.test(low)) {
+    return `Warm quote layout about ${product} — sincere words neighbours already share about ${businessName}.`;
+  }
+  if (/\breview\s+screenshot\b/i.test(low)) {
+    return `Quote-style tiles for ${product} — bright text on brand colours, neighbour-made energy.`;
+  }
+  const cleaned = t0
+    .replace(/\bscreenshot\b/gi, "quote graphic")
+    .replace(/\breceipt\/qr\b/gi, "checkout card")
+    .replace(/\bwith permission\b/gi, "")
+    .replace(/\bpost\s+one\b/gi, "One")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}
+
+function themeVisualGuide(theme: ThemeKey, product: string, ctx: TemplateContext, activationSeed: string): string[] {
+  const name = ctx.businessName;
+  const city = ctx.city.trim();
+  const loc = ctx.location?.trim();
+  switch (theme) {
+    case "behind_scenes":
+      return [
+        `${name} prepping ${product}${loc ? ` at ${loc}` : city ? ` around ${city}` : ""} — candid motion, respectful lighting.`,
+        `One tight overlay names the quality checkpoint so trust lands before the fade.`,
+      ];
+    case "review_collection":
+      return activationSeed.toLowerCase().includes("google")
+        ? [
+            `Simple ${product} still with a heartfelt line about the visit — nothing staged.`,
+            `Soft end card nodding to Maps so happy guests know where the love belongs.`,
+          ]
+        : [
+            `Portrait-style quote tile beside ${product} in natural light.`,
+            `Subtle ${name} mark on the footer so reshares stay recognisable.`,
+          ];
+    case "engagement":
+      return [
+        `Split visual: two ${product} angles so the vote feels obvious at a glance.`,
+        `Thumb-friendly text that mirrors the question you ask in the caption.`,
+      ];
+    case "growth_push":
+      return [
+        `${product} hero shot + urgency line that matches how many slots are really open.`,
+        `Close with ${name} contact strip so serious buyers know the fastest route.`,
+      ];
+    case "promo_offer":
+      return [
+        `${product} bundle tile with deadline language that matches your real window.`,
+        `WhatsApp or DM strip visible before viewers bounce — same offer, zero guesswork.`,
+      ];
+    case "highlight":
+      return [
+        `Macro detail of ${product} plus one plain-language benefit line.`,
+        `Simple before/after or comparison frame if it helps ${name} stand out.${city ? ` Keep the ${city} nod tasteful.` : ""}`,
+      ];
+    case "track_improve":
+    default:
+      return [
+        `Light recap graphic: what moved for ${product} and what gets sharper next.`,
+        `Calm typography, no hype — shows ${name} listens and ships fixes.`,
+      ];
+  }
+}
+
+type MarketingGoalKey = NonNullable<DayPlan["marketingActivation"]>["goal"];
+
+function buildThemedCta(
+  theme: ThemeKey,
+  goal: MarketingGoalKey,
+  product: string,
+  ctx: TemplateContext,
+  format: CaptionFormatKey,
+): string {
+  const prefersWa = ctx.preferredChannels.some((c) => /whatsapp/i.test(c));
+  const chatTo = prefersWa ? `WhatsApp ${ctx.businessName}` : `Message ${ctx.businessName}`;
+  const city = ctx.city.trim();
+  const loc = ctx.location?.trim();
+
+  const storyTail =
+    format === "Story" ? "Sticker replies count — we tally before prep starts." : "Chat replies decide what we batch next.";
+
+  switch (theme) {
+    case "promo_offer":
+      if (goal === "Orders") {
+        return prefersWa
+          ? `${chatTo} with your ${product} order window — we confirm payment + pickup as replies land.`
+          : `DM ${ctx.businessName} to order ${product} before cutoff — pickup details go out instantly.`;
+      }
+      if (goal === "Footfall") {
+        return loc
+          ? `Visit ${loc}${city ? ` (${city})` : ""} for ${product} — say you saw today’s drop for the insiders note.`
+          : `Walk into ${ctx.businessName}${city ? ` in ${city}` : ""} for ${product} while today’s batch is fresh.`;
+      }
+      break;
+    case "growth_push":
+      return prefersWa
+        ? `${chatTo}: type "${product}" and we hold your slot before the cap hits.`
+        : `DM ${ctx.businessName} to lock your ${product} spot before the week’s limit lands.`;
+    case "behind_scenes":
+      if (goal === "Footfall") {
+        return loc
+          ? `Visit ${loc} this week — ask for today’s ${product} run and feel the rhythm behind it.`
+          : `Drop by ${ctx.businessName}${city ? ` on ${city} turf` : ""} — we’ll walk you through how ${product} comes together.`;
+      }
+      break;
+    case "highlight":
+      return `${chatTo} if ${product} should be yours this cycle — we send specs the same hour.`;
+    case "review_collection":
+      return prefersWa
+        ? `Loved ${product}? ${chatTo} — we ping the Google Maps link while the visit is fresh.`
+        : `DM ${ctx.businessName}: say "${product}" and we send the Maps review shortcut.`;
+    case "engagement":
+      return `${chatTo}: tell us which ${product} direction wins. ${storyTail}`;
+    case "track_improve":
+      return `${chatTo} for the refreshed ${product} plan — what changed, what’s next, and how to book.${city ? ` ${city} slots update live.` : ""}`.trim();
+    default:
+      break;
+  }
+
+  switch (goal) {
+    case "Orders":
+      return `${chatTo} to place your ${product} order — we bundle totals + pickup or delivery notes.${city ? ` ${city} routes covered where we can.` : ""}`.trim();
+    case "Bookings":
+      return `${chatTo} to anchor your ${product} booking — calendars lock once you confirm.${city ? ` ${city}-friendly times available.` : ""}`.trim();
+    case "Footfall":
+      return loc
+        ? `Visit ${loc} for ${product} — mention today’s post for the crew to match you faster.`
+        : `Visit ${ctx.businessName}${city ? ` (${city})` : ""} for ${product} — we’ll meet you at the counter.`;
+    case "Leads":
+    case "DMs":
+    default:
+      return prefersWa
+        ? `${chatTo}: say "${product}" and we map the fastest next step.${city ? ` Local to ${city}.` : ""}`.trim()
+        : `DM ${ctx.businessName}: tell us "${product}" and we send tailored options.${city ? ` ${city} crew on it.` : ""}`.trim();
+  }
+}
+
+type CaptionActivationKey =
+  | "promo"
+  | "highlight"
+  | "testimonial"
+  | "google_review"
+  | "bts"
+  | "engagement"
+  | "growth"
+  | "track";
+
+type CaptionFormatKey = "Reel" | "Story" | "Feed" | "Carousel";
+
+type CaptionSlots = {
+  businessName: string;
+  /** e.g. " in Colombo" or "" */
+  locationPhrase: string;
+  city: string;
+  product: string;
+  businessType: string;
+  targetAudience: string;
+  offerLine: string;
+  benefitLine: string;
+  proofLine: string;
+  deadlinePhrase: string;
+  pricePhrase: string;
+  /** Readable line derived from planner brief (shown in MA postBrief UI) — not copied verbatim into hook */
+  postBriefNatural: string;
+  /** Describes what viewers see on screen — from MA visual bullets */
+  visualWatchLine: string;
+  cta: string;
+};
+
+const CAPTION_META_BANNED =
+  /\bpost\s+one\b|\b(post|share)\s+(a|your)\s+(.{0,20})?\b(real\s+)?(review\s+)?(screenshot|photo)\b|\brecord\s+(a\s+)?(video|clip|story)\b|\bscreenshot\b|with\s+permission|\bpermission\b|\bcreate\s+a\s+(post|carousel|story|reel)\b|\buse\s+this\s+(caption|template)\b|^question\s+sticker:/i;
+
+function captionBodyMinusHashtags(captionFull: string): string {
+  const lines = captionFull.split(/\r?\n/);
+  const withoutHashLines = lines.filter((ln) => !ln.trim().startsWith("#") && !/^(\s*#\w+)/.test(ln.trim()));
+  return withoutHashLines.join("\n").replace(/(^|\s)#[\w\u00c0-\u024f]+\b/giu, "").trim();
+}
+
+function clipEmojis(body: string, max = 2): string {
+  const re = /\p{Extended_Pictographic}\uFE0F?/gu;
+  let n = 0;
+  return body.replace(re, (m) => {
+    if (n < max) {
+      n += 1;
+      return m;
+    }
+    return "";
+  });
+}
+
+function escapeRegexToken(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Rough brand + city balance: ≥1 biz mention, duplicate hooks/filler kept ≤2 biz hits. */
+function captionBrandRuleOk(bodyRaw: string, businessName: string, city: string): boolean {
+  const body = captionBodyMinusHashtags(bodyRaw);
+  const b = businessName.trim();
+  if (!b) return true;
+  const bizRe = new RegExp(`\\b${escapeRegexToken(b)}\\b`, "gi");
+  const bizHits = [...body.matchAll(bizRe)].length;
+  if (bizHits < 1 || bizHits > 2) return false;
+  const c = city.trim();
+  if (c.length >= 2) {
+    const cityRe = new RegExp(`\\b${escapeRegexToken(c)}\\b`, "gi");
+    const cityHits = [...body.matchAll(cityRe)].length;
+    if (cityHits > 1) return false;
+  }
+  return true;
+}
+
+function containsCta(captionBody: string, ctaText: string): boolean {
+  const lc = captionBody.toLowerCase();
+  const cue = (ctaText || "").toLowerCase().trim();
+  if (cue.length >= 5 && lc.includes(cue)) return true;
+  return /\b(dm|direct message|whatsapp|wa\b|visit us|walk in|book now|reserve|pre-?order|order now|grab yours|tap in|slide into|reply here|tell us)\b/i.test(
+    lc,
+  );
+}
+
+function captionPassesChecks(
+  body: string,
+  format: CaptionFormatKey,
+  ctaLine: string,
+  businessName?: string,
+  city?: string,
+): boolean {
+  if (!body || CAPTION_META_BANNED.test(body)) return false;
+  if (!containsCta(body, ctaLine)) return false;
+  if (businessName && !captionBrandRuleOk(body, businessName, city ?? "")) return false;
+  const len = captionBodyMinusHashtags(body).replace(/\s+/g, " ").length;
+  if (format === "Story") {
+    return len >= 36;
+  }
+  return len >= 80;
+}
+
+function captionActivation(theme: ThemeKey, reviewSubtype: string): CaptionActivationKey {
+  if (theme === "review_collection" && /\bgoogle\s+review\b/i.test(reviewSubtype || "")) {
+    return "google_review";
+  }
+  switch (theme) {
+    case "promo_offer":
+      return "promo";
+    case "highlight":
+      return "highlight";
+    case "review_collection":
+      return "testimonial";
+    case "behind_scenes":
+      return "bts";
+    case "engagement":
+      return "engagement";
+    case "growth_push":
+      return "growth";
+    case "track_improve":
+    default:
+      return "track";
+  }
+}
+
+function buildSlotsForCaption(
+  input: DayBuilderInput,
+  theme: ThemeKey,
+  reviewSubtype: string,
+  visualBullets?: string[],
+): CaptionSlots {
+  const { ctx, product, weekend } = input;
+  const cityTrim = ctx.city.trim();
+  const locationPhrase = cityTrim ? ` in ${cityTrim}` : "";
+  const activationKeyEarly = captionActivation(theme, reviewSubtype);
+  const audience = ctx.targetCustomers || "our customers nearby";
+  const pricePhrase = ctx.priceRange.trim()
+    ? `Pricing fits what you asked for (${ctx.priceRange}) — ping us for the exact quote.`
+    : "";
+  const deadlinePhrase = weekend ? "this weekend only" : "this week";
+  const offerLines: Record<ThemeKey, string> = {
+    promo_offer: `A sharper ${product} bundle with real savings${locationPhrase}.`,
+    highlight: `The details that make ${product} easy to trust and reorder.`,
+    review_collection:
+      activationKeyEarly === "google_review"
+        ? `Happy ${product} guests still tell friends first — Maps stars make it official.`
+        : `Honest praise from people who already chose ${product} with ${ctx.businessName}.`,
+    behind_scenes: `${ctx.businessName} keeps quality tight before ${product} ever reaches you.`,
+    engagement: `We want your preference on ${product} so tomorrow’s lineup matches demand.`,
+    growth_push: `Limited windows for ${product} — first replies get priority${locationPhrase}.`,
+    track_improve: `${ctx.businessName} tightened how we serve ${product} ${deadlinePhrase}.`,
+  };
+  const benefitLines: Record<ThemeKey, string> = {
+    promo_offer: `You skip guesswork — one clear perk on ${product} for busy ${audience}.`,
+    highlight: `Clear benefits for ${audience} who care about dependable ${ctx.businessType} service.`,
+    review_collection: `Social proof beats promises — hear it straight from neighbours around ${cityTrim || "town"}.`,
+    behind_scenes: `Peace of mind: you see the care behind every ${product} hand-off.`,
+    engagement: `Your vote steers bundles, timings, or flavours everyone wants next.`,
+    growth_push: `Serious buyers move fast — this push keeps queues fair.`,
+    track_improve: `We listened, adjusted, and the next drops feel smoother for loyal guests.`,
+  };
+  const proofLines: Record<ThemeKey, string> = {
+    promo_offer: `Busy families grab ${product} here because turnaround stays honest.`,
+    highlight: `${product} earns repeat visits — that’s why it leads today’s feed.`,
+    review_collection:
+      activationKeyEarly === "google_review"
+        ? googleReviewProofLine(product)
+        : `“Friendly team, straightforward ${product} — worth coming back.”`,
+    behind_scenes: `Lighting, plating, prep — tiny details visible in-frame build trust.`,
+    engagement: `${audience.split(",")[0] || "Locals"} voted last time — we folded it into the menu.`,
+    growth_push: `Inventory and slots refresh daily so nobody waits on empty promises.`,
+    track_improve: `Numbers up on satisfaction — we doubled down where it mattered for ${product}.`,
+  };
+
+  let postBriefNatural = `${ctx.businessName}${locationPhrase} lines up today's ${product} story with ${deadlinePhrase} momentum.`;
+
+  switch (activationKeyEarly) {
+    case "promo":
+      postBriefNatural = `Feed spotlight: ${product} offer customers can redeem fast${locationPhrase}.`;
+      break;
+    case "highlight":
+      postBriefNatural = `Highlight reel covers why ${product} fits ${audience}.`;
+      break;
+    case "testimonial":
+      postBriefNatural = `Customer rave about ${product} — pull quote vibes, warm tone${locationPhrase}.`;
+      break;
+    case "google_review":
+      postBriefNatural = `Gentle nudge so happy guests leave love on Maps for ${product}.`;
+      break;
+    case "bts":
+      postBriefNatural = `Peek behind prep and packaging for ${product}.`;
+      break;
+    case "engagement":
+      postBriefNatural = `Light poll vibe on ${product} choices for ${audience}.`;
+      break;
+    case "growth":
+      postBriefNatural = `Momentum push — ${product}, limited commitment window${locationPhrase}.`;
+      break;
+    case "track":
+      postBriefNatural = `Honest recap: what shifted for ${product} and what improves next sprint.`;
+      break;
+    default:
+      break;
+  }
+
+  return {
+    businessName: ctx.businessName,
+    locationPhrase,
+    city: cityTrim,
+    product,
+    businessType: ctx.businessType || "business",
+    targetAudience: audience,
+    offerLine: offerLines[theme],
+    benefitLine: benefitLines[theme],
+    proofLine: proofLines[theme],
+    deadlinePhrase,
+    pricePhrase,
+    postBriefNatural,
+    visualWatchLine: deriveVisualWatchLine(product, visualBullets),
+    cta: "",
+  };
+}
+
+function googleReviewProofLine(product: string): string {
+  return `Friendly service moments right after trying ${product} — that goodwill travels fastest on Maps.`;
+}
+
+function buildVisualWatchLine(product: string): string {
+  return `Warm, well-lit visuals of ${product} with tidy text overlays so scrolling thumbs stop naturally.`;
+}
+
+function deriveVisualWatchLine(product: string, hints?: string[]): string {
+  if (!hints?.some((x) => x.trim())) return buildVisualWatchLine(product);
+  const clean = (s: string) =>
+    s
+      .replace(/^(Show|Capture|Include|Post|Record|Share|Publish|Use|Frame\s*\d+)\s*[:\-.]?\s*/i, "")
+      .trim();
+  const a = clean(hints[0]!) || `${product}, front-lit and crisp`;
+  const b = clean(hints[1] ?? "") || `Bold line naming the payoff and your next tap`;
+  return `Audience sees ${a.charAt(0).toLowerCase() + a.slice(1)}, then ${b.charAt(0).toLowerCase() + b.slice(1)}.`;
+}
+
+function assembleCaptionTriple(
+  activation: CaptionActivationKey,
+  format: CaptionFormatKey,
+  slots: CaptionSlots,
+  variant: number,
+): { hook: string; value: string; specific: string } {
+  const { businessName, locationPhrase, product, offerLine, benefitLine, proofLine, deadlinePhrase, visualWatchLine, postBriefNatural } =
+    slots;
+  const brandedOpen = `${businessName}${locationPhrase}`;
+  const v = variant % 8;
+
+  const pick = (): { hook: string; value: string; specific: string } => {
+    switch (activation) {
+      case "promo":
+        return [
+          { hook: `${brandedOpen} — ${deadlinePhrase} perk loading`, value: `${benefitLine}`, specific: `${offerLine} Looks like ${visualWatchLine.replace(/^Looks like /i, "")}` },
+          {
+            hook: `${deadlinePhrase.charAt(0).toUpperCase() + deadlinePhrase.slice(1)} at ${businessName}${locationPhrase}`,
+            value: `${benefitLine}`,
+            specific: `${postBriefNatural.split(" — ")[0]}. Frames show ${visualWatchLine.toLowerCase()}`,
+          },
+          { hook: `${product} spotlight${locationPhrase}? ${businessName} has answers`, value: `${offerLine}`, specific: `${proofLine}` },
+          { hook: `Saved you a seat for ${product} wins`, value: `${benefitLine}`, specific: `${offerLine}` },
+          {
+            hook: `${businessName}${locationPhrase} keeps ${product} simple`,
+            value: `${benefitLine}`,
+            specific: `${proofLine}`,
+          },
+          { hook: `Craving smoother ${product} runs? ${brandedOpen}`, value: `${offerLine}`, specific: `${visualWatchLine}` },
+          {
+            hook: `${product} hype, ${deadlinePhrase}`,
+            value: `${benefitLine}`,
+            specific: `${postBriefNatural}`,
+          },
+          { hook: `Locals asked — we listened${locationPhrase}`, value: `${offerLine}`, specific: `${proofLine}` },
+        ][v % 8];
+      case "highlight":
+        return [
+          { hook: `Why everyone keeps tagging ${businessName}`, value: `${benefitLine}`, specific: `${product} detail + ${visualWatchLine.toLowerCase()}` },
+          { hook: `${product}, explained the calm way`, value: `${postBriefNatural}`, specific: `${proofLine}` },
+          { hook: `${brandedOpen} breaks down ${product}`, value: `${benefitLine}`, specific: `${offerLine.replace(/^A sharper /i, "").trimStart()}` },
+          {
+            hook: `Two truths about ${product}`,
+            value: `${benefitLine}`,
+            specific: `${visualWatchLine}`,
+          },
+          { hook: `${businessName}${locationPhrase} loves clarity`, value: `${postBriefNatural}`, specific: `${proofLine}` },
+          { hook: `Here’s ${product}, without fluff`, value: `${benefitLine}`, specific: `${offerLine}` },
+          { hook: `Proof > promises`, value: `${proofLine}`, specific: `${postBriefNatural}` },
+          { hook: `Stop scrolling — ${product} worth knowing`, value: `${benefitLine}`, specific: `${visualWatchLine}` },
+        ][v % 8];
+      case "testimonial":
+        return [
+          {
+            hook: `${brandedOpen} — here's real love on ${product}`,
+            value: `${benefitLine}`,
+            specific: `${proofLine} On-screen mood matches ${visualWatchLine.slice(0, 1).toLowerCase()}${visualWatchLine.slice(1)}`,
+          },
+          { hook: `Real humans, real ${product} moments`, value: `${postBriefNatural}`, specific: `${proofLine}` },
+          { hook: `They said what we couldn't hype ourselves`, value: `${benefitLine}`, specific: `${offerLine}` },
+          { hook: `${product} wins hit different when it's unscripted`, value: `${proofLine}`, specific: `${visualWatchLine}` },
+          {
+            hook: `${businessName}${locationPhrase}? These words say it`,
+            value: `${benefitLine}`,
+            specific: `${postBriefNatural}`,
+          },
+          { hook: `If you wondered about ${product}…`, value: `${offerLine}`, specific: `${proofLine}` },
+          { hook: `Community receipts`, value: `${benefitLine}`, specific: `${postBriefNatural}` },
+          {
+            hook: `Here’s what customers notice first`,
+            value: `${benefitLine}`,
+            specific: `${proofLine} — frames lean into ${visualWatchLine.toLowerCase()}`,
+          },
+        ][v % 8];
+      case "google_review":
+        return [
+          {
+            hook: `Loved ${product} recently${locationPhrase}?`,
+            value: `${benefitLine}`,
+            specific:
+              `${businessName} grows when kind words land on Maps — DM us for your review shortcut link.`,
+          },
+          {
+            hook: `${brandedOpen} runs on goodwill`,
+            value: `Stars help neighbours pick ${product} faster.`,
+            specific: `If we earned it, swing by Google Reviews — need the link? Message us.`,
+          },
+          {
+            hook: `${product} crews thrive on shout-outs`,
+            value: `${benefitLine}`,
+            specific: `Two taps after your visit keeps us visible ${locationPhrase}.`,
+          },
+          { hook: `Quick favour`, value: `${benefitLine}`, specific: `${businessName} review link via DM — painless promise.` },
+          { hook: `Maps love = more tables${locationPhrase}`, value: `${proofLine}`, specific: `${postBriefNatural}` },
+          {
+            hook: `Share the vibe online`,
+            value: `${benefitLine}`,
+            specific: `${businessName}: ask for review link anytime.`,
+          },
+          { hook: `Good energy travels`, value: `${offerLine}`, specific: testimonialDmCta(product) },
+          {
+            hook: `${product} gang — thanks first`,
+            value: `${benefitLine}`,
+            specific: `${googleReviewProofLine(product)}`,
+          },
+        ][v % 8];
+      case "bts":
+        return [
+          { hook: `Come backstage with ${businessName}`, value: `${benefitLine}`, specific: `${postBriefNatural}` },
+          { hook: `How ${product} gets love before you see it`, value: `${offerLine}`, specific: `${visualWatchLine}` },
+          { hook: `Trust lives in the small steps`, value: `${proofLine}`, specific: `${postBriefNatural}` },
+          { hook: `${brandedOpen} keeps standards loud`, value: `${benefitLine}`, specific: `${offerLine}` },
+          { hook: `No smoke, just process`, value: `${postBriefNatural}`, specific: `${visualWatchLine}` },
+          { hook: `BTS = peace of mind`, value: `${benefitLine}`, specific: `${proofLine}` },
+          { hook: `You asked for honesty`, value: `${offerLine}`, specific: `${postBriefNatural}` },
+          { hook: `${product} prep, unfiltered`, value: `${benefitLine}`, specific: `${visualWatchLine}` },
+        ][v % 8];
+      case "engagement":
+        return [
+          { hook: `Quick pulse check`, value: `${postBriefNatural}`, specific: `Option A: classic ${product}. Option B: chef’s twist.` },
+          { hook: `Two flavours, one decision`, value: `${benefitLine}`, specific: `Tap your vote + tell us why.` },
+          { hook: `Help ${businessName} choose`, value: `${offerLine}`, specific: `Comment A or B — we read every note.` },
+          { hook: `Weekend mood?`, value: `${postBriefNatural}`, specific: `Which ${product} combo should return?` },
+          { hook: `Ask the crew`, value: `${benefitLine}`, specific: `Tap your vote + drop a quick DM so we know what to prep.` },
+          { hook: `Crowdsource the menu`, value: `${offerLine}`, specific: `${visualWatchLine}` },
+          { hook: `You drive the next drop`, value: `${postBriefNatural}`, specific: `${proofLine}` },
+          { hook: `Two paths for ${product}`, value: `${benefitLine}`, specific: `Vote on what ${audienceStub(slots)} wants next.` },
+        ][v % 8];
+      case "growth":
+        return [
+          { hook: `${deadlinePhrase.toUpperCase()} momentum`, value: `${offerLine}`, specific: `${proofLine}` },
+          { hook: `${product} slots tightening${locationPhrase}`, value: `${benefitLine}`, specific: `${postBriefNatural}` },
+          { hook: `${businessName} is prioritising serious buyers`, value: `${offerLine}`, specific: `${visualWatchLine}` },
+          { hook: `Don't sleep on ${product}`, value: `${benefitLine}`, specific: `${proofLine}` },
+          { hook: `Inventory truth hour`, value: `${postBriefNatural}`, specific: `${offerLine}` },
+          { hook: `Move now, thank later`, value: `${benefitLine}`, specific: `${proofLine}` },
+          { hook: `${brandedOpen} push day`, value: `${offerLine}`, specific: `${postBriefNatural}` },
+          { hook: `Limited lane open`, value: `${benefitLine}`, specific: `${visualWatchLine}` },
+        ][v % 8];
+      case "track":
+      default:
+        return [
+          { hook: `${businessName} week in motion${locationPhrase}`, value: `${postBriefNatural}`, specific: `${proofLine}` },
+          { hook: `Honest brand chat`, value: `${benefitLine}`, specific: `${offerLine}` },
+          { hook: `What changed for ${product}`, value: `${postBriefNatural}`, specific: `${visualWatchLine}` },
+          { hook: `Progress > perfection`, value: `${proofLine}`, specific: `${benefitLine}` },
+          { hook: `Thanks for riding with us`, value: `${postBriefNatural}`, specific: `${offerLine}` },
+          { hook: `Next chapter loading`, value: `${benefitLine}`, specific: `${proofLine}` },
+          { hook: `${brandedOpen} recap`, value: `${postBriefNatural}`, specific: `${visualWatchLine}` },
+          { hook: `We're doubling down`, value: `${offerLine}`, specific: `${proofLine}` },
+        ][v % 8];
+    }
+  };
+
+  return pick();
+}
+
+function audienceStub(slots: CaptionSlots): string {
+  return slots.targetAudience.split(/[,&]/)[0]?.trim() || "regulars";
+}
+
+function testimonialDmCta(product: string): string {
+  return `Tell us "${product}" in DMs — we'll send your Google Maps link while it's fresh.`;
+}
+
+function formatCaptionBody(
+  format: CaptionFormatKey,
+  hook: string,
+  value: string,
+  specific: string,
+  cta: string,
+  slots: CaptionSlots,
+): string {
+  const priceTail = slots.pricePhrase ? ` ${slots.pricePhrase}` : "";
+  const baseValue = `${value}${priceTail}`.trim();
+
+  switch (format) {
+    case "Story":
+      return clipEmojis(`${hook}\n${baseValue}\n${cta}`.trim(), 2);
+    case "Reel":
+      return clipEmojis(
+        `${hook}\n• ${value}\n• ${specific}\n${cta}`.trim(),
+        2,
+      );
+    case "Carousel":
+      return clipEmojis(
+        `${hook}\nSlide 1 — ${value}\nSlide 2 — ${specific}\nSlide 3 — ${slots.postBriefNatural}\nSlide 4 — ${slots.proofLine}\nSlide 5 — ${slots.offerLine}\n${cta}`.trim(),
+        2,
+      );
+    case "Feed":
+    default:
+      return clipEmojis(`${hook}\n${baseValue}\n${specific}\n${cta}`.trim(), 2);
+  }
+}
+
+function buildPublishableCaptionBundle(args: {
+  theme: ThemeKey;
+  format: CaptionFormatKey;
+  input: DayBuilderInput;
+  reviewSubtype: string;
+  cta: string;
+  hashtagCandidates: string[];
+  variantBase: number;
+  visualGuideHints?: string[];
+}): { caption: string; hashtags: string[]; postBriefUi: string; hookUi: string; visualGuide: string[] } {
+  const activation = captionActivation(args.theme, args.reviewSubtype);
+  const slots = buildSlotsForCaption(args.input, args.theme, args.reviewSubtype, args.visualGuideHints);
+  slots.cta = args.cta;
+  const hashtags = sanitizeHashtagList(args.hashtagCandidates, 6, 10);
+  const brandName = args.input.ctx.businessName;
+  const brandCity = args.input.ctx.city ?? "";
+
+  let body = "";
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const triple = assembleCaptionTriple(activation, args.format, slots, args.variantBase + attempt);
+    body = formatCaptionBody(args.format, triple.hook, triple.value, triple.specific, args.cta, slots);
+    if (captionPassesChecks(body, args.format, args.cta, brandName, brandCity)) break;
+  }
+  if (!captionPassesChecks(body, args.format, args.cta, brandName, brandCity)) {
+    body = formatCaptionBody(
+      args.format,
+      `${slots.businessName}${slots.locationPhrase} — ${slots.product} update`,
+      slots.benefitLine,
+      `${slots.postBriefNatural} ${slots.visualWatchLine}`,
+      args.cta,
+      slots,
+    );
+  }
+
+  const tagLine = hashtags.join(" ");
+  const caption = `${body}\n\n${tagLine}`;
+
+  const postBriefUi = slots.postBriefNatural;
+  const hookUi = captionBodyMinusHashtags(body).split("\n")[0] || tripleHookFallback(slots);
+  const hinted = args.visualGuideHints?.map((x) => x.trim()).filter(Boolean) ?? [];
+  const visualGuide =
+    hinted.length > 0
+      ? hinted.slice(0, 2)
+      : [slots.visualWatchLine, `Keep ${slots.product} well lit with CTA readable before thumbs scroll away.`];
+
+  return { caption, hashtags, postBriefUi, hookUi, visualGuide };
+}
+
+function tripleHookFallback(slots: CaptionSlots): string {
+  return `${slots.businessName}${slots.locationPhrase} — ${slots.product}`;
 }
 
 function variantValue<T>(items: T[], input: DayBuilderInput): T {
@@ -1363,16 +2109,26 @@ function buildDayOutput(theme: ThemeKey, input: DayBuilderInput): DayBuilderOutp
     );
   }
   const cleanSteps = steps.map(conciseStep).filter(Boolean).slice(0, 6);
-  const formatByActionType: Record<ActionType, Array<"Reel" | "Story" | "FeedPost" | "Carousel">> = {
-    sales_offer: ["Reel", "Story"],
-    retention: ["Story", "FeedPost"],
-    lead_capture: ["Carousel", "Story"],
-    operations: ["Story", "Carousel"],
-    trust_proof: ["Carousel", "FeedPost"],
-    partnership: ["Reel", "FeedPost"],
-    review_optimize: ["FeedPost"],
+  const primaryFormatByActionType: Record<ActionType, "Reel" | "Story" | "Feed" | "Carousel"> = {
+    sales_offer: "Reel",
+    retention: "Story",
+    lead_capture: "Carousel",
+    operations: "Feed",
+    trust_proof: "Carousel",
+    partnership: "Reel",
+    review_optimize: "Feed",
   };
-  const formatPlan = formatByActionType[resolvedActionType] ?? ["FeedPost"];
+  const primaryGoalByActionType: Record<ActionType, "DMs" | "Orders" | "Bookings" | "Footfall" | "Leads"> = {
+    sales_offer: input.category === "food" || input.category === "retail" ? "Orders" : "Bookings",
+    retention: input.category === "food" || input.category === "retail" ? "Orders" : "Bookings",
+    lead_capture: "Leads",
+    operations: input.category === "food" || input.category === "retail" ? "Footfall" : "Bookings",
+    trust_proof: input.category === "food" || input.category === "retail" ? "Orders" : "Bookings",
+    partnership: "Leads",
+    review_optimize: "Leads",
+  };
+  const primaryFormat = primaryFormatByActionType[resolvedActionType] ?? "Feed";
+  const primaryGoal = primaryGoalByActionType[resolvedActionType] ?? "Leads";
   const socialChannel: "instagram" | "facebook" | "both" =
     input.ctx.preferredChannels.some((c) => /instagram/i.test(c)) && input.ctx.preferredChannels.some((c) => /facebook/i.test(c))
       ? "both"
@@ -1381,47 +2137,82 @@ function buildDayOutput(theme: ThemeKey, input: DayBuilderInput): DayBuilderOutp
         : input.ctx.preferredChannels.some((c) => /facebook/i.test(c))
           ? "facebook"
           : "both";
-  const storyFrames = formatPlan.includes("Story")
-    ? [
-        `Frame 1: Problem customers face with ${product}.`,
-        `Frame 2: Show how ${input.ctx.businessName} solves it.`,
-        `Frame 3: CTA - ${marketingActivation}`,
-      ]
-    : [];
-  const reelScript = formatPlan.includes("Reel")
-    ? {
-        hook: `Still struggling with ${product}?`,
-        beats: [
-          `Beat 1: Show today’s offer for ${product}.`,
-          `Beat 2: Explain one clear benefit.`,
-          `Beat 3: Show proof or quick customer result.`,
-        ],
-        cta: "Message us now to book/order.",
-      }
-    : undefined;
+  const platformValue: "Instagram" | "Facebook" | "Both" =
+    socialChannel === "instagram" ? "Instagram" : socialChannel === "facebook" ? "Facebook" : "Both";
+  const bestTime = input.weekend ? "11:00 AM" : "7:30 PM";
+  const reviewSubtype = theme === "review_collection" ? reviewPostFormat(input) : "";
+  const concisePostBrief = activationToPostBrief(marketingActivation, product, input.ctx.businessName);
+  const visualGuideHints = themeVisualGuide(theme, product, input.ctx, theme === "review_collection" ? reviewSubtype : marketingActivation);
+  const primaryCta = buildThemedCta(theme, primaryGoal, product, input.ctx, primaryFormat);
+  const hashtagCandidates = [
+    ...baseHashtags,
+    ...themeSpecificHashtagCandidates(input.category, theme, input.ctx.businessType, input.ctx.city, product),
+  ];
+  const cap = buildPublishableCaptionBundle({
+    theme,
+    format: primaryFormat,
+    input,
+    reviewSubtype,
+    cta: primaryCta,
+    hashtagCandidates,
+    variantBase: input.dayNumber + input.variantIndex * 17,
+    visualGuideHints,
+  });
+  const caption = cap.caption;
+  const hashtags = cap.hashtags;
+  const storyFrames =
+    primaryFormat === "Story"
+      ? [
+          `Beat 1 — the pinch people feel around ${product}.`,
+          `Beat 2 — how ${input.ctx.businessName} smooths it in real life.`,
+          `Beat 3 — your next step (${primaryGoal === "Footfall" ? "visit or message" : "DM / order"}) with today’s payoff.`,
+        ]
+      : [];
+  const reelScript =
+    primaryFormat === "Reel"
+      ? {
+          hook: `Micro ${product} story worth the save.`,
+          beats: [`Name the pain in one breath.`, `Show the fix in motion.`, `Leave them with proof that feels human.`],
+          cta: primaryCta.length > 140 ? `${primaryCta.slice(0, 137)}...` : primaryCta,
+        }
+      : undefined;
+  const posterHeadlineHint = `${product}: clear value today`;
+  const matchNote = `This post supports today's business focus by pushing ${primaryGoal.toLowerCase()} for ${product}.`;
+  const offerDeadlineHint = [input.weekend ? "This weekend" : "", input.ctx.priceRange.trim()]
+    .filter(Boolean)
+    .join(" · ");
   return {
     mainActionTitle,
     businessGrowthAction: businessAction,
     executionSteps: cleanSteps,
     postIdea: marketingActivation,
-    caption: `${input.ctx.businessName}: ${marketingActivation} for ${product}. ${socialChannel === "both" ? "Post on Instagram + Facebook today." : `Post on ${socialChannel} today.`}`,
-    hashtags: [...baseHashtags, ...categoryHashtags[input.category], `#${resolvedActionType.replace("_", "")}`],
+    caption,
+    hashtags,
     successMetric: `${metric} for ${product}`,
     posterHint: `${product.toUpperCase()} · ${input.ctx.businessName}`,
     notes: input.weekend ? weekendNote(input.category) : undefined,
     marketingActivation: {
+      platform: platformValue,
+      format: primaryFormat,
+      bestTime,
+      goal: primaryGoal,
+      postBrief: concisePostBrief,
+      hook: cap.hookUi,
+      visualGuide: cap.visualGuide,
+      posterHeadlineHint,
       channel: socialChannel,
-      formatPlan,
-      contentBrief: `Publish social content that supports today’s business action on ${product}. Keep it outcome-focused and clear.`,
-      visualGuide: `Use a real image/video of ${product}. Show price/benefit early. Add strong CTA text.`,
+      formatPlan: [primaryFormat === "Feed" ? "FeedPost" : primaryFormat],
+      contentBrief: concisePostBrief,
       postIdea: marketingActivation,
-      caption: `${input.ctx.businessName}: ${marketingActivation} for ${product}.`,
-      hashtags: [...baseHashtags, ...categoryHashtags[input.category], `#${resolvedActionType.replace("_", "")}`],
-      postingTime: input.weekend ? "11:00 AM" : "7:30 PM",
-      cta: "DM us now to order/book.",
+      caption,
+      hashtags,
+      cta: primaryCta,
+      matchNote,
+      postingTime: bestTime,
       storyFrames,
       reelScript,
-      posterHint: `${product.toUpperCase()} · ${input.ctx.businessName}`,
+      posterHint: posterHeadlineHint,
+      ...(offerDeadlineHint ? { offerDeadlineHint } : {}),
     },
   };
 }
@@ -1499,28 +2290,77 @@ function buildPlan(planDays: number, context: TemplateContext, startDate: Date):
     memory.recentStepTemplates = rememberRecent(memory.recentStepTemplates, metadata.stepTemplate);
     memory.similarityCounts[metadata.similarityKey] = (memory.similarityCounts[metadata.similarityKey] ?? 0) + 1;
 
+    const formatValue = (normalized.marketingActivation?.format ?? "Feed") as CaptionFormatKey;
+    const captionBundleInput: DayBuilderInput = {
+      ctx: context,
+      category: resolvedCategory,
+      dayNumber,
+      weekNumber,
+      weekIndex: Math.floor((dayNumber - 1) / 7),
+      variantIndex: selectedInput?.variantIndex ?? 0,
+      product,
+      weekend: isWeekendForDate(startDate, index),
+      planDays,
+      weekday,
+      dateLabel,
+    };
+    const reviewSubtypeFinalize = theme === "review_collection" ? metadata.postFormat : "";
+    const ctaFinalize = normalized.marketingActivation?.cta ?? "DM us now.";
+    const mergedVisualGuide = Array.isArray(normalized.marketingActivation?.visualGuide)
+      ? normalized.marketingActivation.visualGuide.slice(0, 2).map((x) => String(x))
+      : [];
+    const finalizeCap = buildPublishableCaptionBundle({
+      theme,
+      format: formatValue,
+      input: captionBundleInput,
+      reviewSubtype: reviewSubtypeFinalize,
+      cta: ctaFinalize,
+      hashtagCandidates: [
+        ...baseHashtags,
+        ...themeSpecificHashtagCandidates(resolvedCategory, theme, context.businessType, context.city, product),
+      ],
+      variantBase: dayNumber * 29 + (selectedInput?.variantIndex ?? 0) * 7,
+      visualGuideHints: mergedVisualGuide.length ? mergedVisualGuide : undefined,
+    });
+
     return {
       dayNumber,
       dateLabel,
       ...normalized,
+      dayTheme: deriveDayThemeForPlan(theme, weekend, festival),
       mainActionTitle: festival ? `${mainActionTitle} (${festival} special)` : mainActionTitle,
       postIdea: festival ? `${normalized.postIdea} Theme it for ${festival}.` : normalized.postIdea,
-      caption: festival ? `${normalized.caption} ${festival} offer/message included.` : normalized.caption,
+      caption: finalizeCap.caption,
+      hashtags: finalizeCap.hashtags,
       marketingActivation: {
+        platform: normalized.marketingActivation?.platform ?? "Both",
+        format: normalized.marketingActivation?.format ?? "Feed",
+        bestTime: normalized.marketingActivation?.bestTime ?? normalized.marketingActivation?.postingTime ?? "7:30 PM",
+        goal: normalized.marketingActivation?.goal ?? "Leads",
+        postBrief:
+          normalized.marketingActivation?.postBrief ??
+          normalized.marketingActivation?.contentBrief ??
+          `Today's social slice keeps ${product} aligned with ${context.businessName}'s core action.`,
+        hook: finalizeCap.hookUi,
+        visualGuide: finalizeCap.visualGuide,
+        posterHeadlineHint: normalized.marketingActivation?.posterHeadlineHint ?? normalized.posterHint,
         channel: normalized.marketingActivation?.channel ?? "both",
         formatPlan: normalized.marketingActivation?.formatPlan ?? ["FeedPost"],
         contentBrief:
           normalized.marketingActivation?.contentBrief ??
           `Publish on ${normalized.marketingActivation?.channel ?? "both"} to support today's action.`,
-        visualGuide: normalized.marketingActivation?.visualGuide ?? "",
         postIdea: festival ? `${normalized.postIdea} Theme it for ${festival}.` : normalized.postIdea,
-        caption: festival ? `${normalized.caption} ${festival} offer/message included.` : normalized.caption,
-        hashtags: normalized.hashtags,
-        postingTime: normalized.marketingActivation?.postingTime ?? "7:30 PM",
+        caption: finalizeCap.caption,
+        hashtags: finalizeCap.hashtags,
+        postingTime: normalized.marketingActivation?.postingTime ?? normalized.marketingActivation?.bestTime ?? "7:30 PM",
         cta: normalized.marketingActivation?.cta ?? "DM us now to order/book.",
+        matchNote:
+          normalized.marketingActivation?.matchNote ??
+          `This post supports today's business action: ${normalized.mainActionTitle}.`,
         storyFrames: normalized.marketingActivation?.storyFrames ?? [],
         reelScript: normalized.marketingActivation?.reelScript,
         posterHint: normalized.posterHint,
+        offerDeadlineHint: normalized.marketingActivation?.offerDeadlineHint,
       },
       notes: festival
         ? `${festival} seasonal day: adapt offer and messaging to festival demand.`

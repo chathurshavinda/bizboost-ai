@@ -64,6 +64,10 @@ export async function POST(req: Request) {
       "luxury-dark",
       "neon-tech",
       "festival-vibrant",
+      "testimonial-quote",
+      "image-first",
+      "offer-card",
+      "social-stack",
     ] as const;
     const posterStyle = (allowedPosterStyles as readonly string[]).includes(posterStyleRaw)
       ? (posterStyleRaw as (typeof allowedPosterStyles)[number])

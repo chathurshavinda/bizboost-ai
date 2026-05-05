@@ -35,6 +35,10 @@ const POSTER_STYLES = [
   "luxury-dark",
   "neon-tech",
   "festival-vibrant",
+  "testimonial-quote",
+  "image-first",
+  "offer-card",
+  "social-stack",
 ] as const;
 type PosterStyle = (typeof POSTER_STYLES)[number];
 
@@ -77,6 +81,23 @@ type BusinessDetails = {
   monthlyMarketingBudget?: string;
   expectedRevenueRange?: string;
   socialLinks?: string;
+  /** Biz Editor + day plan: align poster JSON with today's marketing activation */
+  activationPostBrief?: string;
+  activationHook?: string;
+  activationCta?: string;
+  activationFormat?: string;
+  activationPlatform?: string;
+  activationVisualSummary?: string;
+  activationPosterHint?: string;
+  /** Promo | ProductHighlight | Testimonial | BTS | Engagement | WeekendSpecial | GrowthPush */
+  dayTheme?: string;
+  /** Locked brand accent hex (#RRGGBB) — must not change across variations */
+  brandAccentLocked?: string;
+  /** Deadline / price line for badge (weekend timing, promo copy) */
+  activationOfferDeadline?: string;
+  /** BizBoost catalog template id (conceptual); layout still = lockedStyle / style JSON */
+  posterTemplateId?: string;
+  posterTemplateHint?: string;
 };
 
 type GenerateRequestBody = {
@@ -139,6 +160,18 @@ function validateBody(body: unknown):
     monthlyMarketingBudget: cleanString((details as Partial<BusinessDetails>).monthlyMarketingBudget),
     expectedRevenueRange: cleanString((details as Partial<BusinessDetails>).expectedRevenueRange),
     socialLinks: cleanString((details as Partial<BusinessDetails>).socialLinks),
+    activationPostBrief: cleanString((details as Partial<BusinessDetails>).activationPostBrief),
+    activationHook: cleanString((details as Partial<BusinessDetails>).activationHook),
+    activationCta: cleanString((details as Partial<BusinessDetails>).activationCta),
+    activationFormat: cleanString((details as Partial<BusinessDetails>).activationFormat),
+    activationPlatform: cleanString((details as Partial<BusinessDetails>).activationPlatform),
+    activationVisualSummary: cleanString((details as Partial<BusinessDetails>).activationVisualSummary),
+    activationPosterHint: cleanString((details as Partial<BusinessDetails>).activationPosterHint),
+    dayTheme: cleanString((details as Partial<BusinessDetails>).dayTheme),
+    brandAccentLocked: cleanString((details as Partial<BusinessDetails>).brandAccentLocked),
+    activationOfferDeadline: cleanString((details as Partial<BusinessDetails>).activationOfferDeadline),
+    posterTemplateId: cleanString((details as Partial<BusinessDetails>).posterTemplateId),
+    posterTemplateHint: cleanString((details as Partial<BusinessDetails>).posterTemplateHint),
   };
 
   const isShortFormType =
@@ -179,24 +212,84 @@ function buildPosterDesignPrompt(details: BusinessDetails): string {
   const offer = details.offer || "";
   const dayPlan = details.dayPlan || "";
   const photoContext = details.photoContext || "A real photo uploaded by the business owner";
+  const finalCaptionHint = (details.finalCaption || "").trim();
+  const hasActivationContext =
+    !!details.activationPostBrief ||
+    !!details.activationHook ||
+    !!details.activationCta ||
+    !!details.activationFormat ||
+    !!details.activationPlatform ||
+    !!details.activationVisualSummary ||
+    !!details.activationPosterHint;
+  const activationBlock = hasActivationContext
+    ? `
+Today's marketing activation (the poster MUST match this campaign — same message, no contradictions):
+- Platform: ${details.activationPlatform || "Instagram / Facebook"}
+- Format: ${details.activationFormat || "Feed"}
+- What to post (brief): ${details.activationPostBrief || "N/A"}
+- Hook line / angle: ${details.activationHook || "N/A"}
+- CTA to reinforce (poster button text should echo this): ${details.activationCta || "N/A"}
+- Visual direction: ${details.activationVisualSummary || "N/A"}
+- Poster headline hint (if provided): ${details.activationPosterHint || "N/A"}
+- Timing / deadline or price cue for badge (if provided): ${details.activationOfferDeadline || "N/A"}
+`
+    : "";
+  const captionAlignBlock =
+    finalCaptionHint.length > 0
+      ? `
+Draft caption already written for this post (distill — do NOT paste verbatim; match tone and offer):
+"""${finalCaptionHint.slice(0, 900)}"""
+`
+    : "";
   const hasLockedStyle = !!details.lockedStyle;
+  const accentLockedHex = /^#[0-9a-fA-F]{6}$/.test(details.brandAccentLocked ?? "") ? details.brandAccentLocked! : "";
   const hasVariationHints =
-    !!details.avoidHeadline || !!details.avoidSubheadline || !!details.avoidAccentColor || !!details.variationHint;
+    !!details.avoidHeadline || !!details.avoidSubheadline || (!accentLockedHex && !!details.avoidAccentColor) || !!details.variationHint;
 
   const lockedStyleBlock = hasLockedStyle
     ? `
 STYLE IS LOCKED — you MUST use style="${details.lockedStyle}". Do NOT pick any other style for this output.`
     : "";
 
+  const brandingAccentBlock = accentLockedHex
+    ? `
+BRAND ACCENT IS LOCKED — you MUST output accentColor="${accentLockedHex}" exactly. Do NOT change this hex across runs or variations.
+
+Logo / layout consistency — keep typography hierarchy clean: headline largest, brand name tucked in logo-safe zone at top corner, CTA anchored at bottom.`
+    : `
+Logo-safe zone — keep brandName compact at the TOP (logo corner). Headline dominates center; subhead supports; offerBadge stays small near headline or badge strip; CTA reads at bottom.`;
+
+  const dayThemeBlock =
+    details.dayTheme && details.dayTheme.trim().length > 0
+      ? `
+Poster campaign theme tag: "${details.dayTheme.trim()}"
+Tune emphasis to this story type without contradicting Today's marketing activation.
+- Promo: punchy urgency, offerBadge can carry deadline/offer.
+- ProductHighlight: product promise and clarity beats hype.
+- Testimonial/proof-feel: softer headline supported by credible subhead.
+- BTS / Engagement: conversational, approachable tone.
+- WeekendSpecial: friendly weekend urgency.
+- GrowthPush: action-forward framing.`
+      : "";
+
+  const templateCatalogBlock =
+    details.posterTemplateId || details.posterTemplateHint
+      ? `
+BizBoost template library pick (user-facing template — align copy & hierarchy to this intent):
+- Template id: ${details.posterTemplateId || "N/A"}
+- Intent: ${details.posterTemplateHint || "N/A"}
+The JSON "style" field must still match STYLE LOCK rules and locked layout; this block guides wording priority and which content fields to emphasize.`
+      : "";
+
   const variationBlock = hasVariationHints
     ? `
-VARIATION REQUEST — this is a regeneration. Produce a DIFFERENT, IMPROVED variation of the design. Keep the brand feel but change the wording, angle, and palette. Specifically:
+VARIATION REQUEST — this is a regeneration. Produce a DIFFERENT, IMPROVED variation of the design. Change the wording, angle, hierarchy, and overlay as needed.${accentLockedHex ? " KEEP accentColor locked to the hex above." : " Feel free to tweak palette while staying on-brand."} Specifically:
 ${details.avoidHeadline ? `- Do NOT reuse this previous headline: "${details.avoidHeadline}". Use different words and a different angle.` : ""}
 ${details.avoidSubheadline ? `- Do NOT reuse this previous subheadline: "${details.avoidSubheadline}". Write a fresh supporting line.` : ""}
-${details.avoidAccentColor ? `- Do NOT reuse this accent color: "${details.avoidAccentColor}". Pick a different bold hex color that still fits the style.` : ""}
-${details.variationHint ? `- Variation seed: ${details.variationHint} (use this to pick a creative variation).` : ""}
-- Vary the overlay (light / dark / none) if it improves readability over the photo.
-- The NEW design must feel fresher and more polished than the previous one.`
+${accentLockedHex || !details.avoidAccentColor ? "" : `- Do NOT reuse this accent color: "${details.avoidAccentColor}". Pick a different bold hex color that still fits the style.`}
+${details.variationHint ? `- Variation seed: ${details.variationHint}` : ""}
+- Vary overlay (light / dark / none) if it improves readability over the photo.
+- The NEW design must feel fresher than the previous one without breaking locked style rules.`
     : "";
 
   return `You are a senior brand designer creating a single social-media poster concept for a small business in Sri Lanka.
@@ -211,7 +304,7 @@ Business details:
 - Selected Day Plan: ${dayPlan || "General promo"}
 - Photo Context: ${photoContext}
 - Preferred Language: ${details.language || "English"}
-${lockedStyleBlock}${variationBlock}
+${activationBlock}${captionAlignBlock}${dayThemeBlock}${templateCatalogBlock}${brandingAccentBlock}${lockedStyleBlock}${variationBlock}
 
 Task:
 Produce a clean, bold poster concept inspired by professional brand posters (like Nike and Adidas style social posters). The poster will be rendered as typography and shapes overlaid on the user's real photo.
@@ -225,8 +318,15 @@ Style options (pick ONE that best fits the business, photo, and offer):
 - "luxury-dark": black + gold premium palette with centered serif brand mark (jewellery, weddings, high-end salons, boutique hotels)
 - "neon-tech": futuristic drop feel with monospace tags and neon accent word (tech brands, gadgets, gaming, modern cafes)
 - "festival-vibrant": warm vibrant celebratory vibe for Sri Lanka festivals and promotions (Avurudu, Vesak, Christmas, Deepavali, launch parties, food specials)
+- "testimonial-quote": centered quote typography, reputation / review led, softer hierarchy
+- "image-first": large visual field upper area; compact headline & CTA in a anchored lower band — product / photo-forward
+- "offer-card": frosted/card frame overlapping the photo; sharp offer focus in the glass panel
+- "social-stack": vertical story-style rails + stacked headline block + wide footer “sticker” CTA — modern reels/story feel
 
 Rules:
+- If "Today's marketing activation" is present, headline, subheadline, offerBadge, and ctaLabel MUST read as one coherent campaign with that brief and CTA. Do not invent a different promo than the activation describes.
+- If a draft caption is provided, headline/subhead must echo its promise (same product/offer angle) without copying long sentences.
+- Pick the style that matches the brand vibe AND the activation format (e.g. Story/Reel → bolder, fewer words; Carousel → can carry one extra supporting line in subheadline).
 - Pick the style that matches the brand vibe, NOT always bold-statement.
 - If the offer/dayPlan mentions a Sri Lankan festival (e.g. Avurudu, Vesak, Christmas, Deepavali, Ramadan), prefer "festival-vibrant".
 - If the business is jewellery / salon / wedding / luxury / boutique, prefer "luxury-dark".
@@ -238,7 +338,7 @@ Rules:
 - offerBadge: short (max 3 words) like "20% OFF", "NEW", "BUY 1 GET 1" — or empty string if no offer.
 - ctaLabel: 1 to 3 words like "BUY NOW", "ORDER TODAY", "VIEW ONLINE", "BOOK NOW", "RESERVE NOW".
 - brandName: use the given business name as-is (short version if too long).
-- accentColor: a single bold hex color that fits the style (e.g. "#E11D48" bold, "#D4AF37" luxury, "#22D3EE" neon, "#F59E0B" festival).
+- accentColor: ${accentLockedHex ? `must be exactly "${accentLockedHex}" per brand lock above` : `a single bold hex that fits the style (e.g. "#E11D48" bold, "#D4AF37" luxury, "#22D3EE" neon, "#F59E0B" festival)`}.
 - textColor: "#FFFFFF" or "#0F172A" — whichever gives the best contrast over a photo.
 - overlay: "light" | "dark" | "none" — dark overlay darkens the photo for better white text readability; light for dark photos; none for clean photos.
 - Do NOT include the photo in the text. Do NOT describe the photo.
@@ -247,7 +347,7 @@ Rules:
 Output STRICT JSON only. No markdown, no code fences, no commentary. Use this exact shape:
 
 {
-  "style": "bold-statement" | "landscape-action" | "hero-product" | "editorial" | "minimal-clean" | "luxury-dark" | "neon-tech" | "festival-vibrant",
+  "style": "bold-statement" | "landscape-action" | "hero-product" | "editorial" | "minimal-clean" | "luxury-dark" | "neon-tech" | "festival-vibrant" | "testimonial-quote" | "image-first" | "offer-card" | "social-stack",
   "brandName": "string",
   "headline": "string",
   "subheadline": "string",
@@ -551,9 +651,11 @@ function parsePosterDesign(raw: string, details: BusinessDetails): PosterDesign 
     const overlayRaw = typeof parsed.overlay === "string" ? parsed.overlay.toLowerCase() : "dark";
     const overlay = overlayRaw === "light" || overlayRaw === "none" ? overlayRaw : "dark";
 
-    let accentColor = clampHex(parsed.accentColor, "#E11D48");
+    const accentLockedParsed = /^#[0-9a-fA-F]{6}$/.test(details.brandAccentLocked ?? "") ? details.brandAccentLocked! : "";
+    let accentColor = accentLockedParsed || clampHex(parsed.accentColor, "#E11D48");
     if (
       details.avoidAccentColor &&
+      !accentLockedParsed &&
       accentColor.toLowerCase() === details.avoidAccentColor.toLowerCase()
     ) {
       const fallbackPalette = ["#E11D48", "#0EA5E9", "#7C3AED", "#F59E0B", "#22D3EE", "#D4AF37", "#EF4444", "#10B981"];
