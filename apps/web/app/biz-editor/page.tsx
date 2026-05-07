@@ -902,7 +902,7 @@ export default function BizEditorPage() {
             <div>
               <h2>Poster Preview</h2>
               <p className="previewHint">
-                Browse templates by category below — typography uses the shared BizBoost layout system so branding stays cohesive.
+                Browse templates by category below typography uses the shared BizBoost layout system so branding stays cohesive.
               </p>
               {campaignDayTheme ? (<p className="themeBadge">Poster theme from plan · {campaignDayTheme}</p>) : null}
             </div>
@@ -941,19 +941,26 @@ export default function BizEditorPage() {
             <PosterTemplate imageUrl={imageUrl} design={posterDesign}/>
           </div>
 
-          <details className="designTuning">
-            <summary>Fine-tune poster text</summary>
-            <div className="tuningGrid">
+          <section className="designTuning">
+            <h3 className="tuningTitle">Fine tune poster</h3>
+            <div className="tuningBodyWrap">
+              <div className="tuningGrid">
               <label className="tuneField">
                 <span>Brand name</span>
                 <input value={posterDesign.brandName} onChange={(e) => setPosterDesign((prev) => ({ ...prev, brandName: e.target.value }))}/>
               </label>
               <label className="tuneField">
-                <span>Headline</span>
+                <span className="tuneLabelRow">
+                  <span>Headline</span>
+                  <em>{posterDesign.headline.length}</em>
+                </span>
                 <input value={posterDesign.headline} onChange={(e) => setPosterDesign((prev) => ({ ...prev, headline: e.target.value }))}/>
               </label>
               <label className="tuneField">
-                <span>Subheadline</span>
+                <span className="tuneLabelRow">
+                  <span>Subheadline</span>
+                  <em>{posterDesign.subheadline.length}</em>
+                </span>
                 <input value={posterDesign.subheadline} onChange={(e) => setPosterDesign((prev) => ({ ...prev, subheadline: e.target.value }))}/>
               </label>
               <label className="tuneField">
@@ -961,15 +968,19 @@ export default function BizEditorPage() {
                 <input value={posterDesign.offerBadge} onChange={(e) => setPosterDesign((prev) => ({ ...prev, offerBadge: e.target.value }))}/>
               </label>
               <label className="tuneField">
-                <span>CTA label</span>
+                <span className="tuneLabelRow">
+                  <span>CTA label</span>
+                  <em>{posterDesign.ctaLabel.length}</em>
+                </span>
                 <input value={posterDesign.ctaLabel} onChange={(e) => setPosterDesign((prev) => ({ ...prev, ctaLabel: e.target.value }))}/>
               </label>
               <label className="tuneField">
                 <span>Accent color (manual — AI regenerate restores brand accent)</span>
                 <input type="color" value={posterDesign.accentColor} onChange={(e) => setPosterDesign((prev) => ({ ...prev, accentColor: e.target.value }))}/>
               </label>
+              </div>
             </div>
-          </details>
+          </section>
 
           {generated ? <p className="previewCaptionHint">Caption: {previewCaption}</p> : null}
         </section>
@@ -1273,12 +1284,14 @@ export default function BizEditorPage() {
           background: rgba(255, 255, 255, 0.7);
           padding: 10px 12px;
         }
-        .designTuning summary {
-          cursor: pointer;
+        .tuningTitle {
+          margin: 0;
+          color: #334155;
           font-size: 13px;
           font-weight: 700;
-          color: #334155;
-          user-select: none;
+        }
+        .tuningBodyWrap {
+          margin-top: 10px;
         }
         .tuningGrid {
           margin-top: 10px;
@@ -1297,6 +1310,20 @@ export default function BizEditorPage() {
           letter-spacing: 0.08em;
           text-transform: uppercase;
           color: #64748b;
+        }
+        .tuneLabelRow {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 8px;
+        }
+        .tuneLabelRow em {
+          font-style: normal;
+          font-size: 10px;
+          letter-spacing: 0;
+          text-transform: none;
+          color: #94a3b8;
+          font-weight: 700;
         }
         .tuneField input {
           border: 1px solid rgba(148, 163, 184, 0.42);
@@ -1343,6 +1370,9 @@ export default function BizEditorPage() {
         }
         @media (max-width: 900px) {
           .editorGrid {
+            grid-template-columns: 1fr;
+          }
+          .tuningGrid {
             grid-template-columns: 1fr;
           }
         }
