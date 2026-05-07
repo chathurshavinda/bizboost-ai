@@ -1,622 +1,547 @@
 "use client";
-
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/src/lib/useAuth";
 import { auth } from "@/src/lib/firebase";
 import { downloadMarketingPlanPdf } from "@/src/lib/pdf/marketingPlanPdf";
 import { getNextIncompleteDay, getTodayPlanDay, isPlanFullyCompleted } from "@/src/lib/taskCardState";
-
 type BusinessDetails = {
-  businessName?: string;
-  businessType?: string;
+    businessName?: string;
+    businessType?: string;
 };
-
 type SelectedPlan = {
-  planDays?: number;
-  plan_days?: number;
+    planDays?: number;
+    plan_days?: number;
 };
-
 type GeneratedDay = {
-  dayNumber: number;
-  dateISO?: string;
-  dateLabel?: string;
-  mainActionTitle?: string;
-  businessGrowthAction?: string;
-  marketingActivation?: {
+    dayNumber: number;
+    dateISO?: string;
+    dateLabel?: string;
+    mainActionTitle?: string;
+    businessGrowthAction?: string;
+    marketingActivation?: {
+        postIdea?: string;
+        caption?: string;
+        hashtags?: string[];
+        posterHint?: string;
+    };
+    executionSteps?: string[];
     postIdea?: string;
     caption?: string;
     hashtags?: string[];
+    successMetric?: string;
     posterHint?: string;
-  };
-  executionSteps?: string[];
-  postIdea?: string;
-  caption?: string;
-  hashtags?: string[];
-  successMetric?: string;
-  posterHint?: string;
-  notes?: string;
-  completed?: boolean;
+    notes?: string;
+    completed?: boolean;
 };
-
 type ModalType = "missingBusiness" | "incompleteBusiness" | "missingPlan" | "serverError" | null;
-
 type LatestPlanResponse = {
-  ok?: boolean;
-  plan?: {
-    _id?: string;
-    status?: "active" | "completed" | "archived";
-    durationDays?: number;
-    planDays?: GeneratedDay[];
-    progress?: { completedCount?: number; percent?: number };
-    narrativePlan?: string;
-  };
-  data?: Record<string, unknown>;
-  error?: string;
+    ok?: boolean;
+    plan?: {
+        _id?: string;
+        status?: "active" | "completed" | "archived";
+        durationDays?: number;
+        planDays?: GeneratedDay[];
+        progress?: {
+            completedCount?: number;
+            percent?: number;
+        };
+        narrativePlan?: string;
+    };
+    data?: Record<string, unknown>;
+    error?: string;
 };
-
 type CompleteDayResponse = {
-  ok?: boolean;
-  plan?: {
-    _id?: string;
-    status?: "active" | "completed" | "archived";
-    planDays?: GeneratedDay[];
-    progress?: { completedCount?: number; percent?: number };
-  };
-  error?: string;
+    ok?: boolean;
+    plan?: {
+        _id?: string;
+        status?: "active" | "completed" | "archived";
+        planDays?: GeneratedDay[];
+        progress?: {
+            completedCount?: number;
+            percent?: number;
+        };
+    };
+    error?: string;
 };
-
-const cleanTitle = (title: string) =>
-  title
+const cleanTitle = (title: string) => title
     .replace(/^Week\s*\d+\s*/i, "")
     .replace(/^Day\s*\d+\s*/i, "")
     .trim();
-
 function truncateText(text: string, max: number) {
-  const t = text.trim();
-  if (!t) return "";
-  if (t.length <= max) return t;
-  return `${t.slice(0, Math.max(0, max - 1))}…`;
+    const t = text.trim();
+    if (!t)
+        return "";
+    if (t.length <= max)
+        return t;
+    return `${t.slice(0, Math.max(0, max - 1))}…`;
 }
-
 function truncateWords(text: string, maxWords: number) {
-  const t = text.trim();
-  if (!t) return "";
-  const words = t.split(/\s+/);
-  if (words.length <= maxWords) return t;
-  return `${words.slice(0, maxWords).join(" ")}…`;
+    const t = text.trim();
+    if (!t)
+        return "";
+    const words = t.split(/\s+/);
+    if (words.length <= maxWords)
+        return t;
+    return `${words.slice(0, maxWords).join(" ")}…`;
 }
-
 function isLegacyFallbackPlan(plan: GeneratedDay[]): boolean {
-  if (!Array.isArray(plan) || plan.length === 0) return false;
-  const fallbackLikeDays = plan.filter((day) => {
-    const title = String(day.mainActionTitle ?? "").toLowerCase().trim();
-    const action = String(day.businessGrowthAction ?? "").toLowerCase().trim();
-    const postIdea = String(day.postIdea ?? "").toLowerCase().trim();
-    return (
-      /^day\s+\d+\s+growth focus$/.test(title) ||
-      action.includes("complete one practical business task that moves leads") ||
-      postIdea.includes("one short post or customer story that backs up today")
-    );
-  }).length;
-  return fallbackLikeDays >= Math.max(2, Math.ceil(plan.length * 0.5));
+    if (!Array.isArray(plan) || plan.length === 0)
+        return false;
+    const fallbackLikeDays = plan.filter((day) => {
+        const title = String(day.mainActionTitle ?? "").toLowerCase().trim();
+        const action = String(day.businessGrowthAction ?? "").toLowerCase().trim();
+        const postIdea = String(day.postIdea ?? "").toLowerCase().trim();
+        return (/^day\s+\d+\s+growth focus$/.test(title) ||
+            action.includes("complete one practical business task that moves leads") ||
+            postIdea.includes("one short post or customer story that backs up today"));
+    }).length;
+    return fallbackLikeDays >= Math.max(2, Math.ceil(plan.length * 0.5));
 }
-
 function renderInline(text: string): (string | JSX.Element)[] {
-  const parts: (string | JSX.Element)[] = [];
-  const regex = /\*\*(.+?)\*\*/g;
-  let last = 0;
-  let match: RegExpExecArray | null;
-  let i = 0;
-  while ((match = regex.exec(text)) !== null) {
-    if (match.index > last) parts.push(text.slice(last, match.index));
-    parts.push(<strong key={`b-${i++}`}>{match[1]}</strong>);
-    last = match.index + match[0].length;
-  }
-  if (last < text.length) parts.push(text.slice(last));
-  return parts.length > 0 ? parts : [text];
+    const parts: (string | JSX.Element)[] = [];
+    const regex = /\*\*(.+?)\*\*/g;
+    let last = 0;
+    let match: RegExpExecArray | null;
+    let i = 0;
+    while ((match = regex.exec(text)) !== null) {
+        if (match.index > last)
+            parts.push(text.slice(last, match.index));
+        parts.push(<strong key={`b-${i++}`}>{match[1]}</strong>);
+        last = match.index + match[0].length;
+    }
+    if (last < text.length)
+        parts.push(text.slice(last));
+    return parts.length > 0 ? parts : [text];
 }
-
 function renderMarkdownPlan(markdown: string): JSX.Element {
-  const lines = markdown.replace(/\r\n/g, "\n").split("\n");
-  const blocks: JSX.Element[] = [];
-  let i = 0;
-
-  while (i < lines.length) {
-    const line = lines[i];
-
-    if (/^\s*$/.test(line)) {
-      i += 1;
-      continue;
-    }
-
-    const h2 = line.match(/^##\s+(.+)$/);
-    if (h2) {
-      blocks.push(
-        <h3 key={`h-${i}`} className="mdH2">
+    const lines = markdown.replace(/\r\n/g, "\n").split("\n");
+    const blocks: JSX.Element[] = [];
+    let i = 0;
+    while (i < lines.length) {
+        const line = lines[i];
+        if (/^\s*$/.test(line)) {
+            i += 1;
+            continue;
+        }
+        const h2 = line.match(/^##\s+(.+)$/);
+        if (h2) {
+            blocks.push(<h3 key={`h-${i}`} className="mdH2">
           {h2[1].trim()}
-        </h3>,
-      );
-      i += 1;
-      continue;
-    }
-
-    const h3 = line.match(/^###\s+(.+)$/);
-    if (h3) {
-      blocks.push(
-        <h4 key={`h-${i}`} className="mdH3">
+        </h3>);
+            i += 1;
+            continue;
+        }
+        const h3 = line.match(/^###\s+(.+)$/);
+        if (h3) {
+            blocks.push(<h4 key={`h-${i}`} className="mdH3">
           {h3[1].trim()}
-        </h4>,
-      );
-      i += 1;
-      continue;
-    }
-
-    if (/^\s*\|(.+)\|\s*$/.test(line) && i + 1 < lines.length && /^\s*\|?\s*:?-+/.test(lines[i + 1])) {
-      const headerCells = line
-        .trim()
-        .replace(/^\||\|$/g, "")
-        .split("|")
-        .map((c) => c.trim());
-      i += 2;
-      const rows: string[][] = [];
-      while (i < lines.length && /^\s*\|.+\|\s*$/.test(lines[i])) {
-        const cells = lines[i]
-          .trim()
-          .replace(/^\||\|$/g, "")
-          .split("|")
-          .map((c) => c.trim());
-        rows.push(cells);
-        i += 1;
-      }
-      blocks.push(
-        <div className="mdTableWrap" key={`t-${i}`}>
+        </h4>);
+            i += 1;
+            continue;
+        }
+        if (/^\s*\|(.+)\|\s*$/.test(line) && i + 1 < lines.length && /^\s*\|?\s*:?-+/.test(lines[i + 1])) {
+            const headerCells = line
+                .trim()
+                .replace(/^\||\|$/g, "")
+                .split("|")
+                .map((c) => c.trim());
+            i += 2;
+            const rows: string[][] = [];
+            while (i < lines.length && /^\s*\|.+\|\s*$/.test(lines[i])) {
+                const cells = lines[i]
+                    .trim()
+                    .replace(/^\||\|$/g, "")
+                    .split("|")
+                    .map((c) => c.trim());
+                rows.push(cells);
+                i += 1;
+            }
+            blocks.push(<div className="mdTableWrap" key={`t-${i}`}>
           <table className="mdTable">
             <thead>
               <tr>
-                {headerCells.map((h, idx) => (
-                  <th key={idx}>{renderInline(h)}</th>
-                ))}
+                {headerCells.map((h, idx) => (<th key={idx}>{renderInline(h)}</th>))}
               </tr>
             </thead>
             <tbody>
-              {rows.map((r, rIdx) => (
-                <tr key={rIdx}>
-                  {r.map((c, cIdx) => (
-                    <td key={cIdx}>{renderInline(c)}</td>
-                  ))}
-                </tr>
-              ))}
+              {rows.map((r, rIdx) => (<tr key={rIdx}>
+                  {r.map((c, cIdx) => (<td key={cIdx}>{renderInline(c)}</td>))}
+                </tr>))}
             </tbody>
           </table>
-        </div>,
-      );
-      continue;
-    }
-
-    if (/^\s*[-*]\s+/.test(line)) {
-      const items: string[] = [];
-      while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) {
-        items.push(lines[i].replace(/^\s*[-*]\s+/, ""));
-        i += 1;
-      }
-      blocks.push(
-        <ul className="mdList" key={`u-${i}`}>
-          {items.map((it, idx) => (
-            <li key={idx}>{renderInline(it)}</li>
-          ))}
-        </ul>,
-      );
-      continue;
-    }
-
-    if (/^\s*\d+\.\s+/.test(line)) {
-      const items: string[] = [];
-      while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) {
-        items.push(lines[i].replace(/^\s*\d+\.\s+/, ""));
-        i += 1;
-      }
-      blocks.push(
-        <ol className="mdOl" key={`o-${i}`}>
-          {items.map((it, idx) => (
-            <li key={idx}>{renderInline(it)}</li>
-          ))}
-        </ol>,
-      );
-      continue;
-    }
-
-    const paragraph: string[] = [];
-    while (
-      i < lines.length &&
-      !/^\s*$/.test(lines[i]) &&
-      !/^##\s+/.test(lines[i]) &&
-      !/^###\s+/.test(lines[i]) &&
-      !/^\s*[-*]\s+/.test(lines[i]) &&
-      !/^\s*\d+\.\s+/.test(lines[i]) &&
-      !/^\s*\|.+\|\s*$/.test(lines[i])
-    ) {
-      paragraph.push(lines[i]);
-      i += 1;
-    }
-    blocks.push(
-      <p className="mdP" key={`p-${i}`}>
-        {renderInline(paragraph.join(" "))}
-      </p>,
-    );
-  }
-
-  return <div className="mdWrap">{blocks}</div>;
-}
-
-export default function MarketingPlanPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const { user, loading: authLoading } = useAuth();
-  const isNewMode = searchParams.get("mode") === "new";
-  const requestedDays = Number(searchParams.get("days") ?? 0);
-
-  const [isLoading, setIsLoading] = useState(true);
-  const [businessDetails, setBusinessDetails] = useState<BusinessDetails | null>(null);
-  const [selectedPlanDays, setSelectedPlanDays] = useState<number | null>(null);
-  const [modalType, setModalType] = useState<ModalType>(null);
-  const [generating, setGenerating] = useState(false);
-  const [generatedPlan, setGeneratedPlan] = useState<GeneratedDay[]>([]);
-  const [hasGenerated, setHasGenerated] = useState(false);
-  const [narrativePlan, setNarrativePlan] = useState<string>("");
-  const [narrativeOpen, setNarrativeOpen] = useState(false);
-  const [completedMap, setCompletedMap] = useState<Record<number, boolean>>({});
-  const [savingDayNumber, setSavingDayNumber] = useState<number | null>(null);
-  const [planId, setPlanId] = useState<string>("");
-  const [planStatus, setPlanStatus] = useState<"active" | "completed" | "archived">("active");
-  const [missingProfileFields, setMissingProfileFields] = useState<string[]>([]);
-
-  const canGenerate = !isLoading && !!businessDetails && !!selectedPlanDays && !generating && (!hasGenerated || isNewMode);
-
-  const loadInitialData = useCallback(async () => {
-    const uid = auth.currentUser?.uid ?? user?.uid;
-    console.log("UID", uid);
-    if (!uid) return;
-
-    setIsLoading(true);
-    setModalType(null);
-    setMissingProfileFields([]);
-
-    try {
-      const businessRes = await fetch(`/api/business-profile?firebase_uid=${encodeURIComponent(uid)}`, {
-        cache: "no-store",
-      });
-      const businessJson = await businessRes.json();
-
-      if (
-        businessRes.status === 404 ||
-        (businessJson?.ok === false &&
-          (businessJson?.error === "No business profile" || businessJson?.error === "business_profile_not_found"))
-      ) {
-        setBusinessDetails(null);
-        setSelectedPlanDays(null);
-        setModalType("missingBusiness");
-        return;
-      }
-
-      if (!businessRes.ok || !businessJson?.ok) {
-        throw new Error(businessJson?.error || "Failed to load business details");
-      }
-
-      setBusinessDetails((businessJson.data ?? {}) as BusinessDetails);
-
-      const planRes = await fetch(`/api/select-plan?firebase_uid=${encodeURIComponent(uid)}`, {
-        cache: "no-store",
-      });
-      const planJson = await planRes.json();
-
-      if (
-        planRes.status === 404 ||
-        (planJson?.ok === false && (planJson?.error === "No plan selected" || planJson?.error === "plan_not_selected"))
-      ) {
-        setSelectedPlanDays(null);
-        setModalType("missingPlan");
-        return;
-      }
-
-      if (!planRes.ok || !planJson?.ok) {
-        throw new Error(planJson?.error || "Failed to load selected plan");
-      }
-
-      const selected = (planJson.data ?? {}) as SelectedPlan;
-      const savedNextDays = Number((planJson.data as Record<string, unknown>)?.next_plan_days ?? 0);
-      const days = [7, 14, 30].includes(requestedDays)
-        ? requestedDays
-        : Number(savedNextDays || (selected.planDays ?? selected.plan_days ?? 0));
-
-      if (![7, 14, 30].includes(days)) {
-        setSelectedPlanDays(null);
-        setModalType("missingPlan");
-        return;
-      }
-
-      setSelectedPlanDays(days);
-
-      if (isNewMode) {
-        setGeneratedPlan([]);
-        setHasGenerated(false);
-        setNarrativePlan("");
-        setCompletedMap({});
-        setPlanId("");
-        setPlanStatus("active");
-        return;
-      }
-
-      const latestRes = await fetch(`/api/marketing-plan/latest?firebase_uid=${encodeURIComponent(uid)}`, {
-        cache: "no-store",
-      });
-
-      const latestJson = (await latestRes.json()) as LatestPlanResponse;
-      if (latestRes.ok && latestJson?.ok) {
-        const plan = latestJson.plan;
-        const rawPlan = Array.isArray(plan?.planDays) ? plan.planDays : [];
-        const normalized = rawPlan.map((d) => ({
-          ...d,
-          executionSteps: Array.isArray(d.executionSteps) ? d.executionSteps : [],
-          hashtags: Array.isArray(d.hashtags) ? d.hashtags : [],
-        }));
-        const legacyFallback = isLegacyFallbackPlan(normalized);
-        setGeneratedPlan(legacyFallback ? [] : normalized);
-        setHasGenerated(normalized.length > 0 && !legacyFallback);
-        setSelectedPlanDays(Number(plan?.durationDays ?? days));
-        setNarrativePlan(
-          typeof plan?.narrativePlan === "string" ? plan.narrativePlan : "",
-        );
-        const completedDays = normalized.filter((day) => day.completed).map((day) => day.dayNumber);
-        setCompletedMap(
-          completedDays.reduce<Record<number, boolean>>((acc, day) => {
-            const dayNumber = Number(day);
-            if (Number.isInteger(dayNumber) && dayNumber > 0) acc[dayNumber] = true;
-            return acc;
-          }, {}),
-        );
-        setPlanId(typeof plan?._id === "string" ? plan._id : "");
-        setPlanStatus(plan?.status ?? "active");
-      } else {
-        setGeneratedPlan([]);
-        setHasGenerated(false);
-        setNarrativePlan("");
-        setCompletedMap({});
-      }
-    } catch {
-      setBusinessDetails(null);
-      setSelectedPlanDays(null);
-      setModalType("serverError");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user?.uid, isNewMode, requestedDays]);
-
-  async function generatePlan() {
-    const uid = auth.currentUser?.uid ?? user?.uid;
-    console.log("UID", uid);
-    if (!uid) {
-      router.replace("/login");
-      return;
-    }
-
-    setGenerating(true);
-    setModalType(null);
-    setMissingProfileFields([]);
-
-    try {
-      const response = await fetch("/api/marketing-plan/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          firebase_uid: uid,
-          durationDays: selectedPlanDays,
-          days: selectedPlanDays,
-          mode: isNewMode ? "new" : "default",
-          forceNew: isNewMode,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok || !result?.ok) {
-        if (result?.error === "business_profile_not_found") {
-          setModalType("missingBusiness");
-        } else if (result?.error === "business_profile_incomplete") {
-          setMissingProfileFields(
-            Array.isArray(result?.missingFields) ? result.missingFields.map((value: unknown) => String(value)) : [],
-          );
-          setModalType("incompleteBusiness");
-        } else if (result?.error === "plan_not_selected") {
-          setModalType("missingPlan");
-        } else {
-          setModalType("serverError");
+        </div>);
+            continue;
         }
-        return;
-      }
-
-      const rawNext = Array.isArray(result?.plan?.planDays)
-        ? result.plan.planDays
-        : Array.isArray(result?.data?.planDays)
-          ? result.data.planDays
-        : Array.isArray(result?.data?.planData)
-          ? result.data.planData
-          : [];
-      const nextPlan = rawNext.map((d: GeneratedDay) => ({
-        ...d,
-        executionSteps: Array.isArray(d.executionSteps) ? d.executionSteps : [],
-        hashtags: Array.isArray(d.hashtags) ? d.hashtags : [],
-      }));
-      setGeneratedPlan(nextPlan);
-      setSelectedPlanDays(
-        Number(result?.plan?.durationDays ?? result?.data?.planDays ?? selectedPlanDays ?? nextPlan.length ?? 0),
-      );
-      setHasGenerated(nextPlan.length > 0);
-      const nextNarrative =
-        typeof result?.plan?.narrativePlan === "string"
-          ? result.plan.narrativePlan
-          : typeof result?.data?.narrativePlan === "string"
-            ? result.data.narrativePlan
-            : "";
-      setNarrativePlan(nextNarrative);
-      setNarrativeOpen(Boolean(nextNarrative));
-      setCompletedMap(nextPlan.reduce<Record<number, boolean>>((acc, day) => {
-        if (day.completed) acc[day.dayNumber] = true;
-        return acc;
-      }, {}));
-      setPlanId(typeof result?.plan?._id === "string" ? result.plan._id : "");
-      setPlanStatus(result?.plan?.status ?? "active");
-      if (isNewMode) {
-        router.push("/marketing-plan");
-      }
-    } catch {
-      setModalType("serverError");
-    } finally {
-      setGenerating(false);
+        if (/^\s*[-*]\s+/.test(line)) {
+            const items: string[] = [];
+            while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) {
+                items.push(lines[i].replace(/^\s*[-*]\s+/, ""));
+                i += 1;
+            }
+            blocks.push(<ul className="mdList" key={`u-${i}`}>
+          {items.map((it, idx) => (<li key={idx}>{renderInline(it)}</li>))}
+        </ul>);
+            continue;
+        }
+        if (/^\s*\d+\.\s+/.test(line)) {
+            const items: string[] = [];
+            while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) {
+                items.push(lines[i].replace(/^\s*\d+\.\s+/, ""));
+                i += 1;
+            }
+            blocks.push(<ol className="mdOl" key={`o-${i}`}>
+          {items.map((it, idx) => (<li key={idx}>{renderInline(it)}</li>))}
+        </ol>);
+            continue;
+        }
+        const paragraph: string[] = [];
+        while (i < lines.length &&
+            !/^\s*$/.test(lines[i]) &&
+            !/^##\s+/.test(lines[i]) &&
+            !/^###\s+/.test(lines[i]) &&
+            !/^\s*[-*]\s+/.test(lines[i]) &&
+            !/^\s*\d+\.\s+/.test(lines[i]) &&
+            !/^\s*\|.+\|\s*$/.test(lines[i])) {
+            paragraph.push(lines[i]);
+            i += 1;
+        }
+        blocks.push(<p className="mdP" key={`p-${i}`}>
+        {renderInline(paragraph.join(" "))}
+      </p>);
     }
-  }
-
-  async function toggleDayCompleted(dayNumber: number, completed: boolean) {
-    const uid = auth.currentUser?.uid ?? user?.uid;
-    console.log("UID", uid);
-    if (!uid || savingDayNumber) return;
-
-    const previousCompleted = Boolean(completedMap[dayNumber]);
-    setSavingDayNumber(dayNumber);
-    setCompletedMap((prev) => ({
-      ...prev,
-      [dayNumber]: completed,
-    }));
-
-    try {
-      const response = await fetch("/api/marketing-plan/day-complete", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ firebase_uid: uid, planId, dayNumber, completed }),
-      });
-      const result = (await response.json()) as CompleteDayResponse;
-
-      if (!response.ok || !result?.ok) {
+    return <div className="mdWrap">{blocks}</div>;
+}
+export default function MarketingPlanPage() {
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const { user, loading: authLoading } = useAuth();
+    const isNewMode = searchParams.get("mode") === "new";
+    const requestedDays = Number(searchParams.get("days") ?? 0);
+    const [isLoading, setIsLoading] = useState(true);
+    const [businessDetails, setBusinessDetails] = useState<BusinessDetails | null>(null);
+    const [selectedPlanDays, setSelectedPlanDays] = useState<number | null>(null);
+    const [modalType, setModalType] = useState<ModalType>(null);
+    const [generating, setGenerating] = useState(false);
+    const [generatedPlan, setGeneratedPlan] = useState<GeneratedDay[]>([]);
+    const [hasGenerated, setHasGenerated] = useState(false);
+    const [narrativePlan, setNarrativePlan] = useState<string>("");
+    const [narrativeOpen, setNarrativeOpen] = useState(false);
+    const [completedMap, setCompletedMap] = useState<Record<number, boolean>>({});
+    const [savingDayNumber, setSavingDayNumber] = useState<number | null>(null);
+    const [planId, setPlanId] = useState<string>("");
+    const [planStatus, setPlanStatus] = useState<"active" | "completed" | "archived">("active");
+    const [missingProfileFields, setMissingProfileFields] = useState<string[]>([]);
+    const canGenerate = !isLoading && !!businessDetails && !!selectedPlanDays && !generating && (!hasGenerated || isNewMode);
+    const loadInitialData = useCallback(async () => {
+        const uid = auth.currentUser?.uid ?? user?.uid;
+        console.log("UID", uid);
+        if (!uid)
+            return;
+        setIsLoading(true);
+        setModalType(null);
+        setMissingProfileFields([]);
+        try {
+            const businessRes = await fetch(`/api/business-profile?firebase_uid=${encodeURIComponent(uid)}`, {
+                cache: "no-store",
+            });
+            const businessJson = await businessRes.json();
+            if (businessRes.status === 404 ||
+                (businessJson?.ok === false &&
+                    (businessJson?.error === "No business profile" || businessJson?.error === "business_profile_not_found"))) {
+                setBusinessDetails(null);
+                setSelectedPlanDays(null);
+                setModalType("missingBusiness");
+                return;
+            }
+            if (!businessRes.ok || !businessJson?.ok) {
+                throw new Error(businessJson?.error || "Failed to load business details");
+            }
+            setBusinessDetails((businessJson.data ?? {}) as BusinessDetails);
+            const planRes = await fetch(`/api/select-plan?firebase_uid=${encodeURIComponent(uid)}`, {
+                cache: "no-store",
+            });
+            const planJson = await planRes.json();
+            if (planRes.status === 404 ||
+                (planJson?.ok === false && (planJson?.error === "No plan selected" || planJson?.error === "plan_not_selected"))) {
+                setSelectedPlanDays(null);
+                setModalType("missingPlan");
+                return;
+            }
+            if (!planRes.ok || !planJson?.ok) {
+                throw new Error(planJson?.error || "Failed to load selected plan");
+            }
+            const selected = (planJson.data ?? {}) as SelectedPlan;
+            const savedNextDays = Number((planJson.data as Record<string, unknown>)?.next_plan_days ?? 0);
+            const days = [7, 14, 30].includes(requestedDays)
+                ? requestedDays
+                : Number(savedNextDays || (selected.planDays ?? selected.plan_days ?? 0));
+            if (![7, 14, 30].includes(days)) {
+                setSelectedPlanDays(null);
+                setModalType("missingPlan");
+                return;
+            }
+            setSelectedPlanDays(days);
+            if (isNewMode) {
+                setGeneratedPlan([]);
+                setHasGenerated(false);
+                setNarrativePlan("");
+                setCompletedMap({});
+                setPlanId("");
+                setPlanStatus("active");
+                return;
+            }
+            const latestRes = await fetch(`/api/marketing-plan/latest?firebase_uid=${encodeURIComponent(uid)}`, {
+                cache: "no-store",
+            });
+            const latestJson = (await latestRes.json()) as LatestPlanResponse;
+            if (latestRes.ok && latestJson?.ok) {
+                const plan = latestJson.plan;
+                const rawPlan = Array.isArray(plan?.planDays) ? plan.planDays : [];
+                const normalized = rawPlan.map((d) => ({
+                    ...d,
+                    executionSteps: Array.isArray(d.executionSteps) ? d.executionSteps : [],
+                    hashtags: Array.isArray(d.hashtags) ? d.hashtags : [],
+                }));
+                const legacyFallback = isLegacyFallbackPlan(normalized);
+                setGeneratedPlan(legacyFallback ? [] : normalized);
+                setHasGenerated(normalized.length > 0 && !legacyFallback);
+                setSelectedPlanDays(Number(plan?.durationDays ?? days));
+                setNarrativePlan(typeof plan?.narrativePlan === "string" ? plan.narrativePlan : "");
+                const completedDays = normalized.filter((day) => day.completed).map((day) => day.dayNumber);
+                setCompletedMap(completedDays.reduce<Record<number, boolean>>((acc, day) => {
+                    const dayNumber = Number(day);
+                    if (Number.isInteger(dayNumber) && dayNumber > 0)
+                        acc[dayNumber] = true;
+                    return acc;
+                }, {}));
+                setPlanId(typeof plan?._id === "string" ? plan._id : "");
+                setPlanStatus(plan?.status ?? "active");
+            }
+            else {
+                setGeneratedPlan([]);
+                setHasGenerated(false);
+                setNarrativePlan("");
+                setCompletedMap({});
+            }
+        }
+        catch {
+            setBusinessDetails(null);
+            setSelectedPlanDays(null);
+            setModalType("serverError");
+        }
+        finally {
+            setIsLoading(false);
+        }
+    }, [user?.uid, isNewMode, requestedDays]);
+    async function generatePlan() {
+        const uid = auth.currentUser?.uid ?? user?.uid;
+        console.log("UID", uid);
+        if (!uid) {
+            router.replace("/login");
+            return;
+        }
+        setGenerating(true);
+        setModalType(null);
+        setMissingProfileFields([]);
+        try {
+            const response = await fetch("/api/marketing-plan/generate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    firebase_uid: uid,
+                    durationDays: selectedPlanDays,
+                    days: selectedPlanDays,
+                    mode: isNewMode ? "new" : "default",
+                    forceNew: isNewMode,
+                }),
+            });
+            const result = await response.json();
+            if (!response.ok || !result?.ok) {
+                if (result?.error === "business_profile_not_found") {
+                    setModalType("missingBusiness");
+                }
+                else if (result?.error === "business_profile_incomplete") {
+                    setMissingProfileFields(Array.isArray(result?.missingFields) ? result.missingFields.map((value: unknown) => String(value)) : []);
+                    setModalType("incompleteBusiness");
+                }
+                else if (result?.error === "plan_not_selected") {
+                    setModalType("missingPlan");
+                }
+                else {
+                    setModalType("serverError");
+                }
+                return;
+            }
+            const rawNext = Array.isArray(result?.plan?.planDays)
+                ? result.plan.planDays
+                : Array.isArray(result?.data?.planDays)
+                    ? result.data.planDays
+                    : Array.isArray(result?.data?.planData)
+                        ? result.data.planData
+                        : [];
+            const nextPlan = rawNext.map((d: GeneratedDay) => ({
+                ...d,
+                executionSteps: Array.isArray(d.executionSteps) ? d.executionSteps : [],
+                hashtags: Array.isArray(d.hashtags) ? d.hashtags : [],
+            }));
+            setGeneratedPlan(nextPlan);
+            setSelectedPlanDays(Number(result?.plan?.durationDays ?? result?.data?.planDays ?? selectedPlanDays ?? nextPlan.length ?? 0));
+            setHasGenerated(nextPlan.length > 0);
+            const nextNarrative = typeof result?.plan?.narrativePlan === "string"
+                ? result.plan.narrativePlan
+                : typeof result?.data?.narrativePlan === "string"
+                    ? result.data.narrativePlan
+                    : "";
+            setNarrativePlan(nextNarrative);
+            setNarrativeOpen(Boolean(nextNarrative));
+            setCompletedMap(nextPlan.reduce<Record<number, boolean>>((acc, day) => {
+                if (day.completed)
+                    acc[day.dayNumber] = true;
+                return acc;
+            }, {}));
+            setPlanId(typeof result?.plan?._id === "string" ? result.plan._id : "");
+            setPlanStatus(result?.plan?.status ?? "active");
+            if (isNewMode) {
+                router.push("/marketing-plan");
+            }
+        }
+        catch {
+            setModalType("serverError");
+        }
+        finally {
+            setGenerating(false);
+        }
+    }
+    async function toggleDayCompleted(dayNumber: number, completed: boolean) {
+        const uid = auth.currentUser?.uid ?? user?.uid;
+        console.log("UID", uid);
+        if (!uid || savingDayNumber)
+            return;
+        const previousCompleted = Boolean(completedMap[dayNumber]);
+        setSavingDayNumber(dayNumber);
         setCompletedMap((prev) => ({
-          ...prev,
-          [dayNumber]: previousCompleted,
+            ...prev,
+            [dayNumber]: completed,
         }));
-        setModalType("serverError");
-        return;
-      }
-
-      const nextPlanDays = Array.isArray(result?.plan?.planDays) ? result.plan.planDays : [];
-      const completedDays = nextPlanDays.filter((day) => day.completed).map((day) => day.dayNumber);
-      setCompletedMap(
-        completedDays.reduce<Record<number, boolean>>((acc, day) => {
-          const completedDay = Number(day);
-          if (Number.isInteger(completedDay) && completedDay > 0) acc[completedDay] = true;
-          return acc;
-        }, {}),
-      );
-      setGeneratedPlan(nextPlanDays);
-      setPlanStatus(result?.plan?.status ?? "active");
-    } catch {
-      setCompletedMap((prev) => ({
-        ...prev,
-        [dayNumber]: previousCompleted,
-      }));
-      setModalType("serverError");
-    } finally {
-      setSavingDayNumber(null);
+        try {
+            const response = await fetch("/api/marketing-plan/day-complete", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ firebase_uid: uid, planId, dayNumber, completed }),
+            });
+            const result = (await response.json()) as CompleteDayResponse;
+            if (!response.ok || !result?.ok) {
+                setCompletedMap((prev) => ({
+                    ...prev,
+                    [dayNumber]: previousCompleted,
+                }));
+                setModalType("serverError");
+                return;
+            }
+            const nextPlanDays = Array.isArray(result?.plan?.planDays) ? result.plan.planDays : [];
+            const completedDays = nextPlanDays.filter((day) => day.completed).map((day) => day.dayNumber);
+            setCompletedMap(completedDays.reduce<Record<number, boolean>>((acc, day) => {
+                const completedDay = Number(day);
+                if (Number.isInteger(completedDay) && completedDay > 0)
+                    acc[completedDay] = true;
+                return acc;
+            }, {}));
+            setGeneratedPlan(nextPlanDays);
+            setPlanStatus(result?.plan?.status ?? "active");
+        }
+        catch {
+            setCompletedMap((prev) => ({
+                ...prev,
+                [dayNumber]: previousCompleted,
+            }));
+            setModalType("serverError");
+        }
+        finally {
+            setSavingDayNumber(null);
+        }
     }
-  }
-
-  function downloadPdf() {
-    if (generatedPlan.length === 0) return;
-    const businessName = (businessDetails?.businessName ?? "Business")
-      .replace(/[^\w\s-]/g, "")
-      .trim()
-      .replace(/\s+/g, "_");
-    const days = selectedPlanDays ?? generatedPlan.length;
-    downloadMarketingPlanPdf({
-      businessName: businessDetails?.businessName ?? "Business",
-      planDays: days,
-      planData: generatedPlan,
-      filename: `BizBoost_Plan_${businessName || "Business"}_${days}Days.pdf`,
-    });
-  }
-
-  useEffect(() => {
-    if (authLoading) return;
-
-    if (!user?.uid) {
-      router.replace("/login");
-      return;
+    function downloadPdf() {
+        if (generatedPlan.length === 0)
+            return;
+        const businessName = (businessDetails?.businessName ?? "Business")
+            .replace(/[^\w\s-]/g, "")
+            .trim()
+            .replace(/\s+/g, "_");
+        const days = selectedPlanDays ?? generatedPlan.length;
+        downloadMarketingPlanPdf({
+            businessName: businessDetails?.businessName ?? "Business",
+            planDays: days,
+            planData: generatedPlan,
+            filename: `BizBoost_Plan_${businessName || "Business"}_${days}Days.pdf`,
+        });
     }
-
-    void loadInitialData();
-  }, [authLoading, user?.uid, router, loadInitialData]);
-
-  const modalContent = useMemo(() => {
-    if (modalType === "missingBusiness") {
-      return {
-        title: "Fill business details first",
-        text: "Please complete your business details.",
-        primaryText: "Go to Business Details",
-        primaryAction: () => router.push("/onboarding/business-details"),
-        secondaryText: "Close",
-        secondaryAction: () => setModalType(null),
-      };
-    }
-
-    if (modalType === "incompleteBusiness") {
-      const fieldsText = missingProfileFields.length > 0
-        ? `Missing: ${missingProfileFields.join(", ")}.`
-        : "Some required details are missing.";
-      return {
-        title: "Complete business details",
-        text: `${fieldsText} Update your business profile, then generate your plan again.`,
-        primaryText: "Update Business Details",
-        primaryAction: () => router.push("/onboarding/business-details"),
-        secondaryText: "Close",
-        secondaryAction: () => setModalType(null),
-      };
-    }
-
-    if (modalType === "missingPlan") {
-      return {
-        title: "Select a plan first",
-        text: "Please choose a plan to continue.",
-        primaryText: "Go to Select Plan",
-        primaryAction: () => router.push("/select-plan"),
-        secondaryText: "Close",
-        secondaryAction: () => setModalType(null),
-      };
-    }
-
-    if (modalType === "serverError") {
-      return {
-        title: "Something went wrong",
-        text: "Please try again.",
-        primaryText: "Retry",
-        primaryAction: () => void loadInitialData(),
-        secondaryText: "Close",
-        secondaryAction: () => setModalType(null),
-      };
-    }
-
-    return null;
-  }, [modalType, missingProfileFields, router, loadInitialData]);
-
-  const planDaysLabel = selectedPlanDays ?? generatedPlan.length ?? 0;
-  const safePlan = Array.isArray(generatedPlan) ? generatedPlan : [];
-  const completedCount = safePlan.filter((day) => completedMap[day.dayNumber]).length;
-  const progressPercent = safePlan.length > 0 ? Math.round((completedCount / safePlan.length) * 100) : 0;
-  const planFullyCompleted = isPlanFullyCompleted(safePlan, completedMap);
-  const todayPlanDay = getTodayPlanDay(safePlan);
-  const fallbackDay = getNextIncompleteDay(safePlan, completedMap);
-  const taskDay = todayPlanDay ?? fallbackDay;
-  const isTodayTaskCompleted = Boolean(todayPlanDay && completedMap[todayPlanDay.dayNumber]);
-  const isFallbackTask = !todayPlanDay && Boolean(fallbackDay);
-
-  return (
-    <div className="planPage">
+    useEffect(() => {
+        if (authLoading)
+            return;
+        if (!user?.uid) {
+            router.replace("/login");
+            return;
+        }
+        void loadInitialData();
+    }, [authLoading, user?.uid, router, loadInitialData]);
+    const modalContent = useMemo(() => {
+        if (modalType === "missingBusiness") {
+            return {
+                title: "Fill business details first",
+                text: "Please complete your business details.",
+                primaryText: "Go to Business Details",
+                primaryAction: () => router.push("/onboarding/business-details"),
+                secondaryText: "Close",
+                secondaryAction: () => setModalType(null),
+            };
+        }
+        if (modalType === "incompleteBusiness") {
+            const fieldsText = missingProfileFields.length > 0
+                ? `Missing: ${missingProfileFields.join(", ")}.`
+                : "Some required details are missing.";
+            return {
+                title: "Complete business details",
+                text: `${fieldsText} Update your business profile, then generate your plan again.`,
+                primaryText: "Update Business Details",
+                primaryAction: () => router.push("/onboarding/business-details"),
+                secondaryText: "Close",
+                secondaryAction: () => setModalType(null),
+            };
+        }
+        if (modalType === "missingPlan") {
+            return {
+                title: "Select a plan first",
+                text: "Please choose a plan to continue.",
+                primaryText: "Go to Select Plan",
+                primaryAction: () => router.push("/select-plan"),
+                secondaryText: "Close",
+                secondaryAction: () => setModalType(null),
+            };
+        }
+        if (modalType === "serverError") {
+            return {
+                title: "Something went wrong",
+                text: "Please try again.",
+                primaryText: "Retry",
+                primaryAction: () => void loadInitialData(),
+                secondaryText: "Close",
+                secondaryAction: () => setModalType(null),
+            };
+        }
+        return null;
+    }, [modalType, missingProfileFields, router, loadInitialData]);
+    const planDaysLabel = selectedPlanDays ?? generatedPlan.length ?? 0;
+    const safePlan = Array.isArray(generatedPlan) ? generatedPlan : [];
+    const completedCount = safePlan.filter((day) => completedMap[day.dayNumber]).length;
+    const progressPercent = safePlan.length > 0 ? Math.round((completedCount / safePlan.length) * 100) : 0;
+    const planFullyCompleted = isPlanFullyCompleted(safePlan, completedMap);
+    const todayPlanDay = getTodayPlanDay(safePlan);
+    const fallbackDay = getNextIncompleteDay(safePlan, completedMap);
+    const taskDay = todayPlanDay ?? fallbackDay;
+    const isTodayTaskCompleted = Boolean(todayPlanDay && completedMap[todayPlanDay.dayNumber]);
+    const isFallbackTask = !todayPlanDay && Boolean(fallbackDay);
+    return (<div className="planPage">
       <div className="planShell">
         <section className="topCard">
           <div className="topInner">
@@ -650,97 +575,67 @@ export default function MarketingPlanPage() {
             </div>
           </div>
 
-          {!hasGenerated ? (
-            <div className="generateWrap">
+          {!hasGenerated ? (<div className="generateWrap">
               <button type="button" disabled={!canGenerate} onClick={() => void generatePlan()} className="generateBtn">
-                {generating ? (
-                  <>
-                    <span className="spinner" />
+                {generating ? (<>
+                    <span className="spinner"/>
                     Generating...
-                  </>
-                ) : (
-                  isNewMode ? "Generate New Plan" : "Generate My Plan"
-                )}
+                  </>) : (isNewMode ? "Generate New Plan" : "Generate My Plan")}
               </button>
-            </div>
-          ) : (
-            <p className="planSavedNote">Your latest plan is saved and loads automatically on every visit.</p>
-          )}
+            </div>) : (<p className="planSavedNote">Your latest plan is saved and loads automatically on every visit.</p>)}
         </section>
 
         <section className="listCard">
-          {planFullyCompleted ? (
-            <div className="planCompleteCard topBanner">
+          {planFullyCompleted ? (<div className="planCompleteCard topBanner">
               <p className="planCompleteTitle">Plan Completed 🎉</p>
               <p className="planCompleteText">Great work! You completed all scheduled tasks.</p>
               <div className="planCompleteActions">
                 <button type="button" className="downloadBtn" onClick={() => router.push("/select-plan?mode=new")}>Start New Plan</button>
               </div>
-            </div>
-          ) : (
-            <section className={`todayTaskCard taskCardInset ${isTodayTaskCompleted ? "todayTaskCelebration" : ""}`}>
+            </div>) : (<section className={`todayTaskCard taskCardInset ${isTodayTaskCompleted ? "todayTaskCelebration" : ""}`}>
               <div className="todayTaskHead">
                 <h3>
                   {isTodayTaskCompleted
-                    ? "Today completed 🎉"
-                    : isFallbackTask
-                      ? "Next Task"
-                      : "Today’s Task"}
+                ? "Today completed 🎉"
+                : isFallbackTask
+                    ? "Next Task"
+                    : "Today’s Task"}
                 </h3>
               </div>
-              {isLoading ? (
-                <div className="todayTaskBody">
+              {isLoading ? (<div className="todayTaskBody">
                   <p className="todayTaskSub">Loading today&apos;s task…</p>
-                </div>
-              ) : taskDay ? (
-                <div className="todayTaskBody">
+                </div>) : taskDay ? (<div className="todayTaskBody">
                   <span className="todayTaskDate">{taskDay.dateLabel || "Today"}</span>
                   <p className="todayTaskTitle">
                     {taskDay.mainActionTitle ? cleanTitle(taskDay.mainActionTitle) || taskDay.mainActionTitle : `Day ${taskDay.dayNumber} action`}
                   </p>
-                  {isTodayTaskCompleted ? (
-                    <>
+                  {isTodayTaskCompleted ? (<>
                       <div className="todayTaskActionsRow">
                         <button type="button" className="todayTaskBtn todayTaskBtnSecondary" disabled>
                           Completed
                         </button>
-                        {fallbackDay && fallbackDay.dayNumber !== taskDay.dayNumber ? (
-                          <button
-                            type="button"
-                            className="todayTaskBtn todayTaskBtnPrimary"
-                            onClick={() => router.push(`/marketing-plan/day/${fallbackDay.dayNumber}`)}
-                          >
+                        {fallbackDay && fallbackDay.dayNumber !== taskDay.dayNumber ? (<button type="button" className="todayTaskBtn todayTaskBtnPrimary" onClick={() => router.push(`/marketing-plan/day/${fallbackDay.dayNumber}`)}>
                             View Tomorrow →
-                          </button>
-                        ) : null}
+                          </button>) : null}
                       </div>
                       <p className="todayTaskHint">Today is done. Keep the streak going!</p>
-                    </>
-                  ) : (
-                    <button type="button" className="todayTaskBtn todayTaskBtnPrimary" onClick={() => router.push(`/marketing-plan/day/${taskDay.dayNumber}`)}>
+                    </>) : (<button type="button" className="todayTaskBtn todayTaskBtnPrimary" onClick={() => router.push(`/marketing-plan/day/${taskDay.dayNumber}`)}>
                       Open Day Detail
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="todayTaskBody">
+                    </button>)}
+                </div>) : (<div className="todayTaskBody">
                   <p className="todayTaskSub">No task available yet.</p>
-                </div>
-              )}
-            </section>
-          )}
+                </div>)}
+            </section>)}
           <div className="listHead">
             <div>
               <h2>Your growth plan ({planDaysLabel} days)</h2>
-              {safePlan.length > 0 ? (
-                <>
+              {safePlan.length > 0 ? (<>
                   <p className="planListSub">Each day: business growth task first, then marketing activation to support it.</p>
                   <div className="progressSummary">
                     <span>{completedCount}/{safePlan.length} completed</span>
                     <span>{progressPercent}%</span>
                   </div>
-                </>
-              ) : null}
+                </>) : null}
             </div>
             <div className="headRight">
               <span className="daysBadge">{planDaysLabel || 0} Days</span>
@@ -751,40 +646,18 @@ export default function MarketingPlanPage() {
               </button>
             </div>
           </div>
-          {safePlan.length === 0 ? (
-            <div className="emptyState">Generate your plan to see daily actions here.</div>
-          ) : (
-            <div className="rows">
-              {safePlan.map((day) => (
-                <div
-                  key={day.dayNumber}
-                  className={`dayRow ${completedMap[day.dayNumber] ? "dayRowCompleted" : ""}`}
-                  onClick={() => router.push(`/marketing-plan/day/${day.dayNumber}`)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(event) => {
+          {safePlan.length === 0 ? (<div className="emptyState">Generate your plan to see daily actions here.</div>) : (<div className="rows">
+              {safePlan.map((day) => (<div key={day.dayNumber} className={`dayRow ${completedMap[day.dayNumber] ? "dayRowCompleted" : ""}`} onClick={() => router.push(`/marketing-plan/day/${day.dayNumber}`)} role="button" tabIndex={0} onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      router.push(`/marketing-plan/day/${day.dayNumber}`);
+                        event.preventDefault();
+                        router.push(`/marketing-plan/day/${day.dayNumber}`);
                     }
-                  }}
-                >
-                  <label
-                    className={`dayCheckWrap ${savingDayNumber === day.dayNumber ? "dayCheckWrapSaving" : ""}`}
-                    aria-label={`Mark day ${day.dayNumber} as completed`}
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    <input
-                      type="checkbox"
-                      className="dayCheck"
-                      checked={Boolean(completedMap[day.dayNumber])}
-                      disabled={savingDayNumber === day.dayNumber}
-                      onChange={(event) => {
-                        event.stopPropagation();
-                        void toggleDayCompleted(day.dayNumber, event.target.checked);
-                      }}
-                      onClick={(event) => event.stopPropagation()}
-                    />
+                }}>
+                  <label className={`dayCheckWrap ${savingDayNumber === day.dayNumber ? "dayCheckWrapSaving" : ""}`} aria-label={`Mark day ${day.dayNumber} as completed`} onClick={(event) => event.stopPropagation()}>
+                    <input type="checkbox" className="dayCheck" checked={Boolean(completedMap[day.dayNumber])} disabled={savingDayNumber === day.dayNumber} onChange={(event) => {
+                    event.stopPropagation();
+                    void toggleDayCompleted(day.dayNumber, event.target.checked);
+                }} onClick={(event) => event.stopPropagation()}/>
                     <span className="dayCheckVisual" aria-hidden>
                       {savingDayNumber === day.dayNumber ? "…" : completedMap[day.dayNumber] ? "✓" : ""}
                     </span>
@@ -813,14 +686,11 @@ export default function MarketingPlanPage() {
                     </div>
                     <span className="rowArrow" aria-hidden>→</span>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                </div>))}
+            </div>)}
         </section>
 
-        {narrativePlan && (
-          <section className="narrativeCard">
+        {narrativePlan && (<section className="narrativeCard">
             <div className="narrativeHead">
               <div>
                 <p className="eyebrow">AI Strategy Report</p>
@@ -833,15 +703,11 @@ export default function MarketingPlanPage() {
                 {narrativeOpen ? "Hide" : "View Full Plan"}
               </button>
             </div>
-            {narrativeOpen && (
-              <div className="narrativeBody">{renderMarkdownPlan(narrativePlan)}</div>
-            )}
-          </section>
-        )}
+            {narrativeOpen && (<div className="narrativeBody">{renderMarkdownPlan(narrativePlan)}</div>)}
+          </section>)}
       </div>
 
-      {modalContent && (
-        <div className="modalOverlay">
+      {modalContent && (<div className="modalOverlay">
           <div className="modalCard">
             <h3>{modalContent.title}</h3>
             <p>{modalContent.text}</p>
@@ -854,8 +720,7 @@ export default function MarketingPlanPage() {
               </button>
             </div>
           </div>
-        </div>
-      )}
+        </div>)}
 
       <style jsx>{`
         .planPage {
@@ -1641,6 +1506,5 @@ export default function MarketingPlanPage() {
           }
         }
       `}</style>
-    </div>
-  );
+    </div>);
 }

@@ -1,468 +1,445 @@
 "use client";
-
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/src/lib/useAuth";
-
 type DayPlan = {
-  dayNumber: number;
-  dateISO?: string;
-  dateLabel?: string;
-  dayTheme?: string;
-  mainActionTitle?: string;
-  businessGrowthAction?: string;
-  executionSteps?: string[];
-  postIdea?: string;
-  caption?: string;
-  marketingActivation?: {
-    platform?: "Instagram" | "Facebook" | "Both";
-    format?: "Reel" | "Story" | "Feed" | "Carousel";
-    bestTime?: string;
-    goal?: "DMs" | "Orders" | "Bookings" | "Footfall" | "Leads";
-    postBrief?: string;
-    hook?: string;
-    visualGuide?: string[];
-    posterHeadlineHint?: string;
-    channel?: "instagram" | "facebook" | "both";
-    formatPlan?: Array<"Reel" | "Story" | "FeedPost" | "Carousel">;
-    contentBrief?: string;
+    dayNumber: number;
+    dateISO?: string;
+    dateLabel?: string;
+    dayTheme?: string;
+    mainActionTitle?: string;
+    businessGrowthAction?: string;
+    executionSteps?: string[];
     postIdea?: string;
     caption?: string;
+    marketingActivation?: {
+        platform?: "Instagram" | "Facebook" | "Both";
+        format?: "Reel" | "Story" | "Feed" | "Carousel";
+        bestTime?: string;
+        goal?: "DMs" | "Orders" | "Bookings" | "Footfall" | "Leads";
+        postBrief?: string;
+        hook?: string;
+        visualGuide?: string[];
+        posterHeadlineHint?: string;
+        channel?: "instagram" | "facebook" | "both";
+        formatPlan?: Array<"Reel" | "Story" | "FeedPost" | "Carousel">;
+        contentBrief?: string;
+        postIdea?: string;
+        caption?: string;
+        hashtags?: string[];
+        postingTime?: string;
+        cta?: string;
+        matchNote?: string;
+        storyFrames?: string[];
+        reelScript?: {
+            hook?: string;
+            beats?: string[];
+            cta?: string;
+        };
+        posterHint?: string;
+        offerDeadlineHint?: string;
+    };
     hashtags?: string[];
-    postingTime?: string;
-    cta?: string;
-    matchNote?: string;
-    storyFrames?: string[];
-    reelScript?: {
-      hook?: string;
-      beats?: string[];
-      cta?: string;
-    };
+    successMetric?: string;
     posterHint?: string;
-    offerDeadlineHint?: string;
-  };
-  hashtags?: string[];
-  successMetric?: string;
-  posterHint?: string;
-  notes?: string;
-  completed?: boolean;
+    notes?: string;
+    completed?: boolean;
 };
-
 type LatestPlanResponse = {
-  ok: boolean;
-  plan?: {
-    _id?: string;
-    durationDays?: number;
-    planDays?: DayPlan[];
-    businessSnapshot?: {
-      businessName?: string;
-      businessType?: string;
+    ok: boolean;
+    plan?: {
+        _id?: string;
+        durationDays?: number;
+        planDays?: DayPlan[];
+        businessSnapshot?: {
+            businessName?: string;
+            businessType?: string;
+        };
     };
-  };
-  error?: string;
+    error?: string;
 };
-
 type ModalType = "missingBusiness" | "missingPlan" | "noPlan" | "serverError" | null;
-
 type SuccessScoreData = {
-  successPercent: number;
-  reasons: string[];
-  improvements: string[];
+    successPercent: number;
+    reasons: string[];
+    improvements: string[];
 };
-
 const cleanDayTitle = (title: string) => title.replace(/^Week\s*\d+\s*/i, "").replace(/^Day\s*\d+\s*/i, "").trim();
-
-
 export default function MarketingPlanDayPage() {
-  const params = useParams<{ day: string }>();
-  const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
-
-  const dayNumber = Number(params?.day ?? 0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [copied, setCopied] = useState(false);
-  const [modalType, setModalType] = useState<ModalType>(null);
-  const [planDays, setPlanDays] = useState<number>(0);
-  const [businessName, setBusinessName] = useState<string>("");
-  const [businessProfile, setBusinessProfile] = useState<Record<string, unknown>>({});
-  const [currentDay, setCurrentDay] = useState<DayPlan | null>(null);
-  const [completedDays, setCompletedDays] = useState<number[]>([]);
-  const [isCompleting, setIsCompleting] = useState(false);
-  const [planId, setPlanId] = useState<string>("");
-  const [scoreLoading, setScoreLoading] = useState(false);
-  const [scoreError, setScoreError] = useState("");
-  const [successScore, setSuccessScore] = useState<SuccessScoreData | null>(null);
-
-  useEffect(() => {
-    // Keep Day Detail pinned to top on initial load and day-id changes.
-    if (typeof window !== "undefined") {
-      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-      document.documentElement.scrollTop = 0;
-      document.body.scrollTop = 0;
-    }
-  }, [dayNumber]);
-
-  useEffect(() => {
-    if (authLoading) return;
-    if (!user?.uid) {
-      router.replace("/login");
-      return;
-    }
-
-    if (!Number.isFinite(dayNumber) || dayNumber <= 0) {
-      router.push("/marketing-plan");
-      return;
-    }
-
-    const load = async () => {
-      setIsLoading(true);
-      setModalType(null);
-      try {
-        const businessRes = await fetch(`/api/business-profile?firebase_uid=${encodeURIComponent(user.uid)}`, { cache: "no-store" });
-        const businessJson = await businessRes.json();
-        if (businessRes.status === 404 || businessJson?.error === "business_profile_not_found") {
-          setModalType("missingBusiness");
-          return;
+    const params = useParams<{
+        day: string;
+    }>();
+    const router = useRouter();
+    const { user, loading: authLoading } = useAuth();
+    const dayNumber = Number(params?.day ?? 0);
+    const [isLoading, setIsLoading] = useState(true);
+    const [copied, setCopied] = useState(false);
+    const [modalType, setModalType] = useState<ModalType>(null);
+    const [planDays, setPlanDays] = useState<number>(0);
+    const [businessName, setBusinessName] = useState<string>("");
+    const [businessProfile, setBusinessProfile] = useState<Record<string, unknown>>({});
+    const [currentDay, setCurrentDay] = useState<DayPlan | null>(null);
+    const [completedDays, setCompletedDays] = useState<number[]>([]);
+    const [isCompleting, setIsCompleting] = useState(false);
+    const [planId, setPlanId] = useState<string>("");
+    const [scoreLoading, setScoreLoading] = useState(false);
+    const [scoreError, setScoreError] = useState("");
+    const [successScore, setSuccessScore] = useState<SuccessScoreData | null>(null);
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+            document.documentElement.scrollTop = 0;
+            document.body.scrollTop = 0;
         }
-
-        const selectedRes = await fetch(`/api/select-plan?firebase_uid=${encodeURIComponent(user.uid)}`, { cache: "no-store" });
-        const selectedJson = await selectedRes.json();
-        if (selectedRes.status === 404 || selectedJson?.error === "No plan selected" || selectedJson?.error === "plan_not_selected") {
-          setModalType("missingPlan");
-          return;
+    }, [dayNumber]);
+    useEffect(() => {
+        if (authLoading)
+            return;
+        if (!user?.uid) {
+            router.replace("/login");
+            return;
         }
-
-        const latestRes = await fetch(`/api/marketing-plan/latest?firebase_uid=${encodeURIComponent(user.uid)}`, { cache: "no-store" });
-        const latestJson = (await latestRes.json()) as LatestPlanResponse;
-
-        if (latestRes.status === 404 || latestJson?.error === "no_plan_found") {
-          setModalType("noPlan");
-          return;
+        if (!Number.isFinite(dayNumber) || dayNumber <= 0) {
+            router.push("/marketing-plan");
+            return;
         }
-        if (!latestRes.ok || !latestJson.ok) {
-          setModalType("serverError");
-          return;
+        const load = async () => {
+            setIsLoading(true);
+            setModalType(null);
+            try {
+                const businessRes = await fetch(`/api/business-profile?firebase_uid=${encodeURIComponent(user.uid)}`, { cache: "no-store" });
+                const businessJson = await businessRes.json();
+                if (businessRes.status === 404 || businessJson?.error === "business_profile_not_found") {
+                    setModalType("missingBusiness");
+                    return;
+                }
+                const selectedRes = await fetch(`/api/select-plan?firebase_uid=${encodeURIComponent(user.uid)}`, { cache: "no-store" });
+                const selectedJson = await selectedRes.json();
+                if (selectedRes.status === 404 || selectedJson?.error === "No plan selected" || selectedJson?.error === "plan_not_selected") {
+                    setModalType("missingPlan");
+                    return;
+                }
+                const latestRes = await fetch(`/api/marketing-plan/latest?firebase_uid=${encodeURIComponent(user.uid)}`, { cache: "no-store" });
+                const latestJson = (await latestRes.json()) as LatestPlanResponse;
+                if (latestRes.status === 404 || latestJson?.error === "no_plan_found") {
+                    setModalType("noPlan");
+                    return;
+                }
+                if (!latestRes.ok || !latestJson.ok) {
+                    setModalType("serverError");
+                    return;
+                }
+                const data = latestJson.plan ?? {};
+                const safePlan = Array.isArray(data.planDays) ? data.planDays : [];
+                const found = safePlan.find((item) => Number(item.dayNumber) === dayNumber) ?? null;
+                if (!found) {
+                    router.push("/marketing-plan");
+                    return;
+                }
+                setCurrentDay({
+                    ...found,
+                    executionSteps: Array.isArray(found.executionSteps) ? found.executionSteps : [],
+                    hashtags: Array.isArray(found.hashtags) ? found.hashtags : [],
+                });
+                setBusinessProfile(businessJson?.data && typeof businessJson.data === "object" ? (businessJson.data as Record<string, unknown>) : {});
+                setBusinessName(data.businessSnapshot?.businessName ?? businessJson?.data?.businessName ?? "Business");
+                setPlanDays(Number(data.durationDays ?? safePlan.length ?? 0));
+                setCompletedDays(safePlan.filter((day) => day.completed).map((day) => day.dayNumber));
+                setPlanId(typeof data._id === "string" ? data._id : "");
+            }
+            catch {
+                setModalType("serverError");
+            }
+            finally {
+                setIsLoading(false);
+            }
+        };
+        void load();
+    }, [authLoading, user?.uid, router, dayNumber]);
+    useEffect(() => {
+        if (!user?.uid || !currentDay || !planId)
+            return;
+        let cancelled = false;
+        const fetchScore = async (recalculate = false) => {
+            if (cancelled)
+                return;
+            setScoreLoading(true);
+            setScoreError("");
+            try {
+                const response = await fetch("/api/ai/success-score", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        firebase_uid: user.uid,
+                        recalculate,
+                        businessProfile,
+                        dayPlan: {
+                            dayNumber: currentDay.dayNumber,
+                            dateLabel: currentDay.dateLabel,
+                            mainActionTitle: currentDay.mainActionTitle,
+                            businessGrowthAction: currentDay.businessGrowthAction,
+                            executionSteps: currentDay.executionSteps,
+                            postIdea: currentDay.marketingActivation?.postIdea ?? currentDay.postIdea,
+                            caption: currentDay.marketingActivation?.caption ?? currentDay.caption,
+                            successMetric: currentDay.successMetric,
+                        },
+                        planContext: {
+                            planId,
+                            dayNumber: currentDay.dayNumber,
+                            dateLabel: currentDay.dateLabel,
+                            totalDays: planDays,
+                        },
+                    }),
+                });
+                const json = await response.json();
+                if (cancelled)
+                    return;
+                if (!response.ok || !json?.ok || !json?.data) {
+                    setScoreError("Unable to load success probability.");
+                    return;
+                }
+                setSuccessScore({
+                    successPercent: Number(json.data.successPercent ?? 0),
+                    reasons: Array.isArray(json.data.reasons) ? json.data.reasons.map((item: unknown) => String(item)) : [],
+                    improvements: Array.isArray(json.data.improvements)
+                        ? json.data.improvements.map((item: unknown) => String(item))
+                        : [],
+                });
+            }
+            catch {
+                if (!cancelled)
+                    setScoreError("Unable to load success probability.");
+            }
+            finally {
+                if (!cancelled)
+                    setScoreLoading(false);
+            }
+        };
+        void fetchScore(false);
+        return () => {
+            cancelled = true;
+        };
+    }, [user?.uid, currentDay, planId, planDays, businessProfile]);
+    const handleRecalculateScore = async () => {
+        if (!user?.uid || !currentDay || !planId)
+            return;
+        setScoreLoading(true);
+        setScoreError("");
+        try {
+            const response = await fetch("/api/ai/success-score", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    firebase_uid: user.uid,
+                    recalculate: true,
+                    businessProfile,
+                    dayPlan: {
+                        dayNumber: currentDay.dayNumber,
+                        dateLabel: currentDay.dateLabel,
+                        mainActionTitle: currentDay.mainActionTitle,
+                        businessGrowthAction: currentDay.businessGrowthAction,
+                        executionSteps: currentDay.executionSteps,
+                        postIdea: currentDay.marketingActivation?.postIdea ?? currentDay.postIdea,
+                        caption: currentDay.marketingActivation?.caption ?? currentDay.caption,
+                        successMetric: currentDay.successMetric,
+                    },
+                    planContext: {
+                        planId,
+                        dayNumber: currentDay.dayNumber,
+                        dateLabel: currentDay.dateLabel,
+                        totalDays: planDays,
+                    },
+                }),
+            });
+            const json = await response.json();
+            if (!response.ok || !json?.ok || !json?.data) {
+                setScoreError("Unable to recalculate success probability.");
+                return;
+            }
+            setSuccessScore({
+                successPercent: Number(json.data.successPercent ?? 0),
+                reasons: Array.isArray(json.data.reasons) ? json.data.reasons.map((item: unknown) => String(item)) : [],
+                improvements: Array.isArray(json.data.improvements)
+                    ? json.data.improvements.map((item: unknown) => String(item))
+                    : [],
+            });
         }
-
-        const data = latestJson.plan ?? {};
-        const safePlan = Array.isArray(data.planDays) ? data.planDays : [];
-        const found = safePlan.find((item) => Number(item.dayNumber) === dayNumber) ?? null;
-
-        if (!found) {
-          router.push("/marketing-plan");
-          return;
+        catch {
+            setScoreError("Unable to recalculate success probability.");
         }
-
-        setCurrentDay({
-          ...found,
-          executionSteps: Array.isArray(found.executionSteps) ? found.executionSteps : [],
-          hashtags: Array.isArray(found.hashtags) ? found.hashtags : [],
-        });
-        setBusinessProfile(
-          businessJson?.data && typeof businessJson.data === "object" ? (businessJson.data as Record<string, unknown>) : {},
-        );
-        setBusinessName(data.businessSnapshot?.businessName ?? businessJson?.data?.businessName ?? "Business");
-        setPlanDays(Number(data.durationDays ?? safePlan.length ?? 0));
-        setCompletedDays(safePlan.filter((day) => day.completed).map((day) => day.dayNumber));
-        setPlanId(typeof data._id === "string" ? data._id : "");
-      } catch {
-        setModalType("serverError");
-      } finally {
-        setIsLoading(false);
-      }
+        finally {
+            setScoreLoading(false);
+        }
     };
-
-    void load();
-  }, [authLoading, user?.uid, router, dayNumber]);
-
-  useEffect(() => {
-    if (!user?.uid || !currentDay || !planId) return;
-    let cancelled = false;
-
-    const fetchScore = async (recalculate = false) => {
-      if (cancelled) return;
-      setScoreLoading(true);
-      setScoreError("");
-      try {
-        const response = await fetch("/api/ai/success-score", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            firebase_uid: user.uid,
-            recalculate,
-            businessProfile,
-            dayPlan: {
-              dayNumber: currentDay.dayNumber,
-              dateLabel: currentDay.dateLabel,
-              mainActionTitle: currentDay.mainActionTitle,
-              businessGrowthAction: currentDay.businessGrowthAction,
-              executionSteps: currentDay.executionSteps,
-              postIdea: currentDay.marketingActivation?.postIdea ?? currentDay.postIdea,
-              caption: currentDay.marketingActivation?.caption ?? currentDay.caption,
-              successMetric: currentDay.successMetric,
-            },
-            planContext: {
-              planId,
-              dayNumber: currentDay.dayNumber,
-              dateLabel: currentDay.dateLabel,
-              totalDays: planDays,
-            },
-          }),
-        });
-        const json = await response.json();
-        if (cancelled) return;
-        if (!response.ok || !json?.ok || !json?.data) {
-          setScoreError("Unable to load success probability.");
-          return;
+    const modalContent = useMemo(() => {
+        if (modalType === "missingBusiness") {
+            return {
+                title: "Fill business details first",
+                text: "Please complete your business details before viewing day plans.",
+                primaryText: "Go to Business Details",
+                primaryAction: () => router.push("/onboarding/business-details"),
+            };
         }
-        setSuccessScore({
-          successPercent: Number(json.data.successPercent ?? 0),
-          reasons: Array.isArray(json.data.reasons) ? json.data.reasons.map((item: unknown) => String(item)) : [],
-          improvements: Array.isArray(json.data.improvements)
-            ? json.data.improvements.map((item: unknown) => String(item))
-            : [],
-        });
-      } catch {
-        if (!cancelled) setScoreError("Unable to load success probability.");
-      } finally {
-        if (!cancelled) setScoreLoading(false);
-      }
-    };
-
-    void fetchScore(false);
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.uid, currentDay, planId, planDays, businessProfile]);
-
-  const handleRecalculateScore = async () => {
-    if (!user?.uid || !currentDay || !planId) return;
-    setScoreLoading(true);
-    setScoreError("");
-    try {
-      const response = await fetch("/api/ai/success-score", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          firebase_uid: user.uid,
-          recalculate: true,
-          businessProfile,
-          dayPlan: {
-            dayNumber: currentDay.dayNumber,
-            dateLabel: currentDay.dateLabel,
-            mainActionTitle: currentDay.mainActionTitle,
-            businessGrowthAction: currentDay.businessGrowthAction,
-            executionSteps: currentDay.executionSteps,
-            postIdea: currentDay.marketingActivation?.postIdea ?? currentDay.postIdea,
-            caption: currentDay.marketingActivation?.caption ?? currentDay.caption,
-            successMetric: currentDay.successMetric,
-          },
-          planContext: {
-            planId,
-            dayNumber: currentDay.dayNumber,
-            dateLabel: currentDay.dateLabel,
-            totalDays: planDays,
-          },
-        }),
-      });
-      const json = await response.json();
-      if (!response.ok || !json?.ok || !json?.data) {
-        setScoreError("Unable to recalculate success probability.");
-        return;
-      }
-      setSuccessScore({
-        successPercent: Number(json.data.successPercent ?? 0),
-        reasons: Array.isArray(json.data.reasons) ? json.data.reasons.map((item: unknown) => String(item)) : [],
-        improvements: Array.isArray(json.data.improvements)
-          ? json.data.improvements.map((item: unknown) => String(item))
-          : [],
-      });
-    } catch {
-      setScoreError("Unable to recalculate success probability.");
-    } finally {
-      setScoreLoading(false);
+        if (modalType === "missingPlan") {
+            return {
+                title: "Select a plan first",
+                text: "Please choose a plan to continue.",
+                primaryText: "Go to Select Plan",
+                primaryAction: () => router.push("/select-plan"),
+            };
+        }
+        if (modalType === "noPlan") {
+            return {
+                title: "No generated plan yet",
+                text: "Generate your marketing plan first.",
+                primaryText: "Go to Marketing Plan",
+                primaryAction: () => router.push("/marketing-plan"),
+            };
+        }
+        if (modalType === "serverError") {
+            return {
+                title: "Something went wrong",
+                text: "Please try again.",
+                primaryText: "Back to Marketing Plan",
+                primaryAction: () => router.push("/marketing-plan"),
+            };
+        }
+        return null;
+    }, [modalType, router]);
+    async function toggleDayCompleted() {
+        if (!user?.uid)
+            return;
+        setIsCompleting(true);
+        try {
+            const response = await fetch("/api/marketing-plan/day-complete", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ firebase_uid: user.uid, planId, dayNumber, completed: !isCompleted }),
+            });
+            const result = await response.json();
+            if (!response.ok || !result?.ok) {
+                setModalType("serverError");
+                return;
+            }
+            const nextPlanDays = Array.isArray(result?.plan?.planDays) ? result.plan.planDays : [];
+            const nextCompletedDays = nextPlanDays.filter((day: DayPlan & {
+                completed?: boolean;
+            }) => day.completed).map((day: DayPlan) => day.dayNumber);
+            setCompletedDays(nextCompletedDays);
+        }
+        catch {
+            setModalType("serverError");
+        }
+        finally {
+            setIsCompleting(false);
+        }
     }
-  };
-
-  const modalContent = useMemo(() => {
-    if (modalType === "missingBusiness") {
-      return {
-        title: "Fill business details first",
-        text: "Please complete your business details before viewing day plans.",
-        primaryText: "Go to Business Details",
-        primaryAction: () => router.push("/onboarding/business-details"),
-      };
+    const isCompleted = completedDays.includes(dayNumber);
+    const activationView = useMemo(() => {
+        if (!currentDay)
+            return null;
+        const ma = currentDay.marketingActivation;
+        const squash = (s: string, max: number) => {
+            const t = (s || "").replace(/\s+/g, " ").trim();
+            if (!t)
+                return "";
+            return t.length <= max ? t : `${t.slice(0, max - 1).trim()}…`;
+        };
+        const platform = ma?.platform ?? "Both";
+        const format = ma?.format ?? "Feed";
+        const bestTime = ma?.bestTime || ma?.postingTime || "7:30 PM";
+        const goal = ma?.goal ?? "Leads";
+        const whatToPost = squash(ma?.postBrief || ma?.contentBrief || ma?.postIdea || currentDay.postIdea || "", 200);
+        const hookLine = squash(ma?.hook || "", 160);
+        const whyWorks = squash(ma?.matchNote || `Lines up with today's task and nudges people toward ${goal.toLowerCase()}.`, 190);
+        const defaultVisuals = [
+            "Show your product or service clearly with good light.",
+            "Add one short on-image line with the main benefit.",
+            "End the visual with your contact or next step.",
+        ];
+        const visuals = (ma?.visualGuide?.length ? ma.visualGuide : defaultVisuals)
+            .map((line) => squash(String(line), 150))
+            .filter(Boolean)
+            .slice(0, 3);
+        const captionText = (ma?.caption || currentDay.caption || "").trim();
+        const cta = squash(ma?.cta || "DM us to book or order.", 140);
+        const hashtags = (ma?.hashtags ?? currentDay.hashtags ?? []) as string[];
+        const storyFrames = ma?.storyFrames ?? [];
+        const reelScript = ma?.reelScript;
+        return {
+            platform,
+            format,
+            bestTime,
+            whatToPost,
+            hookLine,
+            whyWorks,
+            visuals,
+            captionText,
+            cta,
+            hashtags,
+            storyFrames,
+            reelScript,
+        };
+    }, [currentDay]);
+    const openBizEditor = useCallback(() => {
+        if (!currentDay)
+            return;
+        const backTo = `/marketing-plan/day/${dayNumber}`;
+        const postIdea = currentDay.marketingActivation?.postIdea ?? currentDay.postIdea ?? "";
+        const cap = currentDay.marketingActivation?.caption ?? currentDay.caption ?? "";
+        const title = currentDay.mainActionTitle ?? "";
+        const posterHint = currentDay.marketingActivation?.posterHint ?? currentDay.posterHint ?? "";
+        const reelScript = currentDay.marketingActivation?.reelScript
+            ? JSON.stringify(currentDay.marketingActivation.reelScript)
+            : "";
+        const storyFrames = Array.isArray(currentDay.marketingActivation?.storyFrames)
+            ? JSON.stringify(currentDay.marketingActivation.storyFrames)
+            : "";
+        const businessGrowthAction = currentDay.businessGrowthAction ?? "";
+        const hashtags = (currentDay.marketingActivation?.hashtags ?? currentDay.hashtags ?? []) as string[];
+        const dayTheme = typeof currentDay.dayTheme === "string" ? currentDay.dayTheme.trim() : "";
+        const offerDeadlineHint = (currentDay.marketingActivation?.offerDeadlineHint ?? "").trim();
+        try {
+            sessionStorage.setItem("bizboost:editorDayContext", JSON.stringify({
+                dayNumber,
+                backTo,
+                caption: cap,
+                postIdea,
+                mainActionTitle: title,
+                posterHint,
+                reelScript,
+                storyFrames,
+                businessGrowthAction,
+                hashtags,
+                dayTheme,
+                ...(offerDeadlineHint ? { offerDeadlineHint } : {}),
+                savedAt: Date.now(),
+            }));
+        }
+        catch {
+        }
+        const themeParam = dayTheme ? `&dayTheme=${encodeURIComponent(dayTheme)}` : "";
+        const deadlineParam = offerDeadlineHint ? `&offerDeadlineHint=${encodeURIComponent(offerDeadlineHint)}` : "";
+        router.push(`/biz-editor?day=${dayNumber}&backTo=${encodeURIComponent(backTo)}&caption=${encodeURIComponent(cap)}&postIdea=${encodeURIComponent(postIdea)}&mainActionTitle=${encodeURIComponent(title)}&posterHint=${encodeURIComponent(posterHint)}&reelScript=${encodeURIComponent(reelScript)}&storyFrames=${encodeURIComponent(storyFrames)}${themeParam}${deadlineParam}`);
+    }, [currentDay, dayNumber, router]);
+    async function copyCaption() {
+        try {
+            const text = activationView?.captionText ?? currentDay?.marketingActivation?.caption ?? currentDay?.caption ?? "";
+            await navigator.clipboard.writeText(text);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1200);
+        }
+        catch {
+            setCopied(false);
+        }
     }
-    if (modalType === "missingPlan") {
-      return {
-        title: "Select a plan first",
-        text: "Please choose a plan to continue.",
-        primaryText: "Go to Select Plan",
-        primaryAction: () => router.push("/select-plan"),
-      };
-    }
-    if (modalType === "noPlan") {
-      return {
-        title: "No generated plan yet",
-        text: "Generate your marketing plan first.",
-        primaryText: "Go to Marketing Plan",
-        primaryAction: () => router.push("/marketing-plan"),
-      };
-    }
-    if (modalType === "serverError") {
-      return {
-        title: "Something went wrong",
-        text: "Please try again.",
-        primaryText: "Back to Marketing Plan",
-        primaryAction: () => router.push("/marketing-plan"),
-      };
-    }
-    return null;
-  }, [modalType, router]);
-
-  async function toggleDayCompleted() {
-    if (!user?.uid) return;
-
-    setIsCompleting(true);
-    try {
-      const response = await fetch("/api/marketing-plan/day-complete", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ firebase_uid: user.uid, planId, dayNumber, completed: !isCompleted }),
-      });
-      const result = await response.json();
-
-      if (!response.ok || !result?.ok) {
-        setModalType("serverError");
-        return;
-      }
-
-      const nextPlanDays = Array.isArray(result?.plan?.planDays) ? result.plan.planDays : [];
-      const nextCompletedDays = nextPlanDays.filter((day: DayPlan & { completed?: boolean }) => day.completed).map((day: DayPlan) => day.dayNumber);
-      setCompletedDays(nextCompletedDays);
-    } catch {
-      setModalType("serverError");
-    } finally {
-      setIsCompleting(false);
-    }
-  }
-
-  const isCompleted = completedDays.includes(dayNumber);
-
-  const activationView = useMemo(() => {
-    if (!currentDay) return null;
-    const ma = currentDay.marketingActivation;
-    const squash = (s: string, max: number) => {
-      const t = (s || "").replace(/\s+/g, " ").trim();
-      if (!t) return "";
-      return t.length <= max ? t : `${t.slice(0, max - 1).trim()}…`;
-    };
-    const platform = ma?.platform ?? "Both";
-    const format = ma?.format ?? "Feed";
-    const bestTime = ma?.bestTime || ma?.postingTime || "7:30 PM";
-    const goal = ma?.goal ?? "Leads";
-    const whatToPost = squash(ma?.postBrief || ma?.contentBrief || ma?.postIdea || currentDay.postIdea || "", 200);
-    const hookLine = squash(ma?.hook || "", 160);
-    const whyWorks = squash(
-      ma?.matchNote || `Lines up with today's task and nudges people toward ${goal.toLowerCase()}.`,
-      190,
-    );
-    const defaultVisuals = [
-      "Show your product or service clearly with good light.",
-      "Add one short on-image line with the main benefit.",
-      "End the visual with your contact or next step.",
-    ];
-    const visuals = (ma?.visualGuide?.length ? ma.visualGuide : defaultVisuals)
-      .map((line) => squash(String(line), 150))
-      .filter(Boolean)
-      .slice(0, 3);
-    const captionText = (ma?.caption || currentDay.caption || "").trim();
-    const cta = squash(ma?.cta || "DM us to book or order.", 140);
-    const hashtags = (ma?.hashtags ?? currentDay.hashtags ?? []) as string[];
-    const storyFrames = ma?.storyFrames ?? [];
-    const reelScript = ma?.reelScript;
-    return {
-      platform,
-      format,
-      bestTime,
-      whatToPost,
-      hookLine,
-      whyWorks,
-      visuals,
-      captionText,
-      cta,
-      hashtags,
-      storyFrames,
-      reelScript,
-    };
-  }, [currentDay]);
-
-  const openBizEditor = useCallback(() => {
-    if (!currentDay) return;
-    const backTo = `/marketing-plan/day/${dayNumber}`;
-    const postIdea = currentDay.marketingActivation?.postIdea ?? currentDay.postIdea ?? "";
-    const cap = currentDay.marketingActivation?.caption ?? currentDay.caption ?? "";
-    const title = currentDay.mainActionTitle ?? "";
-    const posterHint = currentDay.marketingActivation?.posterHint ?? currentDay.posterHint ?? "";
-    const reelScript = currentDay.marketingActivation?.reelScript
-      ? JSON.stringify(currentDay.marketingActivation.reelScript)
-      : "";
-    const storyFrames = Array.isArray(currentDay.marketingActivation?.storyFrames)
-      ? JSON.stringify(currentDay.marketingActivation.storyFrames)
-      : "";
-    const businessGrowthAction = currentDay.businessGrowthAction ?? "";
-    const hashtags = (currentDay.marketingActivation?.hashtags ?? currentDay.hashtags ?? []) as string[];
-    const dayTheme = typeof currentDay.dayTheme === "string" ? currentDay.dayTheme.trim() : "";
-    const offerDeadlineHint = (currentDay.marketingActivation?.offerDeadlineHint ?? "").trim();
-    try {
-      sessionStorage.setItem(
-        "bizboost:editorDayContext",
-        JSON.stringify({
-          dayNumber,
-          backTo,
-          caption: cap,
-          postIdea,
-          mainActionTitle: title,
-          posterHint,
-          reelScript,
-          storyFrames,
-          businessGrowthAction,
-          hashtags,
-          dayTheme,
-          ...(offerDeadlineHint ? { offerDeadlineHint } : {}),
-          savedAt: Date.now(),
-        }),
-      );
-    } catch {
-      /* ignore */
-    }
-    const themeParam = dayTheme ? `&dayTheme=${encodeURIComponent(dayTheme)}` : "";
-    const deadlineParam = offerDeadlineHint ? `&offerDeadlineHint=${encodeURIComponent(offerDeadlineHint)}` : "";
-    router.push(
-      `/biz-editor?day=${dayNumber}&backTo=${encodeURIComponent(backTo)}&caption=${encodeURIComponent(cap)}&postIdea=${encodeURIComponent(postIdea)}&mainActionTitle=${encodeURIComponent(title)}&posterHint=${encodeURIComponent(posterHint)}&reelScript=${encodeURIComponent(reelScript)}&storyFrames=${encodeURIComponent(storyFrames)}${themeParam}${deadlineParam}`,
-    );
-  }, [currentDay, dayNumber, router]);
-
-  async function copyCaption() {
-    try {
-      const text = activationView?.captionText ?? currentDay?.marketingActivation?.caption ?? currentDay?.caption ?? "";
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1200);
-    } catch {
-      setCopied(false);
-    }
-  }
-
-  const dayDateLabel = currentDay?.dateLabel
-    ? `${currentDay.dateLabel} • Day ${dayNumber}${planDays > 0 ? ` of ${planDays}` : ""}`
-    : `Day ${dayNumber}`;
-  const growthTitle = currentDay?.mainActionTitle
-    ? cleanDayTitle(currentDay.mainActionTitle) || currentDay.mainActionTitle
-    : `Day ${dayNumber}`;
-
-  return (
-    <div className="dayPage">
+    const dayDateLabel = currentDay?.dateLabel
+        ? `${currentDay.dateLabel} • Day ${dayNumber}${planDays > 0 ? ` of ${planDays}` : ""}`
+        : `Day ${dayNumber}`;
+    const growthTitle = currentDay?.mainActionTitle
+        ? cleanDayTitle(currentDay.mainActionTitle) || currentDay.mainActionTitle
+        : `Day ${dayNumber}`;
+    return (<div className="dayPage">
       <div className="dayShell">
         <section className="dayHero">
           <div>
@@ -475,26 +452,16 @@ export default function MarketingPlanDayPage() {
           </div>
           <div className="heroActions">
             {isCompleted && <span className="completedBadge">Completed ✅</span>}
-            <button
-              type="button"
-              onClick={() => void toggleDayCompleted()}
-              className="completeBtn"
-              disabled={isLoading || !currentDay || isCompleting || isCompleted}
-            >
+            <button type="button" onClick={() => void toggleDayCompleted()} className="completeBtn" disabled={isLoading || !currentDay || isCompleting || isCompleted}>
               {isCompleting ? "Saving..." : isCompleted ? "Completed ✅" : "Mark Day Completed"}
             </button>
-            <button
-              type="button"
-              onClick={() => router.push("/marketing-plan")}
-              className="backBtn"
-            >
+            <button type="button" onClick={() => router.push("/marketing-plan")} className="backBtn">
               Back to Plan
             </button>
           </div>
         </section>
 
-        {!isLoading && currentDay && (
-          <>
+        {!isLoading && currentDay && (<>
             <section className="card sectionGrowth">
               <div className="sectionTitleRow">
                 <span className="pill pillGrowth">1 · Business growth</span>
@@ -505,12 +472,10 @@ export default function MarketingPlanDayPage() {
               <p className="focusTitle">{growthTitle}</p>
               <h3 className="miniH">Execution steps</h3>
               <ul className="checkList">
-                {(currentDay.executionSteps ?? []).map((step, index) => (
-                  <li key={`${index}-${step}`}>
+                {(currentDay.executionSteps ?? []).map((step, index) => (<li key={`${index}-${step}`}>
                     <span className="stepBadge">Step {index + 1}</span>
                     <p>{step}</p>
-                  </li>
-                ))}
+                  </li>))}
               </ul>
               <div className="kpiRow">
                 <span className="pill pillKpi">KPI</span>
@@ -519,21 +484,14 @@ export default function MarketingPlanDayPage() {
             </section>
 
             <section className="card sectionActivation">
-              {activationView ? (
-                <>
+              {activationView ? (<>
                   <div className="activationHeadRow">
                     <div className="activationHeadLeft">
                       <span className="pill pillActivation">2 · Marketing activation</span>
                       <h2 className="sectionH activationMainTitle">{"Today's social post"}</h2>
                       <p className="activationSub">One post on Instagram or Facebook that matches your task above.</p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => openBizEditor()}
-                      className="editorBtn editorBtnHeader"
-                      aria-label="Open Biz Editor"
-                      title="Open Biz Editor with today’s context"
-                    >
+                    <button type="button" onClick={() => openBizEditor()} className="editorBtn editorBtnHeader" aria-label="Open Biz Editor" title="Open Biz Editor with today’s context">
                       <span className="editorBtnIcon">↗</span>
                       <span className="editorBtnText">Go to Biz Editor</span>
                     </button>
@@ -558,12 +516,10 @@ export default function MarketingPlanDayPage() {
                     <div className="activationCard">
                       <h3 className="activationCardLabel">What to post</h3>
                       <p className="activationOneLiner">{activationView.whatToPost || "—"}</p>
-                      {activationView.hookLine ? (
-                        <>
+                      {activationView.hookLine ? (<>
                           <p className="activationSubLabel">Hook line</p>
                           <p className="activationHookLine">{activationView.hookLine}</p>
-                        </>
-                      ) : null}
+                        </>) : null}
                     </div>
 
                     <div className="activationCard">
@@ -574,9 +530,7 @@ export default function MarketingPlanDayPage() {
                     <div className="activationCard">
                       <h3 className="activationCardLabel">What to show (visual guide)</h3>
                       <ul className="activationBulletList">
-                        {activationView.visuals.map((item, index) => (
-                          <li key={`${index}-${item.slice(0, 24)}`}>{item}</li>
-                        ))}
+                        {activationView.visuals.map((item, index) => (<li key={`${index}-${item.slice(0, 24)}`}>{item}</li>))}
                       </ul>
                     </div>
 
@@ -600,48 +554,31 @@ export default function MarketingPlanDayPage() {
                     <div className="activationCard activationCardTags">
                       <h3 className="activationCardLabel">Hashtags</h3>
                       <div className="tags">
-                        {activationView.hashtags.length > 0 ? (
-                          activationView.hashtags.map((tag) => (
-                            <span key={tag} className="tag">
+                        {activationView.hashtags.length > 0 ? (activationView.hashtags.map((tag) => (<span key={tag} className="tag">
                               {tag}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="noTag">No hashtags</span>
-                        )}
+                            </span>))) : (<span className="noTag">No hashtags</span>)}
                       </div>
                     </div>
                   </div>
 
-                  {activationView.storyFrames.length > 0 || activationView.reelScript ? (
-                    <details className="activationMore">
+                  {activationView.storyFrames.length > 0 || activationView.reelScript ? (<details className="activationMore">
                       <summary>Story or Reel outline (optional)</summary>
-                      {activationView.storyFrames.length > 0 ? (
-                        <ul className="activationBulletList tight">
-                          {activationView.storyFrames.slice(0, 3).map((frame, index) => (
-                            <li key={`sf-${index}`}>{frame}</li>
-                          ))}
-                        </ul>
-                      ) : null}
-                      {activationView.reelScript ? (
-                        <div className="reelScriptCompact">
+                      {activationView.storyFrames.length > 0 ? (<ul className="activationBulletList tight">
+                          {activationView.storyFrames.slice(0, 3).map((frame, index) => (<li key={`sf-${index}`}>{frame}</li>))}
+                        </ul>) : null}
+                      {activationView.reelScript ? (<div className="reelScriptCompact">
                           <p className="activationOneLiner">
                             <strong>Reel:</strong> {activationView.reelScript.hook || ""}
                           </p>
                           <ul className="activationBulletList tight">
-                            {(activationView.reelScript.beats ?? []).slice(0, 3).map((beat, index) => (
-                              <li key={`rb-${index}`}>{beat}</li>
-                            ))}
+                            {(activationView.reelScript.beats ?? []).slice(0, 3).map((beat, index) => (<li key={`rb-${index}`}>{beat}</li>))}
                           </ul>
                           <p className="activationOneLiner">
                             <strong>CTA:</strong> {activationView.reelScript.cta || ""}
                           </p>
-                        </div>
-                      ) : null}
-                    </details>
-                  ) : null}
-                </>
-              ) : null}
+                        </div>) : null}
+                    </details>) : null}
+                </>) : null}
             </section>
 
             <section className="card scoreCard">
@@ -655,48 +592,33 @@ export default function MarketingPlanDayPage() {
                 </button>
               </div>
               {scoreError ? <p className="scoreError">{scoreError}</p> : null}
-              {!scoreError && successScore ? (
-                <>
+              {!scoreError && successScore ? (<>
                   <div className="percentRow">
                     <p className="percentValue">{Math.max(0, Math.min(100, Math.round(successScore.successPercent)))}%</p>
                     <div className="barTrack" aria-hidden>
-                      <div
-                        className="barFill"
-                        style={{ width: `${Math.max(0, Math.min(100, Math.round(successScore.successPercent)))}%` }}
-                      />
+                      <div className="barFill" style={{ width: `${Math.max(0, Math.min(100, Math.round(successScore.successPercent)))}%` }}/>
                     </div>
                   </div>
                   <div className="scoreColumns">
                     <div className="scoreColumn">
                       <h3 className="miniH">Why this score</h3>
                       <ul className="plainList">
-                        {successScore.reasons.map((reason, index) => (
-                          <li key={`${index}-${reason}`}>{reason}</li>
-                        ))}
+                        {successScore.reasons.map((reason, index) => (<li key={`${index}-${reason}`}>{reason}</li>))}
                       </ul>
                     </div>
                     <div className="scoreColumn">
                       <h3 className="miniH">How to improve</h3>
                       <ul className="plainList">
-                        {successScore.improvements.map((tip, index) => (
-                          <li key={`${index}-${tip}`}>{tip}</li>
-                        ))}
+                        {successScore.improvements.map((tip, index) => (<li key={`${index}-${tip}`}>{tip}</li>))}
                       </ul>
                     </div>
                   </div>
-                </>
-              ) : scoreLoading ? (
-                <p className="kpiText">Calculating success probability...</p>
-              ) : (
-                <p className="kpiText">No estimate yet. Click Recalculate.</p>
-              )}
+                </>) : scoreLoading ? (<p className="kpiText">Calculating success probability...</p>) : (<p className="kpiText">No estimate yet. Click Recalculate.</p>)}
             </section>
-          </>
-        )}
+          </>)}
       </div>
 
-      {modalContent && (
-        <div className="modalOverlay">
+      {modalContent && (<div className="modalOverlay">
           <div className="modalCard">
             <h3>{modalContent.title}</h3>
             <p>{modalContent.text}</p>
@@ -704,8 +626,7 @@ export default function MarketingPlanDayPage() {
               {modalContent.primaryText}
             </button>
           </div>
-        </div>
-      )}
+        </div>)}
 
       <style jsx>{`
         .dayPage {
@@ -1325,6 +1246,5 @@ export default function MarketingPlanDayPage() {
           }
         }
       `}</style>
-    </div>
-  );
+    </div>);
 }

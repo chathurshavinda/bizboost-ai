@@ -1,59 +1,50 @@
 "use client";
-
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/src/lib/useAuth";
 import { logout } from "@/src/lib/auth";
 import ConfirmActionModal from "@/src/components/ui/ConfirmActionModal";
-
 type ThemeMode = "light" | "dark";
-
 function maskEmail(email: string): string {
-  const [name, domain] = email.split("@");
-  if (!name || !domain) return email || "Not available";
-  const prefix = name.slice(0, 1) || "*";
-  return `${prefix}***@${domain}`;
+    const [name, domain] = email.split("@");
+    if (!name || !domain)
+        return email || "Not available";
+    const prefix = name.slice(0, 1) || "*";
+    return `${prefix}***@${domain}`;
 }
-
 export default function SettingsPage() {
-  const router = useRouter();
-  const { user, loading } = useAuth();
-
-  const [theme, setTheme] = useState<ThemeMode>("light");
-  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
-  const [loggingOut, setLoggingOut] = useState(false);
-
-  useEffect(() => {
-    const stored = (window.localStorage.getItem("theme") ?? "light") as ThemeMode;
-    const nextTheme: ThemeMode = stored === "dark" ? "dark" : "light";
-    setTheme(nextTheme);
-  }, []);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    if (theme === "dark") root.classList.add("dark");
-    else root.classList.remove("dark");
-    window.localStorage.setItem("theme", theme);
-  }, [theme]);
-
-  useEffect(() => {
-    if (!loading && !user?.uid) {
-      router.replace("/login");
+    const router = useRouter();
+    const { user, loading } = useAuth();
+    const [theme, setTheme] = useState<ThemeMode>("light");
+    const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+    const [loggingOut, setLoggingOut] = useState(false);
+    useEffect(() => {
+        const stored = (window.localStorage.getItem("theme") ?? "light") as ThemeMode;
+        const nextTheme: ThemeMode = stored === "dark" ? "dark" : "light";
+        setTheme(nextTheme);
+    }, []);
+    useEffect(() => {
+        const root = document.documentElement;
+        if (theme === "dark")
+            root.classList.add("dark");
+        else
+            root.classList.remove("dark");
+        window.localStorage.setItem("theme", theme);
+    }, [theme]);
+    useEffect(() => {
+        if (!loading && !user?.uid) {
+            router.replace("/login");
+        }
+    }, [loading, user?.uid, router]);
+    const maskedEmail = useMemo(() => maskEmail(user?.email ?? ""), [user?.email]);
+    async function handleLogout() {
+        setLoggingOut(true);
+        await logout();
+        setLoggingOut(false);
+        setLogoutConfirmOpen(false);
+        router.push("/login");
     }
-  }, [loading, user?.uid, router]);
-
-  const maskedEmail = useMemo(() => maskEmail(user?.email ?? ""), [user?.email]);
-
-  async function handleLogout() {
-    setLoggingOut(true);
-    await logout();
-    setLoggingOut(false);
-    setLogoutConfirmOpen(false);
-    router.push("/login");
-  }
-
-  return (
-    <div className="settingsPage">
+    return (<div className="settingsPage">
       <div className="settingsShell">
         <section className="settingsCard">
           <p className="eyebrow">Settings</p>
@@ -67,18 +58,10 @@ export default function SettingsPage() {
           </div>
           <p className="hint">Choose your preferred appearance mode.</p>
           <div className="themeToggle">
-            <button
-              type="button"
-              className={`themeBtn ${theme === "light" ? "themeBtn--active" : ""}`}
-              onClick={() => setTheme("light")}
-            >
+            <button type="button" className={`themeBtn ${theme === "light" ? "themeBtn--active" : ""}`} onClick={() => setTheme("light")}>
               Light
             </button>
-            <button
-              type="button"
-              className={`themeBtn ${theme === "dark" ? "themeBtn--active" : ""}`}
-              onClick={() => setTheme("dark")}
-            >
+            <button type="button" className={`themeBtn ${theme === "dark" ? "themeBtn--active" : ""}`} onClick={() => setTheme("dark")}>
               Dark
             </button>
           </div>
@@ -108,17 +91,7 @@ export default function SettingsPage() {
         </section>
       </div>
 
-      <ConfirmActionModal
-        open={logoutConfirmOpen}
-        title="Confirm Logout"
-        message="Are you sure you want to log out?"
-        cancelText="Cancel"
-        confirmText="Logout"
-        danger
-        confirming={loggingOut}
-        onCancel={() => setLogoutConfirmOpen(false)}
-        onConfirm={() => void handleLogout()}
-      />
+      <ConfirmActionModal open={logoutConfirmOpen} title="Confirm Logout" message="Are you sure you want to log out?" cancelText="Cancel" confirmText="Logout" danger confirming={loggingOut} onCancel={() => setLogoutConfirmOpen(false)} onConfirm={() => void handleLogout()}/>
 
       <style jsx>{`
         .settingsPage {
@@ -250,6 +223,5 @@ export default function SettingsPage() {
           font-size: 14px;
         }
       `}</style>
-    </div>
-  );
+    </div>);
 }

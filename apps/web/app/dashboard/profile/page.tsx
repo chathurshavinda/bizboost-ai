@@ -1,84 +1,72 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  FaChevronDown,
-  FaBuilding,
-  FaChartLine,
-  FaGlobe,
-  FaLanguage,
-  FaMagic,
-  FaMapMarkerAlt,
-  FaPenNib,
-} from "react-icons/fa";
+import { FaChevronDown, FaBuilding, FaChartLine, FaGlobe, FaLanguage, FaMagic, FaMapMarkerAlt, FaPenNib, } from "react-icons/fa";
 import { auth } from "../../../src/lib/firebase";
 import { useAuth } from "../../../src/lib/useAuth";
 import BusinessProfileGateModal from "../../../src/components/business-profile/BusinessProfileGateModal";
 import BusinessProfileErrorModal from "../../../src/components/business-profile/BusinessProfileErrorModal";
-
 type BusinessProfileData = {
-  firebase_uid?: string;
-  businessName?: string;
-  businessType?: string;
-  country?: string;
-  city?: string;
-  language?: string;
-  productsOrServices?: string | string[];
-  targetCustomers?: string;
-  businessGoals?: string;
-  socialLinks?: string[];
-  ownerOrManagerName?: string;
-  teamSize?: string;
-  contactEmail?: string;
-  monthlyBusinessBudget?: string;
-  monthlyMarketingBudget?: string;
-  expectedRevenueRange?: string;
+    firebase_uid?: string;
+    businessName?: string;
+    businessType?: string;
+    country?: string;
+    city?: string;
+    language?: string;
+    productsOrServices?: string | string[];
+    targetCustomers?: string;
+    businessGoals?: string;
+    socialLinks?: string[];
+    ownerOrManagerName?: string;
+    teamSize?: string;
+    contactEmail?: string;
+    monthlyBusinessBudget?: string;
+    monthlyMarketingBudget?: string;
+    expectedRevenueRange?: string;
 };
-
-type BusinessProfileApiResponse =
-  | { ok: true; data: BusinessProfileData }
-  | { ok: false; error: string };
-
+type BusinessProfileApiResponse = {
+    ok: true;
+    data: BusinessProfileData;
+} | {
+    ok: false;
+    error: string;
+};
 type ProfilePageStatus = "loading" | "ready" | "missing" | "error";
-
 type Capability = {
-  key: "strategy" | "content" | "insights";
-  title: string;
-  description: string;
-  button: string;
-  href: string;
-  icon: JSX.Element;
+    key: "strategy" | "content" | "insights";
+    title: string;
+    description: string;
+    button: string;
+    href: string;
+    icon: JSX.Element;
 };
-
 const capabilities: Capability[] = [
-  {
-    key: "strategy",
-    title: "Strategy Generator",
-    description: "Craft ready-to-launch marketing strategies tailored to your niche.",
-    button: "Generate Strategy",
-    href: "/dashboard",
-    icon: <FaMagic size={20} />,
-  },
-  {
-    key: "content",
-    title: "Content Studio",
-    description: "Spin up posters, captions, and ad copy in seconds.",
-    button: "Create Content",
-    href: "/dashboard/editor",
-    icon: <FaPenNib size={20} />,
-  },
-  {
-    key: "insights",
-    title: "Smart Insights",
-    description: "Track what works and uncover new growth opportunities.",
-    button: "View Insights",
-    href: "/dashboard/day-detail",
-    icon: <FaChartLine size={20} />,
-  },
+    {
+        key: "strategy",
+        title: "Strategy Generator",
+        description: "Craft ready-to-launch marketing strategies tailored to your niche.",
+        button: "Generate Strategy",
+        href: "/dashboard",
+        icon: <FaMagic size={20}/>,
+    },
+    {
+        key: "content",
+        title: "Content Studio",
+        description: "Spin up posters, captions, and ad copy in seconds.",
+        button: "Create Content",
+        href: "/dashboard/editor",
+        icon: <FaPenNib size={20}/>,
+    },
+    {
+        key: "insights",
+        title: "Smart Insights",
+        description: "Track what works and uncover new growth opportunities.",
+        button: "View Insights",
+        href: "/dashboard/day-detail",
+        icon: <FaChartLine size={20}/>,
+    },
 ];
-
-const PROFILE_PAGE_STYLES = String.raw`
+const PROFILE_PAGE_STYLES = String.raw `
   .profilePage {
     min-height: 100vh;
     padding: 28px 16px 14px;
@@ -289,213 +277,179 @@ const PROFILE_PAGE_STYLES = String.raw`
     }
   }
 `;
-
 export default function BusinessProfilePage() {
-  const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
-  const [profile, setProfile] = useState<BusinessProfileData | null>(null);
-  const [status, setStatus] = useState<ProfilePageStatus>("loading");
-  const [retryKey, setRetryKey] = useState(0);
-  const [planGateOpen, setPlanGateOpen] = useState(false);
-  const [checkingPlan, setCheckingPlan] = useState(false);
-  const [moreDetailsOpen, setMoreDetailsOpen] = useState(false);
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [deletingProfile, setDeletingProfile] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadProfile = async () => {
-      if (authLoading) return;
-
-      const uid = user?.uid ?? auth?.currentUser?.uid;
-      console.log("UID", uid);
-
-      if (!uid) {
-        router.replace("/login");
-        return;
-      }
-
-      setStatus("loading");
-
-      try {
-        const query = new URLSearchParams({ firebase_uid: uid });
-        const response = await fetch(`/api/business-profile?${query.toString()}`, {
-          method: "GET",
-          cache: "no-store",
-        });
-
-        if (!isMounted) return;
-
-        if (response.status === 404) {
-          const missingResult = (await response.json()) as BusinessProfileApiResponse;
-          if (!missingResult.ok && missingResult.error === "business_profile_not_found") {
-            setProfile(null);
-            setStatus("missing");
+    const router = useRouter();
+    const { user, loading: authLoading } = useAuth();
+    const [profile, setProfile] = useState<BusinessProfileData | null>(null);
+    const [status, setStatus] = useState<ProfilePageStatus>("loading");
+    const [retryKey, setRetryKey] = useState(0);
+    const [planGateOpen, setPlanGateOpen] = useState(false);
+    const [checkingPlan, setCheckingPlan] = useState(false);
+    const [moreDetailsOpen, setMoreDetailsOpen] = useState(false);
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [deletingProfile, setDeletingProfile] = useState(false);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
+    useEffect(() => {
+        let isMounted = true;
+        const loadProfile = async () => {
+            if (authLoading)
+                return;
+            const uid = user?.uid ?? auth?.currentUser?.uid;
+            console.log("UID", uid);
+            if (!uid) {
+                router.replace("/login");
+                return;
+            }
+            setStatus("loading");
+            try {
+                const query = new URLSearchParams({ firebase_uid: uid });
+                const response = await fetch(`/api/business-profile?${query.toString()}`, {
+                    method: "GET",
+                    cache: "no-store",
+                });
+                if (!isMounted)
+                    return;
+                if (response.status === 404) {
+                    const missingResult = (await response.json()) as BusinessProfileApiResponse;
+                    if (!missingResult.ok && missingResult.error === "business_profile_not_found") {
+                        setProfile(null);
+                        setStatus("missing");
+                        return;
+                    }
+                    throw new Error("Profile not found.");
+                }
+                const data = (await response.json()) as BusinessProfileApiResponse;
+                if (response.status === 500) {
+                    throw new Error("Profile service is unavailable.");
+                }
+                if (response.status === 400) {
+                    throw new Error("Invalid request.");
+                }
+                if (!response.ok || !data.ok || !("data" in data)) {
+                    throw new Error("Failed to load profile.");
+                }
+                setProfile(data.data);
+                setStatus("ready");
+            }
+            catch (error: unknown) {
+                if (!isMounted)
+                    return;
+                console.error("Failed to load business profile:", error);
+                setProfile(null);
+                setStatus("error");
+            }
+        };
+        loadProfile();
+        return () => {
+            isMounted = false;
+        };
+    }, [authLoading, retryKey, router, user]);
+    async function handleStrategyGeneratorClick() {
+        const uid = user?.uid ?? auth?.currentUser?.uid;
+        console.log("UID", uid);
+        if (!uid) {
+            router.replace("/login");
             return;
-          }
-
-          throw new Error("Profile not found.");
         }
-
-        const data = (await response.json()) as BusinessProfileApiResponse;
-
-        if (response.status === 500) {
-          throw new Error("Profile service is unavailable.");
+        try {
+            setCheckingPlan(true);
+            const response = await fetch(`/api/select-plan?firebase_uid=${encodeURIComponent(uid)}`, {
+                cache: "no-store",
+            });
+            if (response.ok) {
+                router.push("/select-plan");
+                return;
+            }
+            if (response.status === 404) {
+                setPlanGateOpen(true);
+                return;
+            }
+            router.push("/select-plan");
         }
-
-        if (response.status === 400) {
-          throw new Error("Invalid request.");
+        catch {
+            router.push("/select-plan");
         }
-
-        if (!response.ok || !data.ok || !("data" in data)) {
-          throw new Error("Failed to load profile.");
+        finally {
+            setCheckingPlan(false);
         }
-
-        setProfile(data.data);
-        setStatus("ready");
-      } catch (error: unknown) {
-        if (!isMounted) return;
-        console.error("Failed to load business profile:", error);
-        setProfile(null);
-        setStatus("error");
-      }
-    };
-
-    loadProfile();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [authLoading, retryKey, router, user]);
-
-  async function handleStrategyGeneratorClick() {
-    const uid = user?.uid ?? auth?.currentUser?.uid;
-    console.log("UID", uid);
-
-    if (!uid) {
-      router.replace("/login");
-      return;
     }
-
-    try {
-      setCheckingPlan(true);
-      const response = await fetch(`/api/select-plan?firebase_uid=${encodeURIComponent(uid)}`, {
-        cache: "no-store",
-      });
-
-      if (response.ok) {
-        router.push("/select-plan");
-        return;
-      }
-
-      if (response.status === 404) {
-        setPlanGateOpen(true);
-        return;
-      }
-
-      router.push("/select-plan");
-    } catch {
-      router.push("/select-plan");
-    } finally {
-      setCheckingPlan(false);
+    async function handleDeleteBusinessProfile() {
+        const uid = user?.uid ?? auth?.currentUser?.uid;
+        console.log("UID", uid);
+        if (!uid) {
+            router.replace("/login");
+            return;
+        }
+        setDeletingProfile(true);
+        setDeleteError(null);
+        try {
+            const response = await fetch("/api/business-profile", {
+                method: "DELETE",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ firebase_uid: uid }),
+            });
+            const result = (await response.json()) as {
+                ok: boolean;
+                error?: string;
+            };
+            if (!response.ok || !result.ok) {
+                throw new Error(result.error || "Failed to delete business profile.");
+            }
+            window.sessionStorage.setItem("bizboostProfileDeleted", "1");
+            router.replace("/onboarding/business-details");
+        }
+        catch (error: unknown) {
+            const message = error instanceof Error ? error.message : "Failed to delete business profile.";
+            setDeleteError(message);
+            setDeletingProfile(false);
+        }
     }
-  }
-
-  async function handleDeleteBusinessProfile() {
-    const uid = user?.uid ?? auth?.currentUser?.uid;
-    console.log("UID", uid);
-
-    if (!uid) {
-      router.replace("/login");
-      return;
-    }
-
-    setDeletingProfile(true);
-    setDeleteError(null);
-
-    try {
-      const response = await fetch("/api/business-profile", {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ firebase_uid: uid }),
-      });
-
-      const result = (await response.json()) as { ok: boolean; error?: string };
-
-      if (!response.ok || !result.ok) {
-        throw new Error(result.error || "Failed to delete business profile.");
-      }
-
-      window.sessionStorage.setItem("bizboostProfileDeleted", "1");
-      router.replace("/onboarding/business-details");
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Failed to delete business profile.";
-      setDeleteError(message);
-      setDeletingProfile(false);
-    }
-  }
-
-  if (authLoading || status === "loading") {
-    return (
-      <div className="profilePage">
+    if (authLoading || status === "loading") {
+        return (<div className="profilePage">
         <div className="profileShell businessProfileShell--loading" style={{ maxWidth: 1100 }}>
-          <div
-            style={{
-              width: "100%",
-              display: "grid",
-              gap: 12,
-              maxWidth: 420,
-              margin: "0 auto",
-            }}
-          >
-            <div
-              style={{
+          <div style={{
+                width: "100%",
+                display: "grid",
+                gap: 12,
+                maxWidth: 420,
+                margin: "0 auto",
+            }}>
+            <div style={{
                 height: 14,
                 borderRadius: 999,
                 background: "rgba(148, 163, 184, 0.24)",
-              }}
-            />
-            <div
-              style={{
+            }}/>
+            <div style={{
                 height: 14,
                 borderRadius: 999,
                 width: "78%",
                 justifySelf: "center",
                 background: "rgba(148, 163, 184, 0.2)",
-              }}
-            />
+            }}/>
             <div className="heroSubtitle">Checking business details...</div>
           </div>
         </div>
         <style jsx>{PROFILE_PAGE_STYLES}</style>
-      </div>
-    );
-  }
-
-  if (status === "missing") {
-    return (
-      <div className="profilePage">
+      </div>);
+    }
+    if (status === "missing") {
+        return (<div className="profilePage">
         <div className="profileShell businessProfileShell--loading" style={{ maxWidth: 1100 }}>
-          <div
-            style={{
-              minHeight: 340,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexDirection: "column",
-              gap: 12,
-              borderRadius: 24,
-              border: "1px solid rgba(148, 163, 184, 0.3)",
-              background: "linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(248, 250, 252, 0.92))",
-              boxShadow: "0 12px 32px rgba(15, 23, 42, 0.06)",
-            }}
-          >
-            <div
-              style={{
+          <div style={{
+                minHeight: 340,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexDirection: "column",
+                gap: 12,
+                borderRadius: 24,
+                border: "1px solid rgba(148, 163, 184, 0.3)",
+                background: "linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(248, 250, 252, 0.92))",
+                boxShadow: "0 12px 32px rgba(15, 23, 42, 0.06)",
+            }}>
+            <div style={{
                 display: "inline-flex",
                 alignItems: "center",
                 padding: "6px 12px",
@@ -506,82 +460,61 @@ export default function BusinessProfilePage() {
                 fontSize: 11,
                 letterSpacing: "0.08em",
                 textTransform: "uppercase",
-              }}
-            >
+            }}>
               Details required
             </div>
             <div className="heroSubtitle">Create your Business Details to unlock this dashboard.</div>
           </div>
         </div>
 
-        <BusinessProfileGateModal
-          open={true}
-          onGoToDetails={() => router.push("/onboarding/business-details")}
-          onBackToHome={() => router.push("/")}
-        />
+        <BusinessProfileGateModal open={true} onGoToDetails={() => router.push("/onboarding/business-details")} onBackToHome={() => router.push("/")}/>
         <style jsx>{PROFILE_PAGE_STYLES}</style>
-      </div>
-    );
-  }
-
-  if (status === "error") {
-    return (
-      <div className="profilePage">
+      </div>);
+    }
+    if (status === "error") {
+        return (<div className="profilePage">
         <div className="profileShell businessProfileShell--loading" style={{ maxWidth: 1100 }}>
-          <div
-            style={{
-              minHeight: 340,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: 24,
-              border: "1px solid rgba(148, 163, 184, 0.28)",
-              background: "linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(241, 245, 249, 0.94))",
-              boxShadow: "0 12px 32px rgba(15, 23, 42, 0.06)",
-            }}
-          >
+          <div style={{
+                minHeight: 340,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: 24,
+                border: "1px solid rgba(148, 163, 184, 0.28)",
+                background: "linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(241, 245, 249, 0.94))",
+                boxShadow: "0 12px 32px rgba(15, 23, 42, 0.06)",
+            }}>
             <div className="heroSubtitle">Please try again in a moment.</div>
           </div>
         </div>
 
-        <BusinessProfileErrorModal
-          open={true}
-          onRetry={() => setRetryKey((value) => value + 1)}
-          onBackToHome={() => router.push("/")}
-        />
+        <BusinessProfileErrorModal open={true} onRetry={() => setRetryKey((value) => value + 1)} onBackToHome={() => router.push("/")}/>
         <style jsx>{PROFILE_PAGE_STYLES}</style>
-      </div>
-    );
-  }
-
-  if (!profile) {
-    return null;
-  }
-
-  const businessName = profile.businessName || "Your business";
-  const businessType = profile.businessType || "Business type";
-  const city = profile.city || "City";
-  const country = profile.country || "Country";
-  const language = profile.language || "English";
-  const productsOrServices = Array.isArray(profile.productsOrServices)
-    ? profile.productsOrServices.join(", ")
-    : profile.productsOrServices || "Not provided";
-  const socialLinks = Array.isArray(profile.socialLinks) ? profile.socialLinks.join(", ") : "Not provided";
-
-  const fields = [
-    profile.businessName,
-    profile.businessType,
-    profile.city,
-    profile.country,
-    profile.language,
-    Array.isArray(profile.productsOrServices) ? profile.productsOrServices.join(", ") : profile.productsOrServices,
-  ];
-
-  const filledFields = fields.filter((item) => (item ?? "").trim().length > 0).length;
-  const completion = Math.round((filledFields / fields.length) * 100);
-
-  return (
-    <div className="profilePage">
+      </div>);
+    }
+    if (!profile) {
+        return null;
+    }
+    const businessName = profile.businessName || "Your business";
+    const businessType = profile.businessType || "Business type";
+    const city = profile.city || "City";
+    const country = profile.country || "Country";
+    const language = profile.language || "English";
+    const productsOrServices = Array.isArray(profile.productsOrServices)
+        ? profile.productsOrServices.join(", ")
+        : profile.productsOrServices || "Not provided";
+    const socialLinks = Array.isArray(profile.socialLinks) ? profile.socialLinks.join(", ") : "Not provided";
+    const fields = [
+        profile.businessName,
+        profile.businessType,
+        profile.city,
+        profile.country,
+        profile.language,
+        Array.isArray(profile.productsOrServices) ? profile.productsOrServices.join(", ") : profile.productsOrServices,
+    ];
+    const filledFields = fields.filter((item) => (item ?? "").trim().length > 0).length;
+    const completion = Math.round((filledFields / fields.length) * 100);
+    return (<div className="profilePage">
       <div className="profileShell">
         <section className="businessProfileHero">
           <div className="businessProfileBadge">Business profile</div>
@@ -592,32 +525,24 @@ export default function BusinessProfilePage() {
 
           <div className="businessProfileHeroMeta">
             <div className="businessProfileMetaChip">
-              <FaLanguage size={14} />
+              <FaLanguage size={14}/>
               <span>{language}</span>
             </div>
             <div className="businessProfileMetaChip">
-              <FaGlobe size={14} />
+              <FaGlobe size={14}/>
               <span>{country}</span>
             </div>
             <div className="businessProfileMetaChip">
-              <FaMapMarkerAlt size={14} />
+              <FaMapMarkerAlt size={14}/>
               <span>{city}</span>
             </div>
           </div>
 
           <div className="businessProfileActionsRow">
-            <button
-              type="button"
-              className="btn primary businessProfileActionButton"
-              onClick={() => router.push("/select-plan")}
-            >
+            <button type="button" className="btn primary businessProfileActionButton" onClick={() => router.push("/select-plan")}>
               Open Plan Builder
             </button>
-            <button
-              type="button"
-              className="btn businessProfileGhostButton"
-              onClick={() => router.push("/onboarding/business-details")}
-            >
+            <button type="button" className="btn businessProfileGhostButton" onClick={() => router.push("/onboarding/business-details")}>
               Edit business details
             </button>
           </div>
@@ -633,7 +558,7 @@ export default function BusinessProfilePage() {
             <div className="businessProfileInfoGrid">
               <div className="businessProfileInfoItem">
                 <div className="businessProfileInfoLabel">
-                  <FaBuilding size={14} />
+                  <FaBuilding size={14}/>
                   <span>Business name</span>
                 </div>
                 <div className="businessProfileInfoValue">{businessName}</div>
@@ -641,7 +566,7 @@ export default function BusinessProfilePage() {
 
               <div className="businessProfileInfoItem">
                 <div className="businessProfileInfoLabel">
-                  <FaBuilding size={14} />
+                  <FaBuilding size={14}/>
                   <span>Business type</span>
                 </div>
                 <div className="businessProfileInfoValue">{businessType}</div>
@@ -649,7 +574,7 @@ export default function BusinessProfilePage() {
 
               <div className="businessProfileInfoItem">
                 <div className="businessProfileInfoLabel">
-                  <FaMapMarkerAlt size={14} />
+                  <FaMapMarkerAlt size={14}/>
                   <span>City / Location</span>
                 </div>
                 <div className="businessProfileInfoValue">{city}</div>
@@ -657,7 +582,7 @@ export default function BusinessProfilePage() {
 
               <div className="businessProfileInfoItem">
                 <div className="businessProfileInfoLabel">
-                  <FaGlobe size={14} />
+                  <FaGlobe size={14}/>
                   <span>Country</span>
                 </div>
                 <div className="businessProfileInfoValue">{country}</div>
@@ -665,7 +590,7 @@ export default function BusinessProfilePage() {
 
               <div className="businessProfileInfoItem businessProfileInfoItemWide">
                 <div className="businessProfileInfoLabel">
-                  <FaLanguage size={14} />
+                  <FaLanguage size={14}/>
                   <span>Primary language</span>
                 </div>
                 <div className="businessProfileInfoValue">{language}</div>
@@ -673,7 +598,7 @@ export default function BusinessProfilePage() {
 
               <div className="businessProfileInfoItem businessProfileInfoItemWide">
                 <div className="businessProfileInfoLabel">
-                  <FaPenNib size={14} />
+                  <FaPenNib size={14}/>
                   <span>Products or services</span>
                 </div>
                 <div className="businessProfileInfoValue">{productsOrServices}</div>
@@ -682,10 +607,7 @@ export default function BusinessProfilePage() {
 
             <button type="button" className="moreDetailsToggle" onClick={() => setMoreDetailsOpen((prev) => !prev)}>
               <span>More business details</span>
-              <FaChevronDown
-                size={14}
-                className={`moreDetailsToggleIcon ${moreDetailsOpen ? "moreDetailsToggleIcon--open" : ""}`}
-              />
+              <FaChevronDown size={14} className={`moreDetailsToggleIcon ${moreDetailsOpen ? "moreDetailsToggleIcon--open" : ""}`}/>
             </button>
 
             <div className={`moreDetailsBody ${moreDetailsOpen ? "moreDetailsBody--open" : ""}`}>
@@ -734,7 +656,7 @@ export default function BusinessProfilePage() {
             <div className="businessProfilePanelTitle">Profile Status</div>
             <div className="businessProfileProgressValue">{completion}% complete</div>
             <div className="businessProfileMeterTrack">
-              <div className="businessProfileMeterFill" style={{ width: `${completion}%` }} />
+              <div className="businessProfileMeterFill" style={{ width: `${completion}%` }}/>
             </div>
 
             <div className="businessProfileStatusList">
@@ -757,25 +679,14 @@ export default function BusinessProfilePage() {
         </section>
 
         <section className="businessProfileCapabilityGrid">
-          {capabilities.map((card) => (
-            <article
-              key={card.key}
-              className="card businessProfileCapabilityCard"
-              onClick={card.key === "strategy" ? () => void handleStrategyGeneratorClick() : undefined}
-              role={card.key === "strategy" ? "button" : undefined}
-              tabIndex={card.key === "strategy" ? 0 : undefined}
-              onKeyDown={
-                card.key === "strategy"
-                  ? (event) => {
-                      if (event.key === "Enter" || event.key === " ") {
+          {capabilities.map((card) => (<article key={card.key} className="card businessProfileCapabilityCard" onClick={card.key === "strategy" ? () => void handleStrategyGeneratorClick() : undefined} role={card.key === "strategy" ? "button" : undefined} tabIndex={card.key === "strategy" ? 0 : undefined} onKeyDown={card.key === "strategy"
+                ? (event) => {
+                    if (event.key === "Enter" || event.key === " ") {
                         event.preventDefault();
                         void handleStrategyGeneratorClick();
-                      }
                     }
-                  : undefined
-              }
-              style={card.key === "strategy" ? { cursor: "pointer" } : undefined}
-            >
+                }
+                : undefined} style={card.key === "strategy" ? { cursor: "pointer" } : undefined}>
               <div className="businessProfileCapabilityTop">
                 <span className="businessProfileCapabilityIcon">{card.icon}</span>
                 <h3 className="businessProfileCapabilityTitle">{card.title}</h3>
@@ -783,60 +694,42 @@ export default function BusinessProfilePage() {
 
               <p className="businessProfileCapabilityDescription">{card.description}</p>
 
-              <button
-                type="button"
-                className="btn primary businessProfileActionButton"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  if (card.key === "strategy") {
+              <button type="button" className="btn primary businessProfileActionButton" onClick={(event) => {
+                event.stopPropagation();
+                if (card.key === "strategy") {
                     void handleStrategyGeneratorClick();
                     return;
-                  }
-
-                  router.push(card.href);
-                }}
-                disabled={card.key === "strategy" && checkingPlan}
-              >
+                }
+                router.push(card.href);
+            }} disabled={card.key === "strategy" && checkingPlan}>
                 {card.key === "strategy" && checkingPlan ? "Checking..." : card.button}
               </button>
-            </article>
-          ))}
+            </article>))}
         </section>
 
         <div className="businessProfileDangerRow">
-          <button
-            type="button"
-            className="businessProfileDeleteButton"
-            onClick={() => {
-              setDeleteError(null);
-              setDeleteModalOpen(true);
-            }}
-          >
+          <button type="button" className="businessProfileDeleteButton" onClick={() => {
+            setDeleteError(null);
+            setDeleteModalOpen(true);
+        }}>
             Delete Business Profile
           </button>
         </div>
       </div>
 
-      {planGateOpen && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 backdrop-blur-[3px]">
+      {planGateOpen && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 backdrop-blur-[3px]">
           <div className="w-full max-w-sm rounded-2xl border border-black/15 bg-white/65 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:p-6">
             <h2 className="text-lg font-semibold text-black">Select your plan first</h2>
             <p className="mt-2 text-sm text-black/65">Please choose a plan to continue.</p>
             <div className="mt-5 flex justify-end">
-              <button
-                type="button"
-                onClick={() => router.push("/select-plan")}
-                className="rounded-xl border border-black/20 bg-black px-4 py-2 text-sm font-medium text-white transition hover:bg-black/85"
-              >
+              <button type="button" onClick={() => router.push("/select-plan")} className="rounded-xl border border-black/20 bg-black px-4 py-2 text-sm font-medium text-white transition hover:bg-black/85">
                 Go to Select Plan
               </button>
             </div>
           </div>
-        </div>
-      )}
+        </div>)}
 
-      {deleteModalOpen && (
-        <div className="businessProfileDeleteOverlay" role="dialog" aria-modal="true" aria-labelledby="delete-profile-title">
+      {deleteModalOpen && (<div className="businessProfileDeleteOverlay" role="dialog" aria-modal="true" aria-labelledby="delete-profile-title">
           <div className="businessProfileDeleteModal">
             <h2 id="delete-profile-title" className="businessProfileDeleteTitle">Delete business profile?</h2>
             <p className="businessProfileDeleteText">
@@ -844,27 +737,15 @@ export default function BusinessProfilePage() {
             </p>
             {deleteError ? <p className="businessProfileDeleteError">{deleteError}</p> : null}
             <div className="businessProfileDeleteActions">
-              <button
-                type="button"
-                className="businessProfileCancelDeleteButton"
-                onClick={() => setDeleteModalOpen(false)}
-                disabled={deletingProfile}
-              >
+              <button type="button" className="businessProfileCancelDeleteButton" onClick={() => setDeleteModalOpen(false)} disabled={deletingProfile}>
                 Cancel
               </button>
-              <button
-                type="button"
-                className="businessProfileConfirmDeleteButton"
-                onClick={() => void handleDeleteBusinessProfile()}
-                disabled={deletingProfile}
-              >
+              <button type="button" className="businessProfileConfirmDeleteButton" onClick={() => void handleDeleteBusinessProfile()} disabled={deletingProfile}>
                 {deletingProfile ? "Deleting..." : "Delete"}
               </button>
             </div>
           </div>
-        </div>
-      )}
+        </div>)}
       <style jsx>{PROFILE_PAGE_STYLES}</style>
-    </div>
-  );
+    </div>);
 }

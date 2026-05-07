@@ -1,121 +1,110 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/src/lib/useAuth";
-
 const plans = [
-  {
-    name: "Starter",
-    days: 7,
-    label: "7 Days",
-    bullets: ["Quick launch", "Simple actions", "Fast results"],
-  },
-  {
-    name: "Pro",
-    days: 14,
-    label: "14 Days",
-    bullets: ["More reach", "Steady growth", "Better rhythm"],
-  },
-  {
-    name: "Premium",
-    days: 30,
-    label: "30 Days",
-    bullets: ["Full month", "Deeper planning", "Strong momentum"],
-  },
+    {
+        name: "Starter",
+        days: 7,
+        label: "7 Days",
+        bullets: ["Quick launch", "Simple actions", "Fast results"],
+    },
+    {
+        name: "Pro",
+        days: 14,
+        label: "14 Days",
+        bullets: ["More reach", "Steady growth", "Better rhythm"],
+    },
+    {
+        name: "Premium",
+        days: 30,
+        label: "30 Days",
+        bullets: ["Full month", "Deeper planning", "Strong momentum"],
+    },
 ];
-
 export default function SelectPlanPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const { user, loading: authLoading } = useAuth();
-  const isNewMode = searchParams.get("mode") === "new";
-  const [selected, setSelected] = useState<number | null>(null);
-  const [savingPlanDays, setSavingPlanDays] = useState<number | null>(null);
-  const [errorText, setErrorText] = useState<string | null>(null);
-  const [savingNotice, setSavingNotice] = useState<string | null>(null);
-  const [planHydrated, setPlanHydrated] = useState(false);
-
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.replace("/login");
-    }
-  }, [authLoading, user, router]);
-
-  useEffect(() => {
-    if (authLoading || !user?.uid || isNewMode) {
-      setPlanHydrated(true);
-      return;
-    }
-
-    let cancelled = false;
-
-    const loadSelected = async () => {
-      try {
-        const res = await fetch(`/api/select-plan?firebase_uid=${encodeURIComponent(user.uid)}`, {
-          cache: "no-store",
-        });
-        const data = await res.json();
-        if (cancelled) return;
-        if (res.ok && data?.ok && data.data) {
-          const days = Number(data.data.plan_days ?? data.data.planDays ?? 0);
-          if ([7, 14, 30].includes(days)) {
-            setSelected(days);
-          }
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const { user, loading: authLoading } = useAuth();
+    const isNewMode = searchParams.get("mode") === "new";
+    const [selected, setSelected] = useState<number | null>(null);
+    const [savingPlanDays, setSavingPlanDays] = useState<number | null>(null);
+    const [errorText, setErrorText] = useState<string | null>(null);
+    const [savingNotice, setSavingNotice] = useState<string | null>(null);
+    const [planHydrated, setPlanHydrated] = useState(false);
+    useEffect(() => {
+        if (!authLoading && !user) {
+            router.replace("/login");
         }
-      } catch {
-        /* no selection in DB yet */
-      } finally {
-        if (!cancelled) setPlanHydrated(true);
-      }
-    };
-
-    void loadSelected();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [authLoading, user?.uid, isNewMode]);
-
-  async function persistPlan(days: number) {
-    if (!user?.uid) {
-      router.replace("/login");
-      return;
+    }, [authLoading, user, router]);
+    useEffect(() => {
+        if (authLoading || !user?.uid || isNewMode) {
+            setPlanHydrated(true);
+            return;
+        }
+        let cancelled = false;
+        const loadSelected = async () => {
+            try {
+                const res = await fetch(`/api/select-plan?firebase_uid=${encodeURIComponent(user.uid)}`, {
+                    cache: "no-store",
+                });
+                const data = await res.json();
+                if (cancelled)
+                    return;
+                if (res.ok && data?.ok && data.data) {
+                    const days = Number(data.data.plan_days ?? data.data.planDays ?? 0);
+                    if ([7, 14, 30].includes(days)) {
+                        setSelected(days);
+                    }
+                }
+            }
+            catch {
+            }
+            finally {
+                if (!cancelled)
+                    setPlanHydrated(true);
+            }
+        };
+        void loadSelected();
+        return () => {
+            cancelled = true;
+        };
+    }, [authLoading, user?.uid, isNewMode]);
+    async function persistPlan(days: number) {
+        if (!user?.uid) {
+            router.replace("/login");
+            return;
+        }
+        try {
+            setErrorText(null);
+            setSavingNotice("Saving...");
+            setSavingPlanDays(days);
+            const res = await fetch("/api/select-plan", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    firebase_uid: user.uid,
+                    planDays: days,
+                    nextPlanDays: days,
+                    mode: isNewMode ? "new" : "default",
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data?.ok) {
+                throw new Error(data?.error || "Failed to save plan");
+            }
+        }
+        catch (error: unknown) {
+            const text = error instanceof Error ? error.message : "Something went wrong";
+            setErrorText(text);
+            setSavingNotice(null);
+        }
+        finally {
+            setSavingPlanDays(null);
+            setTimeout(() => setSavingNotice(null), 800);
+        }
     }
-
-    try {
-      setErrorText(null);
-      setSavingNotice("Saving...");
-      setSavingPlanDays(days);
-
-      const res = await fetch("/api/select-plan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          firebase_uid: user.uid,
-          planDays: days,
-          nextPlanDays: days,
-          mode: isNewMode ? "new" : "default",
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok || !data?.ok) {
-        throw new Error(data?.error || "Failed to save plan");
-      }
-    } catch (error: unknown) {
-      const text = error instanceof Error ? error.message : "Something went wrong";
-      setErrorText(text);
-      setSavingNotice(null);
-    } finally {
-      setSavingPlanDays(null);
-      setTimeout(() => setSavingNotice(null), 800);
-    }
-  }
-
-  return (
-    <div className="selectPlanPage">
+    return (<div className="selectPlanPage">
       <div className="selectPlanShell">
         <section className="selectPlanHeader">
           <div className="selectPlanHeaderInner">
@@ -123,46 +112,34 @@ export default function SelectPlanPage() {
             <h1>Select Plan</h1>
             <p className="subtitle">
               {isNewMode
-                ? "Pick a new duration for your next fresh plan."
-                : "Pick the right duration for your marketing plan. You can update this later anytime."}
+            ? "Pick a new duration for your next fresh plan."
+            : "Pick the right duration for your marketing plan. You can update this later anytime."}
             </p>
           </div>
         </section>
 
-        {savingNotice && (
-          <section className="notice noticeInfo">
+        {savingNotice && (<section className="notice noticeInfo">
             <p>{savingNotice}</p>
-            <span className="spinner" />
-          </section>
-        )}
+            <span className="spinner"/>
+          </section>)}
 
-        {errorText && (
-          <section className="notice noticeError">
+        {errorText && (<section className="notice noticeError">
             <div className="noticeRow">
               <p>{errorText}</p>
               <button type="button" onClick={() => selected !== null && void persistPlan(selected)} className="retryBtn">
                 Try again
               </button>
             </div>
-          </section>
-        )}
+          </section>)}
 
         <section className="planGrid">
           {plans.map((plan) => {
             const isSelected = selected === plan.days;
-
-            return (
-              <button
-                key={plan.days}
-                type="button"
-                onClick={() => {
-                  setSelected(plan.days);
-                  void persistPlan(plan.days);
-                }}
-                disabled={savingPlanDays !== null || authLoading || !planHydrated}
-                className={`planCard ${isSelected ? "isSelected" : ""} ${savingPlanDays !== null || authLoading || !planHydrated ? "isDisabled" : ""}`}
-              >
-                <div className="planCardGlow" />
+            return (<button key={plan.days} type="button" onClick={() => {
+                    setSelected(plan.days);
+                    void persistPlan(plan.days);
+                }} disabled={savingPlanDays !== null || authLoading || !planHydrated} className={`planCard ${isSelected ? "isSelected" : ""} ${savingPlanDays !== null || authLoading || !planHydrated ? "isDisabled" : ""}`}>
+                <div className="planCardGlow"/>
                 <div className="planTop">
                   <div>
                     {plan.name === "Pro" && <span className="popularTag">Popular</span>}
@@ -177,16 +154,13 @@ export default function SelectPlanPage() {
                 <p className="included">What&apos;s included:</p>
 
                 <ul>
-                  {plan.bullets.map((bullet) => (
-                    <li key={bullet}>
+                  {plan.bullets.map((bullet) => (<li key={bullet}>
                       <span>✓</span>
                       {bullet}
-                    </li>
-                  ))}
+                    </li>))}
                 </ul>
-              </button>
-            );
-          })}
+              </button>);
+        })}
         </section>
 
         <div className="actions">
@@ -194,16 +168,9 @@ export default function SelectPlanPage() {
             Back
           </button>
 
-          <button
-            type="button"
-            disabled={selected === null || savingPlanDays !== null || authLoading || !planHydrated}
-            onClick={() =>
-              isNewMode
-                ? router.push(`/plan-builder?mode=new&days=${selected ?? 7}`)
-                : router.push("/marketing-plan")
-            }
-            className="nextBtn"
-          >
+          <button type="button" disabled={selected === null || savingPlanDays !== null || authLoading || !planHydrated} onClick={() => isNewMode
+            ? router.push(`/plan-builder?mode=new&days=${selected ?? 7}`)
+            : router.push("/marketing-plan")} className="nextBtn">
             {isNewMode ? "Continue" : "Next"}
           </button>
         </div>
@@ -548,6 +515,5 @@ export default function SelectPlanPage() {
           }
         }
       `}</style>
-    </div>
-  );
+    </div>);
 }

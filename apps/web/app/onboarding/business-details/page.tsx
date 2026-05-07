@@ -1,83 +1,74 @@
 "use client";
-
 import { useEffect, useRef, useState } from "react";
 import StepSidebar, { type StepId } from "../../../src/components/onboarding/StepSidebar";
 import BusinessForm from "../../../src/components/onboarding/BusinessForm";
-
 export default function BusinessDetailsPage() {
-  const [activeStep, setActiveStep] = useState<StepId>("business");
-  const [detailsMode, setDetailsMode] = useState<"create" | "edit">("create");
-  const sectionRefs = useRef<Partial<Record<StepId, HTMLElement | null>>>({});
-
-  const registerSectionRef = (step: StepId, el: HTMLElement | null) => {
-    sectionRefs.current[step] = el;
-  };
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        let bestStep: StepId | null = null;
-        let bestRatio = 0;
-
-        entries.forEach((entry) => {
-          if (!entry.isIntersecting) return;
-          const target = entry.target as HTMLElement;
-          const match = (Object.entries(sectionRefs.current) as [StepId, HTMLElement | null][]).find(
-            ([, el]) => el === target
-          );
-          if (!match) return;
-          const [stepId] = match;
-          if (entry.intersectionRatio > bestRatio) {
-            bestRatio = entry.intersectionRatio;
-            bestStep = stepId;
-          }
-        });
-
-        if (bestStep && bestStep !== activeStep) {
-          setActiveStep(bestStep);
-        }
-      },
-      {
-        threshold: [0.3, 0.5, 0.7],
-      }
-    );
-
-    const elements = (Object.entries(sectionRefs.current) as [StepId, HTMLElement | null][]) 
-      .filter(([id]) => id === "business" || id === "products" || id === "team" || id === "financials")
-      .map(([, el]) => el)
-      .filter((el): el is HTMLElement => Boolean(el));
-
-    elements.forEach((el) => observer.observe(el));
-
-    return () => {
-      observer.disconnect();
+    const [activeStep, setActiveStep] = useState<StepId>("business");
+    const [detailsMode, setDetailsMode] = useState<"create" | "edit">("create");
+    const sectionRefs = useRef<Partial<Record<StepId, HTMLElement | null>>>({});
+    const registerSectionRef = (step: StepId, el: HTMLElement | null) => {
+        sectionRefs.current[step] = el;
     };
-  }, [activeStep]);
-
-  const handleStepClick = (step: StepId) => {
-    const el = sectionRefs.current[step];
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  };
-
-  return (
-    <div className="detailsPage">
+    useEffect(() => {
+        const observer = new IntersectionObserver((entries) => {
+            let bestStep: StepId | null = null;
+            let bestRatio = 0;
+            entries.forEach((entry) => {
+                if (!entry.isIntersecting)
+                    return;
+                const target = entry.target as HTMLElement;
+                const match = (Object.entries(sectionRefs.current) as [
+                    StepId,
+                    HTMLElement | null
+                ][]).find(([, el]) => el === target);
+                if (!match)
+                    return;
+                const [stepId] = match;
+                if (entry.intersectionRatio > bestRatio) {
+                    bestRatio = entry.intersectionRatio;
+                    bestStep = stepId;
+                }
+            });
+            if (bestStep && bestStep !== activeStep) {
+                setActiveStep(bestStep);
+            }
+        }, {
+            threshold: [0.3, 0.5, 0.7],
+        });
+        const elements = (Object.entries(sectionRefs.current) as [
+            StepId,
+            HTMLElement | null
+        ][])
+            .filter(([id]) => id === "business" || id === "products" || id === "team" || id === "financials")
+            .map(([, el]) => el)
+            .filter((el): el is HTMLElement => Boolean(el));
+        elements.forEach((el) => observer.observe(el));
+        return () => {
+            observer.disconnect();
+        };
+    }, [activeStep]);
+    const handleStepClick = (step: StepId) => {
+        const el = sectionRefs.current[step];
+        if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+    };
+    return (<div className="detailsPage">
       <div className="detailsShell">
         <section className="detailsHeader">
           <p className="eyebrow">Business Setup</p>
           <h1>{detailsMode === "edit" ? "Edit Business Details" : "Create Business Details"}</h1>
           <p>
             {detailsMode === "edit"
-              ? "Update your business profile to keep your strategy and content accurate."
-              : "Complete your core profile to personalize your growth and marketing plan."}
+            ? "Update your business profile to keep your strategy and content accurate."
+            : "Complete your core profile to personalize your growth and marketing plan."}
           </p>
         </section>
 
         <section className="detailsCard onboardingWrap">
           <div className="onboardingCard">
-            <StepSidebar currentStep={activeStep} onStepClick={handleStepClick} />
-            <BusinessForm registerSectionRef={registerSectionRef} onModeChange={setDetailsMode} />
+            <StepSidebar currentStep={activeStep} onStepClick={handleStepClick}/>
+            <BusinessForm registerSectionRef={registerSectionRef} onModeChange={setDetailsMode}/>
           </div>
         </section>
       </div>
@@ -211,6 +202,5 @@ export default function BusinessDetailsPage() {
           }
         }
       `}</style>
-    </div>
-  );
+    </div>);
 }

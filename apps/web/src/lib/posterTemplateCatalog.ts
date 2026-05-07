@@ -1,375 +1,333 @@
 import type { PosterStyle } from "@/src/components/poster/PosterTemplate";
-
-/**
- * Matches marketing-plan day themes from deriveDayThemeForPlan — string union for clarity in data.
- */
-export type PlanDayTheme =
-  | "Promo"
-  | "ProductHighlight"
-  | "Testimonial"
-  | "BTS"
-  | "Engagement"
-  | "WeekendSpecial"
-  | "GrowthPush";
-
-export type PosterContentField =
-  | "brandName"
-  | "headline"
-  | "subheadline"
-  | "offerBadge"
-  | "ctaLabel"
-  | "accentColor"
-  | "textColor"
-  | "overlay";
-
-export type PosterTemplateCategory =
-  | "promo-discount"
-  | "product-service"
-  | "testimonial-review"
-  | "event-weekend"
-  | "minimal-premium"
-  | "general";
-
+export type PlanDayTheme = "Promo" | "ProductHighlight" | "Testimonial" | "BTS" | "Engagement" | "WeekendSpecial" | "GrowthPush";
+export type PosterContentField = "brandName" | "headline" | "subheadline" | "offerBadge" | "ctaLabel" | "accentColor" | "textColor" | "overlay";
+export type PosterTemplateCategory = "promo-discount" | "product-service" | "testimonial-review" | "event-weekend" | "minimal-premium" | "general";
 export type PosterLayoutType = PosterStyle;
-
 export interface PosterTemplateDefinition {
-  id: string;
-  name: string;
-  category: PosterTemplateCategory;
-  /** Which visual renderer to use (shared layout system). */
-  layoutType: PosterLayoutType;
-  recommendedUse: string;
-  styleTags: string[];
-  supportedContentFields: PosterContentField[];
-  /** When set, template is preferred for these plan day themes. Empty = eligible for any theme with category match. */
-  dayThemes: PlanDayTheme[];
-  /** Case-insensitive substring matches on business type / industry. */
-  businessTypeKeywords: string[];
+    id: string;
+    name: string;
+    category: PosterTemplateCategory;
+    layoutType: PosterLayoutType;
+    recommendedUse: string;
+    styleTags: string[];
+    supportedContentFields: PosterContentField[];
+    dayThemes: PlanDayTheme[];
+    businessTypeKeywords: string[];
 }
-
 export const POSTER_TEMPLATE_CATEGORY_LABELS: Record<PosterTemplateCategory, string> = {
-  "promo-discount": "Promo & discounts",
-  "product-service": "Product & service highlights",
-  "testimonial-review": "Testimonials & reviews",
-  "event-weekend": "Events & weekend specials",
-  "minimal-premium": "Minimal & premium",
-  general: "General & flexible",
+    "promo-discount": "Promo & discounts",
+    "product-service": "Product & service highlights",
+    "testimonial-review": "Testimonials & reviews",
+    "event-weekend": "Events & weekend specials",
+    "minimal-premium": "Minimal & premium",
+    general: "General & flexible",
 };
-
 export const POSTER_TEMPLATE_CATALOG: PosterTemplateDefinition[] = [
-  /* —— Promo / discount —— */
-  {
-    id: "promo-flash-impact",
-    name: "Flash impact",
-    category: "promo-discount",
-    layoutType: "bold-statement",
-    recommendedUse: "Short BOGO, % off, or flash sale with one hero line.",
-    styleTags: ["urgent", "retail", "bold-type"],
-    supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
-    dayThemes: ["Promo", "GrowthPush"],
-    businessTypeKeywords: ["retail", "shop", "store", "market", "grocery", "fashion", "clothing"],
-  },
-  {
-    id: "promo-split-cta",
-    name: "Split offer + CTA",
-    category: "promo-discount",
-    layoutType: "landscape-action",
-    recommendedUse: "Offer on the left, strong CTA block — good for food & packaged deals.",
-    styleTags: ["split", "cta-forward", "restaurant"],
-    supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
-    dayThemes: ["Promo", "WeekendSpecial"],
-    businessTypeKeywords: ["restaurant", "cafe", "food", "bakery", "catering", "delivery"],
-  },
-  {
-    id: "promo-hero-drop",
-    name: "Hero drop",
-    category: "promo-discount",
-    layoutType: "offer-card",
-    recommendedUse: "Single product or bundle as the star with top badge.",
-    styleTags: ["product-led", "ecommerce"],
-    supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
-    dayThemes: ["Promo", "ProductHighlight"],
-    businessTypeKeywords: ["product", "online", "shop", "store", "electronics", "gift"],
-  },
-  {
-    id: "promo-festival-burst",
-    name: "Festival burst",
-    category: "promo-discount",
-    layoutType: "festival-vibrant",
-    recommendedUse: "Seasonal or cultural promos with warm celebratory energy.",
-    styleTags: ["festival", "seasonal", "warm"],
-    supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
-    dayThemes: ["Promo", "WeekendSpecial", "Engagement"],
-    businessTypeKeywords: ["event", "party", "wedding", "hotel", "catering", "retail"],
-  },
-  {
-    id: "promo-neon-deal",
-    name: "Neon deal",
-    category: "promo-discount",
-    layoutType: "social-stack",
-    recommendedUse: "Techy or modern brand limited offers and app/DM CTAs.",
-    styleTags: ["modern", "digital", "drop"],
-    supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
-    dayThemes: ["Promo", "GrowthPush", "Engagement"],
-    businessTypeKeywords: ["tech", "software", "phone", "computer", "studio", "gaming", "digital"],
-  },
-  /* —— Product / service highlight —— */
-  {
-    id: "product-editorial-spotlight",
-    name: "Editorial spotlight",
-    category: "product-service",
-    layoutType: "editorial",
-    recommendedUse: "Lifestyle, beauty, apparel — storytelling around one offer.",
-    styleTags: ["editorial", "lifestyle"],
-    supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
-    dayThemes: ["ProductHighlight"],
-    businessTypeKeywords: ["salon", "beauty", "spa", "fashion", "boutique", "studio"],
-  },
-  {
-    id: "product-minimal-focus",
-    name: "Minimal focus",
-    category: "product-service",
-    layoutType: "minimal-clean",
-    recommendedUse: "Premium services — one headline, whitespace, understated CTA.",
-    styleTags: ["minimal", "calm"],
-    supportedContentFields: ["brandName", "headline", "subheadline", "ctaLabel", "accentColor", "textColor", "overlay"],
-    dayThemes: ["ProductHighlight"],
-    businessTypeKeywords: ["consult", "agency", "legal", "account", "therapy", "clinic"],
-  },
-  {
-    id: "product-hero-launch",
-    name: "Hero launch",
-    category: "product-service",
-    layoutType: "image-first",
-    recommendedUse: "New SKU, menu item, or service package front and centre.",
-    styleTags: ["launch", "centre-balanced"],
-    supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
-    dayThemes: ["ProductHighlight", "GrowthPush"],
-    businessTypeKeywords: ["product", "brand", "manufacturing", "wholesale"],
-  },
-  {
-    id: "product-action-rows",
-    name: "Action rows",
-    category: "product-service",
-    layoutType: "landscape-action",
-    recommendedUse: "Trades and practical services — clarity + punchy benefit line.",
-    styleTags: ["service", "practical"],
-    supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
-    dayThemes: ["ProductHighlight", "BTS"],
-    businessTypeKeywords: ["construction", "repair", "plumb", "electric", "clean", "maintenance"],
-  },
-  {
-    id: "product-bold-line",
-    name: "Bold line",
-    category: "product-service",
-    layoutType: "social-stack",
-    recommendedUse: "Memorable one-liner for a flagship product or service.",
-    styleTags: ["statement", "awareness"],
-    supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
-    dayThemes: ["ProductHighlight", "Engagement"],
-    businessTypeKeywords: ["gym", "fitness", "coach", "training", "sport"],
-  },
-  /* —— Testimonial / review —— */
-  {
-    id: "review-editorial-quote",
-    name: "Editorial quote",
-    category: "testimonial-review",
-    layoutType: "testimonial-quote",
-    recommendedUse: "Quote-style headline and supporting proof line.",
-    styleTags: ["quote", "trust", "magazine"],
-    supportedContentFields: ["brandName", "headline", "subheadline", "ctaLabel", "accentColor", "textColor", "overlay"],
-    dayThemes: ["Testimonial"],
-    businessTypeKeywords: ["salon", "hotel", "wedding", "photo", "design"],
-  },
-  {
-    id: "review-luxury-proof",
-    name: "Luxury proof",
-    category: "testimonial-review",
-    layoutType: "luxury-dark",
-    recommendedUse: "High-trust upscale brands — serif + restrained CTA.",
-    styleTags: ["luxury", "proof"],
-    supportedContentFields: ["brandName", "headline", "subheadline", "ctaLabel", "accentColor", "textColor", "overlay"],
-    dayThemes: ["Testimonial"],
-    businessTypeKeywords: ["jewellery", "jewelry", "wedding", "boutique", "luxury"],
-  },
-  {
-    id: "review-minimal-trust",
-    name: "Minimal trust",
-    category: "testimonial-review",
-    layoutType: "testimonial-quote",
-    recommendedUse: "Simple customer story or star-rating headline.",
-    styleTags: ["clean", "social-proof"],
-    supportedContentFields: ["brandName", "headline", "subheadline", "ctaLabel", "accentColor", "textColor", "overlay"],
-    dayThemes: ["Testimonial", "ProductHighlight"],
-    businessTypeKeywords: ["clinic", "dental", "health", "wellness"],
-  },
-  {
-    id: "review-bold-social",
-    name: "Bold social proof",
-    category: "testimonial-review",
-    layoutType: "testimonial-quote",
-    recommendedUse: "Short headline that feels like a viral review pull-quote.",
-    styleTags: ["bold", "viral"],
-    supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
-    dayThemes: ["Testimonial", "Engagement"],
-    businessTypeKeywords: ["cafe", "restaurant", "retail", "online"],
-  },
-  /* —— Event / weekend —— */
-  {
-    id: "event-festival-banner",
-    name: "Festival banner",
-    category: "event-weekend",
-    layoutType: "festival-vibrant",
-    recommendedUse: "Weekend specials, holidays, and pop-ups.",
-    styleTags: ["weekend", "celebration"],
-    supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
-    dayThemes: ["WeekendSpecial", "Promo", "Engagement"],
-    businessTypeKeywords: ["event", "food", "retail", "hotel"],
-  },
-  {
-    id: "event-bold-countdown",
-    name: "Bold countdown",
-    category: "event-weekend",
-    layoutType: "bold-statement",
-    recommendedUse: "Ends Sunday, tonight only — time-bound headlines.",
-    styleTags: ["urgency", "event"],
-    supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
-    dayThemes: ["WeekendSpecial", "Promo"],
-    businessTypeKeywords: ["sale", "outlet", "market"],
-  },
-  {
-    id: "event-hero-gather",
-    name: "Hero gather",
-    category: "event-weekend",
-    layoutType: "image-first",
-    recommendedUse: "RSVP-style CTA around an experience or VIP slot.",
-    styleTags: ["rsvp", "experience"],
-    supportedContentFields: ["brandName", "headline", "subheadline", "ctaLabel", "accentColor", "textColor", "overlay"],
-    dayThemes: ["WeekendSpecial", "Engagement"],
-    businessTypeKeywords: ["wedding", "venue", "catering", "tour"],
-  },
-  {
-    id: "event-split-announce",
-    name: "Split announce",
-    category: "event-weekend",
-    layoutType: "landscape-action",
-    recommendedUse: "Workshop flyer feel — detail line + BOOK NOW.",
-    styleTags: ["workshop", "announce"],
-    supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
-    dayThemes: ["WeekendSpecial", "GrowthPush"],
-    businessTypeKeywords: ["class", "course", "workshop", "training"],
-  },
-  /* —— Minimal / premium —— */
-  {
-    id: "premium-luxury-card",
-    name: "Luxury card",
-    category: "minimal-premium",
-    layoutType: "luxury-dark",
-    recommendedUse: "Premium pricing, appointments, limited slots.",
-    styleTags: ["premium", "dark"],
-    supportedContentFields: ["brandName", "headline", "subheadline", "ctaLabel", "accentColor", "textColor", "overlay"],
-    dayThemes: ["ProductHighlight", "Testimonial"],
-    businessTypeKeywords: ["jewellery", "jewelry", "wedding", "spa", "hotel"],
-  },
-  {
-    id: "premium-minimal-zen",
-    name: "Minimal zen",
-    category: "minimal-premium",
-    layoutType: "minimal-clean",
-    recommendedUse: "Studios, wellness, quiet brands — less is more.",
-    styleTags: ["zen", "whitespace"],
-    supportedContentFields: ["brandName", "headline", "subheadline", "ctaLabel", "accentColor", "textColor", "overlay"],
-    dayThemes: ["ProductHighlight", "BTS"],
-    businessTypeKeywords: ["yoga", "wellness", "meditation", "design", "architect"],
-  },
-  {
-    id: "premium-editorial-magazine",
-    name: "Magazine masthead",
-    category: "minimal-premium",
-    layoutType: "editorial",
-    recommendedUse: "Editorial campaign for upscale lifestyle brands.",
-    styleTags: ["editorial", "premium"],
-    supportedContentFields: ["brandName", "headline", "subheadline", "ctaLabel", "accentColor", "textColor", "overlay"],
-    dayThemes: ["ProductHighlight"],
-    businessTypeKeywords: ["fashion", "beauty", "interior"],
-  },
-  {
-    id: "premium-clean-hero",
-    name: "Clean hero",
-    category: "minimal-premium",
-    layoutType: "image-first",
-    recommendedUse: "Balanced premium product shot with restrained type.",
-    styleTags: ["balanced", "premium"],
-    supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
-    dayThemes: ["ProductHighlight", "GrowthPush"],
-    businessTypeKeywords: ["cosmetic", "skincare", "perfume"],
-  },
-  /* —— General fallback —— */
-  {
-    id: "general-balanced-bold",
-    name: "Balanced bold",
-    category: "general",
-    layoutType: "offer-card",
-    recommendedUse: "Default high-impact promo when unsure.",
-    styleTags: ["default", "versatile"],
-    supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
-    dayThemes: [],
-    businessTypeKeywords: [],
-  },
-  {
-    id: "general-split-safe",
-    name: "Split safe",
-    category: "general",
-    layoutType: "landscape-action",
-    recommendedUse: "Readable layout for any SME with clear CTA.",
-    styleTags: ["safe", "readable"],
-    supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
-    dayThemes: [],
-    businessTypeKeywords: [],
-  },
-  {
-    id: "general-centered-cta",
-    name: "Centered CTA",
-    category: "general",
-    layoutType: "image-first",
-    recommendedUse: "Works for most products and services.",
-    styleTags: ["balanced", "cta"],
-    supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
-    dayThemes: [],
-    businessTypeKeywords: [],
-  },
-  {
-    id: "general-tech-neutral",
-    name: "Tech neutral",
-    category: "general",
-    layoutType: "social-stack",
-    recommendedUse: "Modern default for digital-first businesses.",
-    styleTags: ["modern", "neutral"],
-    supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
-    dayThemes: [],
-    businessTypeKeywords: ["tech", "software", "digital", "app"],
-  },
+    {
+        id: "promo-flash-impact",
+        name: "Flash impact",
+        category: "promo-discount",
+        layoutType: "bold-statement",
+        recommendedUse: "Short BOGO, % off, or flash sale with one hero line.",
+        styleTags: ["urgent", "retail", "bold-type"],
+        supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
+        dayThemes: ["Promo", "GrowthPush"],
+        businessTypeKeywords: ["retail", "shop", "store", "market", "grocery", "fashion", "clothing"],
+    },
+    {
+        id: "promo-split-cta",
+        name: "Split offer + CTA",
+        category: "promo-discount",
+        layoutType: "landscape-action",
+        recommendedUse: "Offer on the left, strong CTA block — good for food & packaged deals.",
+        styleTags: ["split", "cta-forward", "restaurant"],
+        supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
+        dayThemes: ["Promo", "WeekendSpecial"],
+        businessTypeKeywords: ["restaurant", "cafe", "food", "bakery", "catering", "delivery"],
+    },
+    {
+        id: "promo-hero-drop",
+        name: "Hero drop",
+        category: "promo-discount",
+        layoutType: "offer-card",
+        recommendedUse: "Single product or bundle as the star with top badge.",
+        styleTags: ["product-led", "ecommerce"],
+        supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
+        dayThemes: ["Promo", "ProductHighlight"],
+        businessTypeKeywords: ["product", "online", "shop", "store", "electronics", "gift"],
+    },
+    {
+        id: "promo-festival-burst",
+        name: "Festival burst",
+        category: "promo-discount",
+        layoutType: "festival-vibrant",
+        recommendedUse: "Seasonal or cultural promos with warm celebratory energy.",
+        styleTags: ["festival", "seasonal", "warm"],
+        supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
+        dayThemes: ["Promo", "WeekendSpecial", "Engagement"],
+        businessTypeKeywords: ["event", "party", "wedding", "hotel", "catering", "retail"],
+    },
+    {
+        id: "promo-neon-deal",
+        name: "Neon deal",
+        category: "promo-discount",
+        layoutType: "social-stack",
+        recommendedUse: "Techy or modern brand limited offers and app/DM CTAs.",
+        styleTags: ["modern", "digital", "drop"],
+        supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
+        dayThemes: ["Promo", "GrowthPush", "Engagement"],
+        businessTypeKeywords: ["tech", "software", "phone", "computer", "studio", "gaming", "digital"],
+    },
+    {
+        id: "product-editorial-spotlight",
+        name: "Editorial spotlight",
+        category: "product-service",
+        layoutType: "editorial",
+        recommendedUse: "Lifestyle, beauty, apparel — storytelling around one offer.",
+        styleTags: ["editorial", "lifestyle"],
+        supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
+        dayThemes: ["ProductHighlight"],
+        businessTypeKeywords: ["salon", "beauty", "spa", "fashion", "boutique", "studio"],
+    },
+    {
+        id: "product-minimal-focus",
+        name: "Minimal focus",
+        category: "product-service",
+        layoutType: "minimal-clean",
+        recommendedUse: "Premium services — one headline, whitespace, understated CTA.",
+        styleTags: ["minimal", "calm"],
+        supportedContentFields: ["brandName", "headline", "subheadline", "ctaLabel", "accentColor", "textColor", "overlay"],
+        dayThemes: ["ProductHighlight"],
+        businessTypeKeywords: ["consult", "agency", "legal", "account", "therapy", "clinic"],
+    },
+    {
+        id: "product-hero-launch",
+        name: "Hero launch",
+        category: "product-service",
+        layoutType: "image-first",
+        recommendedUse: "New SKU, menu item, or service package front and centre.",
+        styleTags: ["launch", "centre-balanced"],
+        supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
+        dayThemes: ["ProductHighlight", "GrowthPush"],
+        businessTypeKeywords: ["product", "brand", "manufacturing", "wholesale"],
+    },
+    {
+        id: "product-action-rows",
+        name: "Action rows",
+        category: "product-service",
+        layoutType: "landscape-action",
+        recommendedUse: "Trades and practical services — clarity + punchy benefit line.",
+        styleTags: ["service", "practical"],
+        supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
+        dayThemes: ["ProductHighlight", "BTS"],
+        businessTypeKeywords: ["construction", "repair", "plumb", "electric", "clean", "maintenance"],
+    },
+    {
+        id: "product-bold-line",
+        name: "Bold line",
+        category: "product-service",
+        layoutType: "social-stack",
+        recommendedUse: "Memorable one-liner for a flagship product or service.",
+        styleTags: ["statement", "awareness"],
+        supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
+        dayThemes: ["ProductHighlight", "Engagement"],
+        businessTypeKeywords: ["gym", "fitness", "coach", "training", "sport"],
+    },
+    {
+        id: "review-editorial-quote",
+        name: "Editorial quote",
+        category: "testimonial-review",
+        layoutType: "testimonial-quote",
+        recommendedUse: "Quote-style headline and supporting proof line.",
+        styleTags: ["quote", "trust", "magazine"],
+        supportedContentFields: ["brandName", "headline", "subheadline", "ctaLabel", "accentColor", "textColor", "overlay"],
+        dayThemes: ["Testimonial"],
+        businessTypeKeywords: ["salon", "hotel", "wedding", "photo", "design"],
+    },
+    {
+        id: "review-luxury-proof",
+        name: "Luxury proof",
+        category: "testimonial-review",
+        layoutType: "luxury-dark",
+        recommendedUse: "High-trust upscale brands — serif + restrained CTA.",
+        styleTags: ["luxury", "proof"],
+        supportedContentFields: ["brandName", "headline", "subheadline", "ctaLabel", "accentColor", "textColor", "overlay"],
+        dayThemes: ["Testimonial"],
+        businessTypeKeywords: ["jewellery", "jewelry", "wedding", "boutique", "luxury"],
+    },
+    {
+        id: "review-minimal-trust",
+        name: "Minimal trust",
+        category: "testimonial-review",
+        layoutType: "testimonial-quote",
+        recommendedUse: "Simple customer story or star-rating headline.",
+        styleTags: ["clean", "social-proof"],
+        supportedContentFields: ["brandName", "headline", "subheadline", "ctaLabel", "accentColor", "textColor", "overlay"],
+        dayThemes: ["Testimonial", "ProductHighlight"],
+        businessTypeKeywords: ["clinic", "dental", "health", "wellness"],
+    },
+    {
+        id: "review-bold-social",
+        name: "Bold social proof",
+        category: "testimonial-review",
+        layoutType: "testimonial-quote",
+        recommendedUse: "Short headline that feels like a viral review pull-quote.",
+        styleTags: ["bold", "viral"],
+        supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
+        dayThemes: ["Testimonial", "Engagement"],
+        businessTypeKeywords: ["cafe", "restaurant", "retail", "online"],
+    },
+    {
+        id: "event-festival-banner",
+        name: "Festival banner",
+        category: "event-weekend",
+        layoutType: "festival-vibrant",
+        recommendedUse: "Weekend specials, holidays, and pop-ups.",
+        styleTags: ["weekend", "celebration"],
+        supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
+        dayThemes: ["WeekendSpecial", "Promo", "Engagement"],
+        businessTypeKeywords: ["event", "food", "retail", "hotel"],
+    },
+    {
+        id: "event-bold-countdown",
+        name: "Bold countdown",
+        category: "event-weekend",
+        layoutType: "bold-statement",
+        recommendedUse: "Ends Sunday, tonight only — time-bound headlines.",
+        styleTags: ["urgency", "event"],
+        supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
+        dayThemes: ["WeekendSpecial", "Promo"],
+        businessTypeKeywords: ["sale", "outlet", "market"],
+    },
+    {
+        id: "event-hero-gather",
+        name: "Hero gather",
+        category: "event-weekend",
+        layoutType: "image-first",
+        recommendedUse: "RSVP-style CTA around an experience or VIP slot.",
+        styleTags: ["rsvp", "experience"],
+        supportedContentFields: ["brandName", "headline", "subheadline", "ctaLabel", "accentColor", "textColor", "overlay"],
+        dayThemes: ["WeekendSpecial", "Engagement"],
+        businessTypeKeywords: ["wedding", "venue", "catering", "tour"],
+    },
+    {
+        id: "event-split-announce",
+        name: "Split announce",
+        category: "event-weekend",
+        layoutType: "landscape-action",
+        recommendedUse: "Workshop flyer feel — detail line + BOOK NOW.",
+        styleTags: ["workshop", "announce"],
+        supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
+        dayThemes: ["WeekendSpecial", "GrowthPush"],
+        businessTypeKeywords: ["class", "course", "workshop", "training"],
+    },
+    {
+        id: "premium-luxury-card",
+        name: "Luxury card",
+        category: "minimal-premium",
+        layoutType: "luxury-dark",
+        recommendedUse: "Premium pricing, appointments, limited slots.",
+        styleTags: ["premium", "dark"],
+        supportedContentFields: ["brandName", "headline", "subheadline", "ctaLabel", "accentColor", "textColor", "overlay"],
+        dayThemes: ["ProductHighlight", "Testimonial"],
+        businessTypeKeywords: ["jewellery", "jewelry", "wedding", "spa", "hotel"],
+    },
+    {
+        id: "premium-minimal-zen",
+        name: "Minimal zen",
+        category: "minimal-premium",
+        layoutType: "minimal-clean",
+        recommendedUse: "Studios, wellness, quiet brands — less is more.",
+        styleTags: ["zen", "whitespace"],
+        supportedContentFields: ["brandName", "headline", "subheadline", "ctaLabel", "accentColor", "textColor", "overlay"],
+        dayThemes: ["ProductHighlight", "BTS"],
+        businessTypeKeywords: ["yoga", "wellness", "meditation", "design", "architect"],
+    },
+    {
+        id: "premium-editorial-magazine",
+        name: "Magazine masthead",
+        category: "minimal-premium",
+        layoutType: "editorial",
+        recommendedUse: "Editorial campaign for upscale lifestyle brands.",
+        styleTags: ["editorial", "premium"],
+        supportedContentFields: ["brandName", "headline", "subheadline", "ctaLabel", "accentColor", "textColor", "overlay"],
+        dayThemes: ["ProductHighlight"],
+        businessTypeKeywords: ["fashion", "beauty", "interior"],
+    },
+    {
+        id: "premium-clean-hero",
+        name: "Clean hero",
+        category: "minimal-premium",
+        layoutType: "image-first",
+        recommendedUse: "Balanced premium product shot with restrained type.",
+        styleTags: ["balanced", "premium"],
+        supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
+        dayThemes: ["ProductHighlight", "GrowthPush"],
+        businessTypeKeywords: ["cosmetic", "skincare", "perfume"],
+    },
+    {
+        id: "general-balanced-bold",
+        name: "Balanced bold",
+        category: "general",
+        layoutType: "offer-card",
+        recommendedUse: "Default high-impact promo when unsure.",
+        styleTags: ["default", "versatile"],
+        supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
+        dayThemes: [],
+        businessTypeKeywords: [],
+    },
+    {
+        id: "general-split-safe",
+        name: "Split safe",
+        category: "general",
+        layoutType: "landscape-action",
+        recommendedUse: "Readable layout for any SME with clear CTA.",
+        styleTags: ["safe", "readable"],
+        supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
+        dayThemes: [],
+        businessTypeKeywords: [],
+    },
+    {
+        id: "general-centered-cta",
+        name: "Centered CTA",
+        category: "general",
+        layoutType: "image-first",
+        recommendedUse: "Works for most products and services.",
+        styleTags: ["balanced", "cta"],
+        supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
+        dayThemes: [],
+        businessTypeKeywords: [],
+    },
+    {
+        id: "general-tech-neutral",
+        name: "Tech neutral",
+        category: "general",
+        layoutType: "social-stack",
+        recommendedUse: "Modern default for digital-first businesses.",
+        styleTags: ["modern", "neutral"],
+        supportedContentFields: ["brandName", "headline", "subheadline", "offerBadge", "ctaLabel", "accentColor", "textColor", "overlay"],
+        dayThemes: [],
+        businessTypeKeywords: ["tech", "software", "digital", "app"],
+    },
 ];
-
 const byId = new Map(POSTER_TEMPLATE_CATALOG.map((t) => [t.id, t]));
-
 export function getPosterTemplateById(id: string | undefined | null): PosterTemplateDefinition | null {
-  if (!id || !byId.has(id)) return null;
-  return byId.get(id)!;
+    if (!id || !byId.has(id))
+        return null;
+    return byId.get(id)!;
 }
-
 export function listPosterTemplatesByCategory(category: PosterTemplateCategory | "all"): PosterTemplateDefinition[] {
-  if (category === "all") return [...POSTER_TEMPLATE_CATALOG];
-  return POSTER_TEMPLATE_CATALOG.filter((t) => t.category === category);
+    if (category === "all")
+        return [...POSTER_TEMPLATE_CATALOG];
+    return POSTER_TEMPLATE_CATALOG.filter((t) => t.category === category);
 }
-
 export function getAllPosterTemplateCategories(): PosterTemplateCategory[] {
-  return [
-    "promo-discount",
-    "product-service",
-    "testimonial-review",
-    "event-weekend",
-    "minimal-premium",
-    "general",
-  ];
+    return [
+        "promo-discount",
+        "product-service",
+        "testimonial-review",
+        "event-weekend",
+        "minimal-premium",
+        "general",
+    ];
 }

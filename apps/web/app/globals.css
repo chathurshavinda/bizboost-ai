@@ -713,7 +713,7 @@ body {
 .spinner { margin-top: 20px; border: 3px solid rgba(255,255,255,0.2); border-top-color: #fff; border-radius: 50%; width: 32px; height: 32px; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ===== Navbar (modern SaaS, light glass) ===== */
+
 .navbar {
   position: sticky;
   top: 10px;
@@ -730,11 +730,11 @@ body {
 }
 
 .navbar--home {
-  /* Keep for state consistency */
+  
 }
 
 .navbar--scrolled {
-  /* Keep for state consistency */
+  
 }
 
 .navbarInner {
@@ -1127,7 +1127,7 @@ body {
   background: rgba(15, 23, 42, 0.08);
 }
 
-/* ===== Side Menu (slides from right) ===== */
+
 .bbSideBackdrop {
   position: fixed;
   inset: 0;
@@ -1368,7 +1368,7 @@ body {
   color: #ffffff;
 }
 
-/* keep generic legacy classes (.logo / .brand / .nav / .right) so other pages don't break */
+
 .logo { width: 32px; height: 32px; border-radius: 999px; display: grid; place-items: center; background: linear-gradient(135deg, rgba(0,0,0,0.08), rgba(0,0,0,0.02)); color: #0a0a0a; font-weight: 800; }
 .brand { width: auto; height: 24px; object-fit: contain; display: block; }
 .nav { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -1386,7 +1386,7 @@ body {
 .ctaCard { margin-top: 20px; }
 .ctaRow { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
 
-/* Business profile — light glass (aligned with marketing-plan / select-plan) */
+
 .businessProfilePage {
   position: relative;
   overflow: hidden;
@@ -1776,7 +1776,7 @@ body {
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
-/* Auth V2 design system */
+
 .authScene {
   min-height: calc(100vh - 64px);
   width: 100%;
@@ -2166,7 +2166,7 @@ body {
   }
 }
 
-/* Auth — BizBoost glass (login / signup /auth) */
+
 .authRefBg {
   --auth-nav-offset: 64px;
   min-height: calc(100dvh - var(--auth-nav-offset));
@@ -2586,7 +2586,7 @@ body {
   }
 }
 
-/* Monochrome glass theme overrides */
+
 :root {
   --ui-bg: #efefef;
   --ui-bg-strong: #d9d9d9;
@@ -2798,7 +2798,7 @@ html.dark .dayRow {
   color: #e2e8f0 !important;
 }
 
-/* Navbar — dark mode */
+
 html.dark .navbar,
 html.dark .navbar--home {
   background: transparent;
@@ -2899,17 +2899,15 @@ html.dark .navMobileDivider {
   background: rgba(255, 255, 255, 0.08);
 }
 
-/* =====================================================================
-   FULL BLACK THEME — true black surfaces, white-alpha borders
-   ===================================================================== */
 
-/* ---- Root body background ---- */
+
+
 html.dark body {
   background: #000000 !important;
   color: #e2e8f0 !important;
 }
 
-/* ---- Override monochrome glass variables to black ---- */
+
 html.dark {
   --ui-bg: #000000;
   --ui-bg-strong: #0a0a0a;
@@ -2924,7 +2922,7 @@ html.dark {
   --ui-shadow-soft: 0 12px 28px rgba(0, 0, 0, 0.55);
 }
 
-/* ---- Glass / Card / Panel surfaces ---- */
+
 html.dark .glass,
 html.dark .card,
 html.dark .authCard,
@@ -2948,7 +2946,7 @@ html.dark .homeSectionInner {
   color: #e2e8f0 !important;
 }
 
-/* ---- Headings ---- */
+
 html.dark .heroTitle,
 html.dark .sectionTitle,
 html.dark .businessProfileTitle,
@@ -2961,7 +2959,7 @@ html.dark .onboardingTitle {
   color: #ffffff !important;
 }
 
-/* ---- Muted / subtitle text ---- */
+
 html.dark .heroSubtitle,
 html.dark .sectionLead,
 html.dark .subtitle,
@@ -2977,7 +2975,7 @@ html.dark .link {
   color: #71717a !important;
 }
 
-/* ---- Inputs ---- */
+
 html.dark .ui-input,
 html.dark .input,
 html.dark .onboardingInput,
@@ -3005,7 +3003,7 @@ html.dark .authRefInput:focus {
   box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.06) !important;
 }
 
-/* ---- Buttons ---- */
+
 html.dark .btn.primary,
 html.dark .ui-button.primary,
 html.dark .authPrimaryButton,
@@ -3048,7 +3046,7 @@ html.dark .authRefProviderButton:hover:not(:disabled) {
   border-color: rgba(255, 255, 255, 0.16) !important;
 }
 
-/* ---- Auth scene background ---- */
+
 html.dark .authScene {
   background: #000000 !important;
 }
@@ -3144,7 +3142,7 @@ html.dark .authRefFeedback--progress {
   background: rgba(30, 58, 138, 0.15) !important;
 }
 
-/* ---- Auth V2 panels ---- */
+
 html.dark .authPanel {
   background: rgba(10, 10, 10, 0.82) !important;
   color: #e2e8f0 !important;
@@ -3213,7 +3211,7 @@ html.dark .authModeBtn--active {
   color: #ffffff !important;
 }
 
-/* ---- Business profile (→ black glass) ---- */
+
 html.dark .businessProfilePage {
   background: #000000 !important;
 }
@@ -3334,7 +3332,7 @@ html.dark .businessProfileGhostButton {
   color: #a1a1aa !important;
 }
 
-/* ---- Onboarding ---- */
+
 html.dark .onboardingWrap {
   background: #000000 !important;
 }
@@ -3355,7 +3353,7 @@ html.dark .onboardingStepLabel--done {
   color: #a1a1aa !important;
 }
 
-/* ---- Dashboard / page-wide ---- */
+
 html.dark .pageWide {
   color: #e2e8f0;
 }
@@ -3368,7 +3366,7 @@ html.dark .heroSubtitle {
   color: #71717a !important;
 }
 
-/* ---- Legacy generic styles ---- */
+
 html.dark .logo {
   background: rgba(255, 255, 255, 0.06) !important;
   color: #e2e8f0 !important;
@@ -3382,14 +3380,14 @@ html.dark .nav a:hover {
   color: #ffffff !important;
 }
 
-/* ---- Settings page ---- */
+
 html.dark .settingsCard {
   background: rgba(10, 10, 10, 0.82) !important;
   border-color: rgba(255, 255, 255, 0.08) !important;
   color: #e2e8f0 !important;
 }
 
-/* ---- Feedback messages ---- */
+
 html.dark .onboardingError {
   color: #fca5a5 !important;
 }
@@ -3398,7 +3396,7 @@ html.dark .onboardingStatus {
   color: #86efac !important;
 }
 
-/* ---- Footer ---- */
+
 html.dark .footer,
 html.dark .footerLeft a {
   color: #71717a !important;
@@ -3408,7 +3406,7 @@ html.dark .footerLeft a:hover {
   color: #ffffff !important;
 }
 
-/* ---- Home page (body.home-page) ---- */
+
 html.dark body.home-page {
   background: #000000 !important;
   color: #e2e8f0 !important;
@@ -3465,7 +3463,7 @@ html.dark .homeBtnGhost:hover {
   border-color: rgba(255, 255, 255, 0.16) !important;
 }
 
-/* ---- Confirm Action Modal ---- */
+
 html.dark .confirmModal,
 html.dark .confirmModalOverlay + div {
   background: rgba(5, 5, 5, 0.95) !important;
@@ -3473,7 +3471,7 @@ html.dark .confirmModalOverlay + div {
   color: #e2e8f0 !important;
 }
 
-/* ---- Select plan / marketing plan shared light panels ---- */
+
 html.dark .planCard,
 html.dark .mainCard,
 html.dark .calendarCard,
@@ -3485,14 +3483,14 @@ html.dark .topCard {
   color: #e2e8f0 !important;
 }
 
-/* ---- Generic text color overrides ---- */
+
 html.dark .text-muted,
 html.dark [class*="Muted"],
 html.dark [class*="muted"] {
   color: #71717a !important;
 }
 
-/* ---- Scrollbar for black mode ---- */
+
 html.dark ::-webkit-scrollbar {
   width: 8px;
 }
@@ -3510,7 +3508,7 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.25);
 }
 
-/* ---- Logo / brand images in dark mode ---- */
+
 html.dark .navbarBrandLogo {
   filter: invert(1) brightness(2);
 }
@@ -3520,7 +3518,7 @@ html.dark .homeFooterName {
   filter: invert(1) brightness(1.8);
 }
 
-/* ---- Home page body.home-page override for dark ---- */
+
 html.dark body.home-page .navbarInner {
   background: rgba(0, 0, 0, 0.82);
   border-color: rgba(255, 255, 255, 0.08);
@@ -3530,7 +3528,7 @@ html.dark .navbarBrandText {
   color: #ffffff;
 }
 
-/* ---- TodaysTaskCard dark ---- */
+
 html.dark .todayTaskCard,
 html.dark .todayTaskCardInner {
   background: rgba(10, 10, 10, 0.82) !important;

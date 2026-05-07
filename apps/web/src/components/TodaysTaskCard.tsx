@@ -1,101 +1,83 @@
 "use client";
-
 import { useEffect, useState } from "react";
-
 type TaskDay = {
-  dayNumber: number;
-  dateLabel?: string;
-  dateISO?: string;
-  mainActionTitle?: string;
-  completed?: boolean;
+    dayNumber: number;
+    dateLabel?: string;
+    dateISO?: string;
+    mainActionTitle?: string;
+    completed?: boolean;
 };
-
 type TodaysTaskCardProps = {
-  loading?: boolean;
-  planDays?: number;
-  days: TaskDay[];
-  completedMap: Record<number, boolean>;
-  firebaseUid?: string;
-  onOpenDay: (dayNumber: number) => void;
-  onOpenPlan: () => void;
-  className?: string;
+    loading?: boolean;
+    planDays?: number;
+    days: TaskDay[];
+    completedMap: Record<number, boolean>;
+    firebaseUid?: string;
+    onOpenDay: (dayNumber: number) => void;
+    onOpenPlan: () => void;
+    className?: string;
 };
-
 function cleanTitle(title: string): string {
-  return title.replace(/^Week\s*\d+\s*/i, "").replace(/^Day\s*\d+\s*/i, "").trim();
+    return title.replace(/^Week\s*\d+\s*/i, "").replace(/^Day\s*\d+\s*/i, "").trim();
 }
-
 function getTodayLabel(): string {
-  return new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    return new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
-
-export default function TodaysTaskCard({
-  loading = false,
-  planDays,
-  days,
-  completedMap,
-  firebaseUid,
-  onOpenDay,
-  onOpenPlan,
-  className,
-}: TodaysTaskCardProps) {
-  const [taskState, setTaskState] = useState<string>("");
-  const [taskDay, setTaskDay] = useState<TaskDay | null>(null);
-  const [loadingTask, setLoadingTask] = useState(false);
-
-  useEffect(() => {
-    if (!firebaseUid) {
-      setTaskState("");
-      setTaskDay(null);
-      return;
-    }
-
-    let cancelled = false;
-    const load = async () => {
-      setLoadingTask(true);
-      try {
-        const response = await fetch(`/api/marketing-plan/today-task?firebase_uid=${encodeURIComponent(firebaseUid)}`, {
-          cache: "no-store",
-        });
-        const json = await response.json();
-        if (cancelled) return;
-        if (!response.ok || !json?.ok) {
-          setTaskState("");
-          setTaskDay(null);
-          return;
+export default function TodaysTaskCard({ loading = false, planDays, days, completedMap, firebaseUid, onOpenDay, onOpenPlan, className, }: TodaysTaskCardProps) {
+    const [taskState, setTaskState] = useState<string>("");
+    const [taskDay, setTaskDay] = useState<TaskDay | null>(null);
+    const [loadingTask, setLoadingTask] = useState(false);
+    useEffect(() => {
+        if (!firebaseUid) {
+            setTaskState("");
+            setTaskDay(null);
+            return;
         }
-        setTaskState(String(json.state ?? ""));
-        setTaskDay((json.todayTask as TaskDay | null) ?? null);
-      } catch {
-        if (cancelled) return;
-        setTaskState("");
-        setTaskDay(null);
-      } finally {
-        if (!cancelled) setLoadingTask(false);
-      }
-    };
-
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [firebaseUid, completedMap]);
-
-  const sortedDays = [...days].sort((a, b) => Number(a.dayNumber) - Number(b.dayNumber));
-  const isCompleted = (day: TaskDay) => Boolean(completedMap[day.dayNumber] || day.completed === true);
-
-  const completedCount = sortedDays.filter((day) => isCompleted(day)).length;
-  const totalDays = planDays && planDays > 0 ? planDays : sortedDays.length;
-  const progressPercent = totalDays > 0 ? Math.round((completedCount / totalDays) * 100) : 0;
-
-  const nextIncomplete = sortedDays.find((day) => !isCompleted(day)) ?? null;
-  const selectedDay = taskDay ?? nextIncomplete;
-  const selectedIsCompleted = selectedDay ? isCompleted(selectedDay) : false;
-  const allCompleted = sortedDays.length > 0 && completedCount >= sortedDays.length;
-  const effectiveLoading = loading || loadingTask;
-
-  return (
-    <section className={`todaysTaskCard ${className ?? ""}`}>
+        let cancelled = false;
+        const load = async () => {
+            setLoadingTask(true);
+            try {
+                const response = await fetch(`/api/marketing-plan/today-task?firebase_uid=${encodeURIComponent(firebaseUid)}`, {
+                    cache: "no-store",
+                });
+                const json = await response.json();
+                if (cancelled)
+                    return;
+                if (!response.ok || !json?.ok) {
+                    setTaskState("");
+                    setTaskDay(null);
+                    return;
+                }
+                setTaskState(String(json.state ?? ""));
+                setTaskDay((json.todayTask as TaskDay | null) ?? null);
+            }
+            catch {
+                if (cancelled)
+                    return;
+                setTaskState("");
+                setTaskDay(null);
+            }
+            finally {
+                if (!cancelled)
+                    setLoadingTask(false);
+            }
+        };
+        void load();
+        return () => {
+            cancelled = true;
+        };
+    }, [firebaseUid, completedMap]);
+    const sortedDays = [...days].sort((a, b) => Number(a.dayNumber) - Number(b.dayNumber));
+    const isCompleted = (day: TaskDay) => Boolean(completedMap[day.dayNumber] || day.completed === true);
+    const completedCount = sortedDays.filter((day) => isCompleted(day)).length;
+    const totalDays = planDays && planDays > 0 ? planDays : sortedDays.length;
+    const progressPercent = totalDays > 0 ? Math.round((completedCount / totalDays) * 100) : 0;
+    const nextIncomplete = sortedDays.find((day) => !isCompleted(day)) ?? null;
+    const selectedDay = taskDay ?? nextIncomplete;
+    const selectedIsCompleted = selectedDay ? isCompleted(selectedDay) : false;
+    const allCompleted = sortedDays.length > 0 && completedCount >= sortedDays.length;
+    const effectiveLoading = loading || loadingTask;
+    return (<section className={`todaysTaskCard ${className ?? ""}`}>
       <div className="headRow">
         <h3>Today&apos;s Task</h3>
         <span className="progressText">
@@ -103,17 +85,12 @@ export default function TodaysTaskCard({
         </span>
       </div>
 
-      {effectiveLoading ? (
-        <div className="body loadingState">Loading today&apos;s task…</div>
-      ) : sortedDays.length === 0 ? (
-        <div className="body emptyState">
+      {effectiveLoading ? (<div className="body loadingState">Loading today&apos;s task…</div>) : sortedDays.length === 0 ? (<div className="body emptyState">
           <p>Generate your plan first</p>
           <button type="button" className="taskBtn primary" onClick={onOpenPlan}>
             Go to Plan Builder
           </button>
-        </div>
-      ) : taskState === "done_today" && selectedDay ? (
-        <div className="body completeState">
+        </div>) : taskState === "done_today" && selectedDay ? (<div className="body completeState">
           <div className="metaRow">
             <span className="dayBadge">
               {(selectedDay.dateLabel || "Today").trim()} · Day {selectedDay.dayNumber}
@@ -128,23 +105,17 @@ export default function TodaysTaskCard({
             <button type="button" className="taskBtn primary" onClick={() => onOpenDay(selectedDay.dayNumber)}>
               Open Day Detail
             </button>
-            {nextIncomplete && nextIncomplete.dayNumber !== selectedDay.dayNumber ? (
-              <button type="button" className="taskBtn secondary" onClick={() => onOpenDay(nextIncomplete.dayNumber)}>
+            {nextIncomplete && nextIncomplete.dayNumber !== selectedDay.dayNumber ? (<button type="button" className="taskBtn secondary" onClick={() => onOpenDay(nextIncomplete.dayNumber)}>
                 Next Task
-              </button>
-            ) : null}
+              </button>) : null}
           </div>
-        </div>
-      ) : allCompleted ? (
-        <div className="body completeState">
+        </div>) : allCompleted ? (<div className="body completeState">
           <p className="headline">Plan completed ✅</p>
           <p className="sub">Great work. You completed all scheduled tasks.</p>
           <button type="button" className="taskBtn primary" onClick={onOpenPlan}>
             View Plan
           </button>
-        </div>
-      ) : selectedDay ? (
-        <div className="body">
+        </div>) : selectedDay ? (<div className="body">
           <div className="metaRow">
             <span className="dayBadge">
               {(selectedDay.dateLabel || getTodayLabel()).trim()} · Day {selectedDay.dayNumber}
@@ -157,22 +128,15 @@ export default function TodaysTaskCard({
             {cleanTitle(selectedDay.mainActionTitle || "") || selectedDay.mainActionTitle || `Day ${selectedDay.dayNumber}`}
           </p>
           <div className="actions">
-            {taskState === "todo" ? (
-              <button type="button" className="taskBtn primary" onClick={() => onOpenDay(selectedDay.dayNumber)}>
+            {taskState === "todo" ? (<button type="button" className="taskBtn primary" onClick={() => onOpenDay(selectedDay.dayNumber)}>
                 Open Day Detail
-              </button>
-            ) : !selectedIsCompleted && nextIncomplete ? (
-              <button type="button" className="taskBtn primary" onClick={() => onOpenDay(nextIncomplete.dayNumber)}>
+              </button>) : !selectedIsCompleted && nextIncomplete ? (<button type="button" className="taskBtn primary" onClick={() => onOpenDay(nextIncomplete.dayNumber)}>
                 Next Task
-              </button>
-            ) : (
-              <button type="button" className="taskBtn primary" onClick={onOpenPlan}>
+              </button>) : (<button type="button" className="taskBtn primary" onClick={onOpenPlan}>
                 View Plan
-              </button>
-            )}
+              </button>)}
           </div>
-        </div>
-      ) : null}
+        </div>) : null}
 
       <style jsx>{`
         .todaysTaskCard {
@@ -312,6 +276,5 @@ export default function TodaysTaskCard({
           transform: translateY(-1px);
         }
       `}</style>
-    </section>
-  );
+    </section>);
 }

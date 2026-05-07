@@ -1,351 +1,293 @@
 "use client";
-
-/* eslint-disable @next/next/no-img-element */
-
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FaCheck, FaRegCopy, FaTimes } from "react-icons/fa";
 import { useAuth } from "@/src/lib/useAuth";
-
 type GeneratedDay = {
-  dayNumber: number;
-  dateLabel?: string;
-  mainActionTitle?: string;
-  businessGrowthAction?: string;
-  executionSteps?: string[];
-  postIdea?: string;
-  caption?: string;
-  hashtags?: string[];
-  successMetric?: string;
-  notes?: string;
-};
-
-type ModalType = "missingBusiness" | "missingPlan" | "noPlan" | "serverError" | null;
-
-type LatestPlanResponse = {
-  ok?: boolean;
-  data?: {
-    planDays?: number;
-    planData?: GeneratedDay[];
-    completedDays?: number[];
-  };
-  error?: string;
-};
-
-type DayStatusRow = {
-  dayNumber?: number;
-  completed?: boolean;
-};
-
-type PosterByDayResponse = {
-  ok?: boolean;
-  data?: {
-    dayNumber?: number;
-    posterDataUrl?: string;
+    dayNumber: number;
+    dateLabel?: string;
+    mainActionTitle?: string;
+    businessGrowthAction?: string;
+    executionSteps?: string[];
+    postIdea?: string;
     caption?: string;
     hashtags?: string[];
-  };
+    successMetric?: string;
+    notes?: string;
 };
-
+type ModalType = "missingBusiness" | "missingPlan" | "noPlan" | "serverError" | null;
+type LatestPlanResponse = {
+    ok?: boolean;
+    data?: {
+        planDays?: number;
+        planData?: GeneratedDay[];
+        completedDays?: number[];
+    };
+    error?: string;
+};
+type DayStatusRow = {
+    dayNumber?: number;
+    completed?: boolean;
+};
+type PosterByDayResponse = {
+    ok?: boolean;
+    data?: {
+        dayNumber?: number;
+        posterDataUrl?: string;
+        caption?: string;
+        hashtags?: string[];
+    };
+};
 type CompleteDayResponse = {
-  ok?: boolean;
-  data?: {
-    completedDays?: number[];
-  };
-  error?: string;
+    ok?: boolean;
+    data?: {
+        completedDays?: number[];
+    };
+    error?: string;
 };
-
 type CalendarCell = {
-  key: string;
-  date: Date | null;
-  day: GeneratedDay | null;
+    key: string;
+    date: Date | null;
+    day: GeneratedDay | null;
 };
-
 const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
 function sortDays(days: GeneratedDay[]): GeneratedDay[] {
-  return [...days].sort((a, b) => Number(a.dayNumber) - Number(b.dayNumber));
+    return [...days].sort((a, b) => Number(a.dayNumber) - Number(b.dayNumber));
 }
-
 function startOfToday(): Date {
-  const date = new Date();
-  date.setHours(0, 0, 0, 0);
-  return date;
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    return date;
 }
-
 function addDays(date: Date, days: number): Date {
-  const next = new Date(date);
-  next.setDate(next.getDate() + days);
-  return next;
+    const next = new Date(date);
+    next.setDate(next.getDate() + days);
+    return next;
 }
-
 function mondayFirstIndex(date: Date): number {
-  return (date.getDay() + 6) % 7;
+    return (date.getDay() + 6) % 7;
 }
-
 function dateLabel(date: Date): string {
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
-
 function isSameDay(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
-
 function cleanTitle(title: string): string {
-  return title.replace(/^Week\s*\d+\s*/i, "").replace(/^Day\s*\d+\s*/i, "").trim();
+    return title.replace(/^Week\s*\d+\s*/i, "").replace(/^Day\s*\d+\s*/i, "").trim();
 }
-
 export default function BizCalendarPage() {
-  const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
-
-  const [isLoading, setIsLoading] = useState(true);
-  const [modalType, setModalType] = useState<ModalType>(null);
-  const [planDays, setPlanDays] = useState<number>(0);
-  const [planData, setPlanData] = useState<GeneratedDay[]>([]);
-  const [completedMap, setCompletedMap] = useState<Record<number, boolean>>({});
-  const [posterMap, setPosterMap] = useState<Record<number, string>>({});
-  const [selectedDayNumber, setSelectedDayNumber] = useState<number | null>(null);
-  const [savingDayNumber, setSavingDayNumber] = useState<number | null>(null);
-  const [copied, setCopied] = useState(false);
-
-  const loadInitialData = useCallback(async () => {
-    if (!user?.uid) return;
-
-    setIsLoading(true);
-    setModalType(null);
-    setPlanData([]);
-    setPlanDays(0);
-    setCompletedMap({});
-    setPosterMap({});
-
-    try {
-      const businessRes = await fetch(`/api/business-profile?firebase_uid=${encodeURIComponent(user.uid)}`, {
-        cache: "no-store",
-      });
-      const businessJson = await businessRes.json();
-
-      if (
-        businessRes.status === 404 ||
-        (businessJson?.ok === false &&
-          (businessJson?.error === "No business profile" || businessJson?.error === "business_profile_not_found"))
-      ) {
-        setModalType("missingBusiness");
-        return;
-      }
-
-      if (!businessRes.ok || !businessJson?.ok) {
-        throw new Error(businessJson?.error || "Failed to load business details");
-      }
-
-      const [latestRes, statusesRes] = await Promise.all([
-        fetch(`/api/marketing-plan/latest?firebase_uid=${encodeURIComponent(user.uid)}`, { cache: "no-store" }),
-        fetch(`/api/day-status/all?firebase_uid=${encodeURIComponent(user.uid)}`, { cache: "no-store" }),
-      ]);
-
-      const latestJson = (await latestRes.json()) as LatestPlanResponse;
-      const statusesJson = await statusesRes.json();
-
-      if (latestRes.status === 404 || latestJson?.error === "no_plan_found") {
-        setModalType("noPlan");
-        return;
-      }
-
-      if (!latestRes.ok || !latestJson?.ok) {
-        throw new Error(latestJson?.error || "Failed to load marketing plan");
-      }
-
-      const sorted = sortDays(Array.isArray(latestJson.data?.planData) ? latestJson.data.planData : []);
-      if (sorted.length === 0) {
-        setModalType("noPlan");
-        return;
-      }
-
-      setPlanData(
-        sorted.map((day) => ({
-          ...day,
-          executionSteps: Array.isArray(day.executionSteps) ? day.executionSteps : [],
-          hashtags: Array.isArray(day.hashtags) ? day.hashtags : [],
-        })),
-      );
-      setPlanDays(Number(latestJson.data?.planDays ?? sorted.length));
-
-      const fromStatusRows: Record<number, boolean> = {};
-      const statusRows = Array.isArray(statusesJson?.data) ? (statusesJson.data as DayStatusRow[]) : [];
-      for (const row of statusRows) {
-        const dayNumber = Number(row.dayNumber ?? 0);
-        if (Number.isInteger(dayNumber) && dayNumber > 0) fromStatusRows[dayNumber] = Boolean(row.completed);
-      }
-
-      const completedDays = Array.isArray(latestJson.data?.completedDays) ? latestJson.data.completedDays : [];
-      for (const completedDay of completedDays) {
-        const dayNumber = Number(completedDay);
-        if (Number.isInteger(dayNumber) && dayNumber > 0) fromStatusRows[dayNumber] = true;
-      }
-      setCompletedMap(fromStatusRows);
-
-      const posterPairs = await Promise.all(
-        sorted.map(async (day) => {
-          try {
-            const response = await fetch(
-              `/api/posters/by-day?firebase_uid=${encodeURIComponent(user.uid)}&dayNumber=${day.dayNumber}`,
-              { cache: "no-store" },
-            );
-            if (!response.ok) return [day.dayNumber, ""] as const;
-
-            const json = (await response.json()) as PosterByDayResponse;
-            return [day.dayNumber, json.ok && json.data?.posterDataUrl ? json.data.posterDataUrl : ""] as const;
-          } catch {
-            return [day.dayNumber, ""] as const;
-          }
-        }),
-      );
-      const nextPosterMap: Record<number, string> = {};
-      for (const [dayNumber, posterUrl] of posterPairs) {
-        if (posterUrl) nextPosterMap[dayNumber] = posterUrl;
-      }
-      setPosterMap(nextPosterMap);
-    } catch (error) {
-      console.error("Biz Calendar load failed:", error);
-      setModalType("serverError");
-    } finally {
-      setIsLoading(false);
+    const router = useRouter();
+    const { user, loading: authLoading } = useAuth();
+    const [isLoading, setIsLoading] = useState(true);
+    const [modalType, setModalType] = useState<ModalType>(null);
+    const [planDays, setPlanDays] = useState<number>(0);
+    const [planData, setPlanData] = useState<GeneratedDay[]>([]);
+    const [completedMap, setCompletedMap] = useState<Record<number, boolean>>({});
+    const [posterMap, setPosterMap] = useState<Record<number, string>>({});
+    const [selectedDayNumber, setSelectedDayNumber] = useState<number | null>(null);
+    const [savingDayNumber, setSavingDayNumber] = useState<number | null>(null);
+    const [copied, setCopied] = useState(false);
+    const loadInitialData = useCallback(async () => {
+        if (!user?.uid)
+            return;
+        setIsLoading(true);
+        setModalType(null);
+        setPlanData([]);
+        setPlanDays(0);
+        setCompletedMap({});
+        setPosterMap({});
+        try {
+            const businessRes = await fetch(`/api/business-profile?firebase_uid=${encodeURIComponent(user.uid)}`, {
+                cache: "no-store",
+            });
+            const businessJson = await businessRes.json();
+            if (businessRes.status === 404 ||
+                (businessJson?.ok === false &&
+                    (businessJson?.error === "No business profile" || businessJson?.error === "business_profile_not_found"))) {
+                setModalType("missingBusiness");
+                return;
+            }
+            if (!businessRes.ok || !businessJson?.ok) {
+                throw new Error(businessJson?.error || "Failed to load business details");
+            }
+            const [latestRes, statusesRes] = await Promise.all([
+                fetch(`/api/marketing-plan/latest?firebase_uid=${encodeURIComponent(user.uid)}`, { cache: "no-store" }),
+                fetch(`/api/day-status/all?firebase_uid=${encodeURIComponent(user.uid)}`, { cache: "no-store" }),
+            ]);
+            const latestJson = (await latestRes.json()) as LatestPlanResponse;
+            const statusesJson = await statusesRes.json();
+            if (latestRes.status === 404 || latestJson?.error === "no_plan_found") {
+                setModalType("noPlan");
+                return;
+            }
+            if (!latestRes.ok || !latestJson?.ok) {
+                throw new Error(latestJson?.error || "Failed to load marketing plan");
+            }
+            const sorted = sortDays(Array.isArray(latestJson.data?.planData) ? latestJson.data.planData : []);
+            if (sorted.length === 0) {
+                setModalType("noPlan");
+                return;
+            }
+            setPlanData(sorted.map((day) => ({
+                ...day,
+                executionSteps: Array.isArray(day.executionSteps) ? day.executionSteps : [],
+                hashtags: Array.isArray(day.hashtags) ? day.hashtags : [],
+            })));
+            setPlanDays(Number(latestJson.data?.planDays ?? sorted.length));
+            const fromStatusRows: Record<number, boolean> = {};
+            const statusRows = Array.isArray(statusesJson?.data) ? (statusesJson.data as DayStatusRow[]) : [];
+            for (const row of statusRows) {
+                const dayNumber = Number(row.dayNumber ?? 0);
+                if (Number.isInteger(dayNumber) && dayNumber > 0)
+                    fromStatusRows[dayNumber] = Boolean(row.completed);
+            }
+            const completedDays = Array.isArray(latestJson.data?.completedDays) ? latestJson.data.completedDays : [];
+            for (const completedDay of completedDays) {
+                const dayNumber = Number(completedDay);
+                if (Number.isInteger(dayNumber) && dayNumber > 0)
+                    fromStatusRows[dayNumber] = true;
+            }
+            setCompletedMap(fromStatusRows);
+            const posterPairs = await Promise.all(sorted.map(async (day) => {
+                try {
+                    const response = await fetch(`/api/posters/by-day?firebase_uid=${encodeURIComponent(user.uid)}&dayNumber=${day.dayNumber}`, { cache: "no-store" });
+                    if (!response.ok)
+                        return [day.dayNumber, ""] as const;
+                    const json = (await response.json()) as PosterByDayResponse;
+                    return [day.dayNumber, json.ok && json.data?.posterDataUrl ? json.data.posterDataUrl : ""] as const;
+                }
+                catch {
+                    return [day.dayNumber, ""] as const;
+                }
+            }));
+            const nextPosterMap: Record<number, string> = {};
+            for (const [dayNumber, posterUrl] of posterPairs) {
+                if (posterUrl)
+                    nextPosterMap[dayNumber] = posterUrl;
+            }
+            setPosterMap(nextPosterMap);
+        }
+        catch (error) {
+            console.error("Biz Calendar load failed:", error);
+            setModalType("serverError");
+        }
+        finally {
+            setIsLoading(false);
+        }
+    }, [user?.uid]);
+    useEffect(() => {
+        if (authLoading)
+            return;
+        if (!user?.uid) {
+            router.replace("/login");
+            return;
+        }
+        void loadInitialData();
+    }, [authLoading, user?.uid, router, loadInitialData]);
+    const selectedDay = useMemo(() => planData.find((day) => day.dayNumber === selectedDayNumber) ?? null, [planData, selectedDayNumber]);
+    const calendarCells = useMemo<CalendarCell[]>(() => {
+        if (planData.length === 0)
+            return [];
+        const today = startOfToday();
+        const leadingEmpty = mondayFirstIndex(today);
+        const filledCells: CalendarCell[] = [];
+        for (let index = 0; index < leadingEmpty; index += 1) {
+            filledCells.push({ key: `empty-start-${index}`, date: null, day: null });
+        }
+        for (let index = 0; index < planData.length; index += 1) {
+            filledCells.push({
+                key: `day-${planData[index].dayNumber}`,
+                date: addDays(today, index),
+                day: planData[index],
+            });
+        }
+        while (filledCells.length % 7 !== 0) {
+            filledCells.push({ key: `empty-end-${filledCells.length}`, date: null, day: null });
+        }
+        return filledCells;
+    }, [planData]);
+    const completedCount = planData.filter((day) => completedMap[day.dayNumber]).length;
+    const progressPercent = planData.length > 0 ? Math.round((completedCount / planData.length) * 100) : 0;
+    async function toggleDayCompleted(dayNumber: number, completed: boolean) {
+        if (!user?.uid || savingDayNumber)
+            return;
+        const previousCompleted = Boolean(completedMap[dayNumber]);
+        setSavingDayNumber(dayNumber);
+        setCompletedMap((prev) => ({ ...prev, [dayNumber]: completed }));
+        try {
+            const response = await fetch("/api/marketing-plan/complete", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ firebase_uid: user.uid, dayNumber, completed }),
+            });
+            const result = (await response.json()) as CompleteDayResponse;
+            if (!response.ok || !result?.ok) {
+                setCompletedMap((prev) => ({ ...prev, [dayNumber]: previousCompleted }));
+                setModalType("serverError");
+                return;
+            }
+            const completedDays = Array.isArray(result.data?.completedDays) ? result.data.completedDays : [];
+            setCompletedMap(completedDays.reduce<Record<number, boolean>>((acc, day) => {
+                const completedDay = Number(day);
+                if (Number.isInteger(completedDay) && completedDay > 0)
+                    acc[completedDay] = true;
+                return acc;
+            }, {}));
+        }
+        catch {
+            setCompletedMap((prev) => ({ ...prev, [dayNumber]: previousCompleted }));
+            setModalType("serverError");
+        }
+        finally {
+            setSavingDayNumber(null);
+        }
     }
-  }, [user?.uid]);
-
-  useEffect(() => {
-    if (authLoading) return;
-
-    if (!user?.uid) {
-      router.replace("/login");
-      return;
+    async function copyCaption() {
+        try {
+            await navigator.clipboard.writeText(selectedDay?.caption ?? "");
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 1200);
+        }
+        catch {
+            setCopied(false);
+        }
     }
-
-    void loadInitialData();
-  }, [authLoading, user?.uid, router, loadInitialData]);
-
-  const selectedDay = useMemo(
-    () => planData.find((day) => day.dayNumber === selectedDayNumber) ?? null,
-    [planData, selectedDayNumber],
-  );
-
-  const calendarCells = useMemo<CalendarCell[]>(() => {
-    if (planData.length === 0) return [];
-
+    const modalContent = useMemo(() => {
+        if (modalType === "missingBusiness") {
+            return {
+                title: "Fill business details first",
+                text: "Add your business profile to unlock Biz Calendar.",
+                primaryText: "Go to Business Details",
+                primaryAction: () => router.push("/onboarding/business-details"),
+                secondaryText: "Close",
+                secondaryAction: () => setModalType(null),
+            };
+        }
+        if (modalType === "missingPlan" || modalType === "noPlan") {
+            return {
+                title: "Generate a plan first",
+                text: "Create your latest marketing plan before opening Biz Calendar.",
+                primaryText: "Go to Plan Builder",
+                primaryAction: () => router.push("/marketing-plan"),
+                secondaryText: "Close",
+                secondaryAction: () => setModalType(null),
+            };
+        }
+        if (modalType === "serverError") {
+            return {
+                title: "Something went wrong",
+                text: "Please try again.",
+                primaryText: "Retry",
+                primaryAction: () => void loadInitialData(),
+                secondaryText: "Close",
+                secondaryAction: () => setModalType(null),
+            };
+        }
+        return null;
+    }, [modalType, router, loadInitialData]);
     const today = startOfToday();
-    const leadingEmpty = mondayFirstIndex(today);
-    const filledCells: CalendarCell[] = [];
-
-    for (let index = 0; index < leadingEmpty; index += 1) {
-      filledCells.push({ key: `empty-start-${index}`, date: null, day: null });
-    }
-
-    for (let index = 0; index < planData.length; index += 1) {
-      filledCells.push({
-        key: `day-${planData[index].dayNumber}`,
-        date: addDays(today, index),
-        day: planData[index],
-      });
-    }
-
-    while (filledCells.length % 7 !== 0) {
-      filledCells.push({ key: `empty-end-${filledCells.length}`, date: null, day: null });
-    }
-
-    return filledCells;
-  }, [planData]);
-
-  const completedCount = planData.filter((day) => completedMap[day.dayNumber]).length;
-  const progressPercent = planData.length > 0 ? Math.round((completedCount / planData.length) * 100) : 0;
-
-  async function toggleDayCompleted(dayNumber: number, completed: boolean) {
-    if (!user?.uid || savingDayNumber) return;
-
-    const previousCompleted = Boolean(completedMap[dayNumber]);
-    setSavingDayNumber(dayNumber);
-    setCompletedMap((prev) => ({ ...prev, [dayNumber]: completed }));
-
-    try {
-      const response = await fetch("/api/marketing-plan/complete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ firebase_uid: user.uid, dayNumber, completed }),
-      });
-      const result = (await response.json()) as CompleteDayResponse;
-
-      if (!response.ok || !result?.ok) {
-        setCompletedMap((prev) => ({ ...prev, [dayNumber]: previousCompleted }));
-        setModalType("serverError");
-        return;
-      }
-
-      const completedDays = Array.isArray(result.data?.completedDays) ? result.data.completedDays : [];
-      setCompletedMap(
-        completedDays.reduce<Record<number, boolean>>((acc, day) => {
-          const completedDay = Number(day);
-          if (Number.isInteger(completedDay) && completedDay > 0) acc[completedDay] = true;
-          return acc;
-        }, {}),
-      );
-    } catch {
-      setCompletedMap((prev) => ({ ...prev, [dayNumber]: previousCompleted }));
-      setModalType("serverError");
-    } finally {
-      setSavingDayNumber(null);
-    }
-  }
-
-  async function copyCaption() {
-    try {
-      await navigator.clipboard.writeText(selectedDay?.caption ?? "");
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1200);
-    } catch {
-      setCopied(false);
-    }
-  }
-
-  const modalContent = useMemo(() => {
-    if (modalType === "missingBusiness") {
-      return {
-        title: "Fill business details first",
-        text: "Add your business profile to unlock Biz Calendar.",
-        primaryText: "Go to Business Details",
-        primaryAction: () => router.push("/onboarding/business-details"),
-        secondaryText: "Close",
-        secondaryAction: () => setModalType(null),
-      };
-    }
-
-    if (modalType === "missingPlan" || modalType === "noPlan") {
-      return {
-        title: "Generate a plan first",
-        text: "Create your latest marketing plan before opening Biz Calendar.",
-        primaryText: "Go to Plan Builder",
-        primaryAction: () => router.push("/marketing-plan"),
-        secondaryText: "Close",
-        secondaryAction: () => setModalType(null),
-      };
-    }
-
-    if (modalType === "serverError") {
-      return {
-        title: "Something went wrong",
-        text: "Please try again.",
-        primaryText: "Retry",
-        primaryAction: () => void loadInitialData(),
-        secondaryText: "Close",
-        secondaryAction: () => setModalType(null),
-      };
-    }
-
-    return null;
-  }, [modalType, router, loadInitialData]);
-
-  const today = startOfToday();
-
-  return (
-    <div className="calPage">
+    return (<div className="calPage">
       <div className="calShell">
         <header className="calHero">
           <div>
@@ -363,39 +305,24 @@ export default function BizCalendarPage() {
 
         <section className="calendarCard">
           <div className="weekdayGrid" aria-hidden>
-            {weekdays.map((day) => (
-              <span key={day}>{day}</span>
-            ))}
+            {weekdays.map((day) => (<span key={day}>{day}</span>))}
           </div>
 
-          {isLoading ? (
-            <div className="calendarGrid" aria-busy="true" aria-label="Loading calendar">
-              {Array.from({ length: 14 }).map((_, index) => (
-                <div key={index} className="dayCell skeleton" />
-              ))}
-            </div>
-          ) : planData.length > 0 ? (
-            <div className="calendarGrid" role="grid" aria-label="BizBoost marketing plan calendar">
+          {isLoading ? (<div className="calendarGrid" aria-busy="true" aria-label="Loading calendar">
+              {Array.from({ length: 14 }).map((_, index) => (<div key={index} className="dayCell skeleton"/>))}
+            </div>) : planData.length > 0 ? (<div className="calendarGrid" role="grid" aria-label="BizBoost marketing plan calendar">
               {calendarCells.map((cell) => {
                 if (!cell.day || !cell.date) {
-                  return <div key={cell.key} className="dayCell dayCellEmpty" aria-hidden />;
+                    return <div key={cell.key} className="dayCell dayCellEmpty" aria-hidden/>;
                 }
-
                 const completed = Boolean(completedMap[cell.day.dayNumber]);
                 const posterUrl = posterMap[cell.day.dayNumber];
                 const todayMatch = isSameDay(cell.date, today);
                 const title = cleanTitle(cell.day.mainActionTitle || "") || cell.day.mainActionTitle || `Day ${cell.day.dayNumber}`;
-
-                return (
-                  <button
-                    key={cell.key}
-                    type="button"
-                    className={`dayCell ${completed ? "completed" : ""} ${todayMatch ? "today" : ""}`}
-                    onClick={() => {
-                      setCopied(false);
-                      setSelectedDayNumber(cell.day?.dayNumber ?? null);
-                    }}
-                  >
+                return (<button key={cell.key} type="button" className={`dayCell ${completed ? "completed" : ""} ${todayMatch ? "today" : ""}`} onClick={() => {
+                        setCopied(false);
+                        setSelectedDayNumber(cell.day?.dayNumber ?? null);
+                    }}>
                     {completed ? <span className="completedWatermark">COMPLETED</span> : null}
                     <span className="cellTop">
                       <span className="dateText">{dateLabel(cell.date)}</span>
@@ -406,27 +333,20 @@ export default function BizCalendarPage() {
                       <span className={`statusBadge ${completed ? "done" : "pending"}`}>
                         {completed ? "✅ Completed" : "⏳ Pending"}
                       </span>
-                      {posterUrl ? (
-                        <span className="posterMini" aria-label="Poster available">
-                          <img src={posterUrl} alt="" />
-                        </span>
-                      ) : null}
+                      {posterUrl ? (<span className="posterMini" aria-label="Poster available">
+                          <img src={posterUrl} alt=""/>
+                        </span>) : null}
                     </span>
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="emptyState">No generated plan found. Generate your marketing plan first.</div>
-          )}
+                  </button>);
+            })}
+            </div>) : (<div className="emptyState">No generated plan found. Generate your marketing plan first.</div>)}
         </section>
       </div>
 
-      {selectedDay && (
-        <div className="drawerOverlay" onClick={() => setSelectedDayNumber(null)}>
+      {selectedDay && (<div className="drawerOverlay" onClick={() => setSelectedDayNumber(null)}>
           <aside className="dayDrawer" role="dialog" aria-modal="true" aria-labelledby="day-drawer-title" onClick={(e) => e.stopPropagation()}>
             <button type="button" className="closeBtn" aria-label="Close day details" onClick={() => setSelectedDayNumber(null)}>
-              <FaTimes size={14} />
+              <FaTimes size={14}/>
             </button>
             <div className="drawerHeader">
               <p className="eyebrow">{selectedDay.dateLabel || `Day ${selectedDay.dayNumber}`}</p>
@@ -436,11 +356,9 @@ export default function BizCalendarPage() {
               </span>
             </div>
 
-            {posterMap[selectedDay.dayNumber] ? (
-              <div className="posterPreview">
-                <img src={posterMap[selectedDay.dayNumber]} alt={`Poster for day ${selectedDay.dayNumber}`} />
-              </div>
-            ) : null}
+            {posterMap[selectedDay.dayNumber] ? (<div className="posterPreview">
+                <img src={posterMap[selectedDay.dayNumber]} alt={`Poster for day ${selectedDay.dayNumber}`}/>
+              </div>) : null}
 
             <section className="drawerSection">
               <h3>Business Growth Action</h3>
@@ -450,12 +368,10 @@ export default function BizCalendarPage() {
             <section className="drawerSection">
               <h3>Execution Steps</h3>
               <ul className="stepList">
-                {(selectedDay.executionSteps ?? []).map((step, index) => (
-                  <li key={`${index}-${step}`}>
-                    <FaCheck size={12} />
+                {(selectedDay.executionSteps ?? []).map((step, index) => (<li key={`${index}-${step}`}>
+                    <FaCheck size={12}/>
                     <span>{step}</span>
-                  </li>
-                ))}
+                  </li>))}
               </ul>
             </section>
 
@@ -468,23 +384,19 @@ export default function BizCalendarPage() {
               <div className="sectionHead">
                 <h3>Caption</h3>
                 <button type="button" className="copyBtn" onClick={() => void copyCaption()}>
-                  <FaRegCopy size={13} />
+                  <FaRegCopy size={13}/>
                   {copied ? "Copied" : "Copy"}
                 </button>
               </div>
-              <textarea className="captionBox" value={selectedDay.caption || ""} readOnly />
+              <textarea className="captionBox" value={selectedDay.caption || ""} readOnly/>
             </section>
 
-            {(selectedDay.hashtags ?? []).length > 0 ? (
-              <section className="drawerSection">
+            {(selectedDay.hashtags ?? []).length > 0 ? (<section className="drawerSection">
                 <h3>Hashtags</h3>
                 <div className="chips">
-                  {(selectedDay.hashtags ?? []).map((tag) => (
-                    <span key={tag}>{tag}</span>
-                  ))}
+                  {(selectedDay.hashtags ?? []).map((tag) => (<span key={tag}>{tag}</span>))}
                 </div>
-              </section>
-            ) : null}
+              </section>) : null}
 
             <section className="drawerSection">
               <h3>Success Metric</h3>
@@ -498,25 +410,18 @@ export default function BizCalendarPage() {
               <button type="button" className="modalBtn secondary" onClick={() => router.push(`/biz-editor?day=${selectedDay.dayNumber}`)}>
                 Go to Biz Editor
               </button>
-              <button
-                type="button"
-                className="modalBtn primary"
-                disabled={savingDayNumber === selectedDay.dayNumber}
-                onClick={() => void toggleDayCompleted(selectedDay.dayNumber, !completedMap[selectedDay.dayNumber])}
-              >
+              <button type="button" className="modalBtn primary" disabled={savingDayNumber === selectedDay.dayNumber} onClick={() => void toggleDayCompleted(selectedDay.dayNumber, !completedMap[selectedDay.dayNumber])}>
                 {savingDayNumber === selectedDay.dayNumber
-                  ? "Saving..."
-                  : completedMap[selectedDay.dayNumber]
+                ? "Saving..."
+                : completedMap[selectedDay.dayNumber]
                     ? "Undo Completed"
                     : "Mark Completed"}
               </button>
             </div>
           </aside>
-        </div>
-      )}
+        </div>)}
 
-      {modalContent && (
-        <div className="modalOverlay">
+      {modalContent && (<div className="modalOverlay">
           <div className="modalCard" role="dialog" aria-modal="true" aria-labelledby="cal-modal-title">
             <h3 id="cal-modal-title">{modalContent.title}</h3>
             <p>{modalContent.text}</p>
@@ -529,8 +434,7 @@ export default function BizCalendarPage() {
               </button>
             </div>
           </div>
-        </div>
-      )}
+        </div>)}
 
       <style jsx>{`
         .calPage {
@@ -1043,6 +947,5 @@ export default function BizCalendarPage() {
           }
         }
       `}</style>
-    </div>
-  );
+    </div>);
 }
