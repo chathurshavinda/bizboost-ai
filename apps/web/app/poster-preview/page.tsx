@@ -15,7 +15,6 @@ type Draft = {
     posterStyle?: PosterDesign["style"] | null;
     posterDesign?: PosterDesign | null;
 };
-const FALLBACK_HASHTAGS = ["#SmallBusiness", "#BusinessGrowth", "#SupportLocal", "#BizBoostAI"];
 async function waitForFontsAndPaint(): Promise<void> {
     if (typeof document !== "undefined" && document.fonts?.ready) {
         await document.fonts.ready.catch(() => undefined);
@@ -48,50 +47,96 @@ function dataUrlToBlob(dataUrl: string): Blob {
         bytes[i] = binary.charCodeAt(i);
     return new Blob([bytes], { type: mime });
 }
-async function posterNodeToDataUrl(node: HTMLElement): Promise<string> {
-    await waitForImages(node);
+
+/** Instagram-style square export — only the poster graphic, no card/page chrome. */
+const POSTER_EXPORT_PX = 1080;
+
+function resolvePosterWrapElement(container: HTMLElement | null): HTMLElement | null {
+    if (!container)
+        return null;
+    if (container.classList.contains("posterWrap"))
+        return container;
+    const inner = container.querySelector(".posterWrap");
+    return inner instanceof HTMLElement ? inner : null;
+}
+
+async function posterWrapToPngDataUrl(posterWrap: HTMLElement): Promise<string> {
+    await waitForImages(posterWrap);
     await waitForFontsAndPaint();
-    const rect = node.getBoundingClientRect();
-    const width = Math.max(1, Math.ceil(rect.width || node.offsetWidth || node.scrollWidth));
-    const height = Math.max(1, Math.ceil(rect.height || node.offsetHeight || node.scrollHeight));
+
+    const w = Math.max(1, Math.round(posterWrap.offsetWidth || posterWrap.getBoundingClientRect().width));
+    const h = Math.max(1, Math.round(posterWrap.offsetHeight || posterWrap.getBoundingClientRect().height));
+    if (w !== h) {
+        console.warn("[poster-preview] Export posterWrap is not square; output may be letterboxed. Size:", w, h);
+    }
+
+    const boxShadow = posterWrap.style.boxShadow,
+        borderRadius = posterWrap.style.borderRadius,
+        outline = posterWrap.style.outline,
+        filter = posterWrap.style.filter;
+    posterWrap.style.boxShadow = "none";
+    posterWrap.style.borderRadius = "0";
+    posterWrap.style.outline = "none";
+    posterWrap.style.filter = "none";
+
+    const toPngOpts = {
+        cacheBust: true,
+        pixelRatio: 1,
+        width: POSTER_EXPORT_PX,
+        height: POSTER_EXPORT_PX,
+        /** No matte — art is edge-to-edge on the square. */
+        backgroundColor: "rgba(0,0,0,0)",
+        skipFonts: true,
+    };
+
     try {
-        return await toPng(node, {
-            cacheBust: true,
-            pixelRatio: 2,
-            backgroundColor: "#ffffff",
-            width,
-            height,
-            skipFonts: true,
-        });
+        return await toPng(posterWrap, toPngOpts);
     }
     catch {
-        try {
-            return await toPng(node, {
-                cacheBust: true,
-                pixelRatio: 1,
-                backgroundColor: "#ffffff",
-                width,
-                height,
-                skipFonts: true,
-            });
-        }
-        catch {
-            const { default: html2canvas } = await import("html2canvas");
-            const canvas = await html2canvas(node, {
-                backgroundColor: "#ffffff",
-                scale: 2,
-                useCORS: true,
-                allowTaint: false,
-            });
-            return canvas.toDataURL("image/png");
-        }
+        const { default: html2canvas } = await import("html2canvas");
+        const side = Math.min(w, h);
+        const scale = POSTER_EXPORT_PX / side;
+        const canvas = await html2canvas(posterWrap, {
+            backgroundColor: null,
+            scale,
+            width: w,
+            height: h,
+            windowWidth: w,
+            windowHeight: h,
+            x: 0,
+            y: 0,
+            useCORS: true,
+            allowTaint: false,
+            logging: false,
+        });
+        const out = document.createElement("canvas");
+        out.width = POSTER_EXPORT_PX;
+        out.height = POSTER_EXPORT_PX;
+        const ctx = out.getContext("2d");
+        if (!ctx)
+            throw new Error("2d context unavailable");
+        ctx.drawImage(canvas, 0, 0, POSTER_EXPORT_PX, POSTER_EXPORT_PX);
+        return out.toDataURL("image/png");
+    }
+    finally {
+        posterWrap.style.boxShadow = boxShadow;
+        posterWrap.style.borderRadius = borderRadius;
+        posterWrap.style.outline = outline;
+        posterWrap.style.filter = filter;
     }
 }
-async function posterCanvasToDataUrl(): Promise<string | null> {
-    const node = document.getElementById("poster-canvas");
-    if (!node)
+
+async function posterWrapFromExportMountOrPreview(posterCanvasEl: HTMLElement | null): Promise<string | null> {
+    const mount = typeof document !== "undefined" ? document.getElementById("poster-export-mount") : null;
+    const mountWrap = mount ? resolvePosterWrapElement(mount) : null;
+    if (mountWrap)
+        return posterWrapToPngDataUrl(mountWrap);
+    if (!posterCanvasEl)
         return null;
-    return posterNodeToDataUrl(node as HTMLElement);
+    const wrap = resolvePosterWrapElement(posterCanvasEl);
+    if (!wrap)
+        return null;
+    return posterWrapToPngDataUrl(wrap);
 }
 function triggerAnchorDownload(blob: Blob, filename: string): void {
     const url = URL.createObjectURL(blob);
@@ -115,22 +160,12 @@ function triggerAnchorDownload(blob: Blob, filename: string): void {
         URL.revokeObjectURL(url);
     }, 2500);
 }
-function buildCaptionLikeEditor(businessName: string, businessType: string, offer: string, variantSeed: number): string {
-    const intros = [
-        `At ${businessName}, we're focusing on ${offer} today.`,
-        `Today at ${businessName}, we're highlighting ${offer}.`,
-        `${businessName} is putting ${offer} front and center today.`,
-    ];
-    const intro = intros[Math.abs(variantSeed) % intros.length];
-    return `${intro}\n\nIf you are in ${businessType}, this is a simple, practical step to attract more attention and convert interest into action.\n\nMessage us now to learn more and get started.`;
-}
 export default function PosterPreviewPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { user, loading: authLoading } = useAuth();
     const [draft, setDraft] = useState<Draft | null>(null);
     const [loading, setLoading] = useState(true);
-    const [regenerating, setRegenerating] = useState(false);
     const [isConfirmed, setIsConfirmed] = useState(false);
     const [confirmBusy, setConfirmBusy] = useState(false);
     const [downloadBusy, setDownloadBusy] = useState(false);
@@ -142,7 +177,7 @@ export default function PosterPreviewPage() {
     const [posterDataUrl, setPosterDataUrl] = useState<string | null>(null);
     const posterRef = useRef<HTMLDivElement>(null);
     const hasPoster = Boolean(draft?.imageDataUrl);
-    const actionsLocked = loading || regenerating;
+    const actionsLocked = loading;
     const exportBusy = confirmBusy || downloadBusy || shareBusy;
     const draftIdForFilename = useMemo(() => {
         const fromDraft = draft?._id?.trim();
@@ -208,17 +243,15 @@ export default function PosterPreviewPage() {
         void load();
     }, [authLoading, user?.uid, router, searchParams]);
     const buildPosterDataUrl = useCallback(async (): Promise<string | null> => {
-        let node = posterRef.current ?? (document.getElementById("poster-canvas") as HTMLElement | null);
-        if (!node) {
+        let canvasEl = posterRef.current ?? (document.getElementById("poster-canvas") as HTMLElement | null);
+        if (!canvasEl) {
             await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-            node = posterRef.current ?? (document.getElementById("poster-canvas") as HTMLElement | null);
+            canvasEl = posterRef.current ?? (document.getElementById("poster-canvas") as HTMLElement | null);
         }
-        if (!node)
-            return null;
-        return posterNodeToDataUrl(node);
+        return posterWrapFromExportMountOrPreview(canvasEl);
     }, []);
     useEffect(() => {
-        if (!hasPoster || loading || regenerating)
+        if (!hasPoster || loading)
             return;
         let cancelled = false;
         const exportCurrentPreview = async () => {
@@ -240,181 +273,21 @@ export default function PosterPreviewPage() {
                 if (cancelled)
                     return;
                 setPosterDataUrl(null);
-                setExportMessage("Poster export failed. Try regenerate.");
+                setExportMessage("Poster export failed. Try refreshing the page.");
             }
         };
         void exportCurrentPreview();
         return () => {
             cancelled = true;
         };
-    }, [buildPosterDataUrl, hasPoster, loading, regenerating, draft?._id, draft?.caption, draft?.imageDataUrl]);
-    const regeneratePoster = useCallback(async () => {
-        if (!user?.uid || !draft?.imageDataUrl)
-            return;
-        setRegenerating(true);
-        setExportMessage("");
-        try {
-            const businessRes = await fetch(`/api/business-profile?firebase_uid=${encodeURIComponent(user.uid)}`, {
-                cache: "no-store",
-            });
-            const businessJson = await businessRes.json();
-            const bp = businessRes.ok && businessJson?.ok
-                ? (businessJson.data as Record<string, unknown>)
-                : ({} as Record<string, unknown>);
-            const businessName = String(bp.businessName ?? "").trim() || "your business";
-            const businessType = String(bp.businessType ?? "").trim() || "SME";
-            const city = String(bp.city ?? "").trim();
-            const country = String(bp.country ?? "Sri Lanka").trim();
-            const location = [city, country].filter(Boolean).join(", ") || "Sri Lanka";
-            const products = Array.isArray(bp.productsOrServices)
-                ? (bp.productsOrServices as unknown[]).filter(Boolean).join(", ")
-                : String(bp.productsOrServices ?? "").trim();
-            const targetCustomers = String(bp.targetCustomers ?? "").trim() || "Local customers";
-            const businessGoal = String(bp.businessGoals ?? "").trim() || "Attract more customers";
-            const budget = String(bp.monthlyMarketingBudget ?? bp.monthlyBusinessBudget ?? "").trim() || "Medium";
-            const language = String(bp.language ?? "English").trim() || "English";
-            const offer = String(draft.offerText ?? "").trim() || "today's featured offer";
-            const existingHashtags = Array.isArray(draft.hashtags) && draft.hashtags.length > 0 ? draft.hashtags : FALLBACK_HASHTAGS;
-            const baseBusinessDetails = {
-                businessName,
-                businessType,
-                location,
-                productsOrServices: products || businessType,
-                targetCustomers,
-                businessGoal,
-                budget,
-                language,
-                offer,
-                tone: "Friendly and professional",
-                photoContext: "A real photo uploaded by the business owner",
-            };
-            const lockedStyle = draft.posterStyle || draft.posterDesign?.style || null;
-            const prevDesign = draft.posterDesign || null;
-            const variationSeed = `v${Date.now().toString(36)}-${Math.floor(Math.random() * 1e4)}`;
-            let nextDesign: PosterDesign | null = null;
-            try {
-                const designRes = await fetch("/api/ai/generate", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        type: "poster-design",
-                        businessDetails: {
-                            ...baseBusinessDetails,
-                            lockedStyle: lockedStyle ?? "",
-                            avoidHeadline: prevDesign?.headline ?? "",
-                            avoidSubheadline: prevDesign?.subheadline ?? "",
-                            avoidAccentColor: prevDesign?.accentColor ?? "",
-                            variationHint: variationSeed,
-                        },
-                    }),
-                });
-                const designJson = await designRes.json();
-                if (designRes.ok && designJson?.ok && designJson?.design) {
-                    nextDesign = designJson.design as PosterDesign;
-                }
-            }
-            catch (err) {
-                console.error("[Poster Preview] Regenerate design error:", err);
-            }
-            const mergedDesign: PosterDesign = {
-                ...DEFAULT_POSTER_DESIGN,
-                ...(prevDesign || {}),
-                ...(nextDesign || {}),
-                style: (lockedStyle as PosterDesign["style"]) ||
-                    nextDesign?.style ||
-                    prevDesign?.style ||
-                    DEFAULT_POSTER_DESIGN.style,
-            };
-            let newCaption = "";
-            let newHashtags: string[] = existingHashtags;
-            try {
-                const captionRes = await fetch("/api/ai/generate", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        type: "poster-caption",
-                        businessDetails: {
-                            ...baseBusinessDetails,
-                            dayPlan: `Regeneration: produce a fresh variant. Previous caption: ${draft.caption || ""}`,
-                            variationHint: variationSeed,
-                        },
-                    }),
-                });
-                const captionJson = await captionRes.json();
-                if (captionRes.ok && captionJson?.ok && typeof captionJson.text === "string") {
-                    const text = String(captionJson.text);
-                    const capMatch = text.match(/Caption:\s*([\s\S]*?)(?:\n\s*Hashtags:|$)/i);
-                    const tagMatch = text.match(/Hashtags:\s*([\s\S]*)$/i);
-                    newCaption = (capMatch?.[1] || text).trim();
-                    if (tagMatch?.[1]) {
-                        const tags = tagMatch[1]
-                            .split(/\s+/)
-                            .map((t) => t.trim())
-                            .filter(Boolean)
-                            .map((t) => (t.startsWith("#") ? t : `#${t}`));
-                        if (tags.length >= 2)
-                            newHashtags = tags.slice(0, 8);
-                    }
-                }
-            }
-            catch (err) {
-                console.error("[Poster Preview] Regenerate caption error:", err);
-            }
-            if (!newCaption) {
-                newCaption = buildCaptionLikeEditor(businessName, businessType, offer, Math.floor(Math.random() * 1e9));
-            }
-            const response = await fetch("/api/caption-drafts", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    firebase_uid: user.uid,
-                    dayNumber: typeof draft.dayNumber === "number" && Number.isFinite(draft.dayNumber) && draft.dayNumber > 0
-                        ? draft.dayNumber
-                        : null,
-                    caption: newCaption,
-                    hashtags: newHashtags,
-                    imageName: draft.imageName || "uploaded-image",
-                    offerText: offer,
-                    imageDataUrl: draft.imageDataUrl,
-                    posterStyle: mergedDesign.style,
-                    posterDesign: mergedDesign,
-                }),
-            });
-            const result = await response.json();
-            if (response.ok && result?.ok && result?.data) {
-                const newId = String(result.data.draftId ?? "");
-                setDraft({
-                    ...result.data,
-                    hashtags: Array.isArray(result.data.hashtags) ? result.data.hashtags : newHashtags,
-                    posterStyle: mergedDesign.style,
-                    posterDesign: mergedDesign,
-                    _id: newId || undefined,
-                });
-                setIsConfirmed(false);
-                setPosterDataUrl(null);
-                if (newId) {
-                    router.replace(`/poster-preview?draftId=${encodeURIComponent(newId)}`);
-                }
-            }
-            else {
-                setExportMessage("Could not regenerate. Please try again.");
-            }
-        }
-        catch (error) {
-            console.error("[Poster Preview] Regenerate failed:", error);
-            setExportMessage("Regeneration failed. Try again.");
-        }
-        finally {
-            setRegenerating(false);
-        }
-    }, [draft, router, user?.uid]);
+    }, [buildPosterDataUrl, hasPoster, loading, draft?._id, draft?.caption, draft?.imageDataUrl]);
     const confirmPoster = useCallback(async () => {
         console.log("confirm clicked");
         if (exportBusy || !hasPoster)
             return;
         setConfirmBusy(true);
         try {
-            const dataUrl = posterDataUrl || (await buildPosterDataUrl());
+            const dataUrl = await buildPosterDataUrl();
             if (!dataUrl)
                 return;
             setPosterDataUrl(dataUrl);
@@ -430,14 +303,14 @@ export default function PosterPreviewPage() {
         finally {
             setConfirmBusy(false);
         }
-    }, [buildPosterDataUrl, exportBusy, hasPoster, posterDataUrl]);
+    }, [buildPosterDataUrl, exportBusy, hasPoster]);
     const handleDownload = useCallback(async () => {
         console.log("download clicked");
         if (exportBusy || !hasPoster || !isConfirmed)
             return;
         setDownloadBusy(true);
         try {
-            const dataUrl = posterDataUrl || (await buildPosterDataUrl());
+            const dataUrl = await buildPosterDataUrl();
             if (!dataUrl) {
                 setExportMessage("Download failed: poster export unavailable.");
                 return;
@@ -454,33 +327,52 @@ export default function PosterPreviewPage() {
         finally {
             setDownloadBusy(false);
         }
-    }, [buildPosterDataUrl, draftIdForFilename, exportBusy, hasPoster, isConfirmed, posterDataUrl]);
+    }, [buildPosterDataUrl, draftIdForFilename, exportBusy, hasPoster, isConfirmed]);
     const handleShare = useCallback(async () => {
         console.log("share clicked");
         if (exportBusy || !hasPoster || !isConfirmed)
             return;
         setShareBusy(true);
         try {
-            const dataUrl = posterDataUrl || (await buildPosterDataUrl());
+            const dataUrl = await buildPosterDataUrl();
             if (!dataUrl) {
+                setExportMessage("Could not prepare the poster image to share.");
                 setShareUnsupportedOpen(true);
                 return;
             }
             setPosterDataUrl(dataUrl);
-            console.log("posterDataUrl length", dataUrl?.length);
             const blob = dataUrlToBlob(dataUrl);
-            const file = new File([blob], "bizboost-poster.png", { type: "image/png" });
-            const payload: ShareData = { files: [file] };
-            if (typeof navigator !== "undefined" && navigator.share && navigator.canShare?.(payload)) {
-                await navigator.share({ files: [file], title: "BizBoost Poster", text: draft?.caption || "" });
-                return;
+            const filename = `bizboost-poster-${draftIdForFilename}.png`;
+            const file = new File([blob], filename, { type: "image/png", lastModified: Date.now() });
+
+            if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+                try {
+                    if (!navigator.canShare || navigator.canShare({ files: [file] })) {
+                        await navigator.share({
+                            files: [file],
+                            title: "BizBoost Poster",
+                            text: (draft?.caption || "").slice(0, 2000),
+                        });
+                        return;
+                    }
+                }
+                catch (err) {
+                    const e = err as Error;
+                    if (e?.name === "AbortError")
+                        return;
+                    console.warn("[Poster Preview] navigator.share with file failed:", e);
+                }
             }
+
             const nextUrl = URL.createObjectURL(blob);
             setShareImageUrl((prev) => {
                 if (prev)
                     URL.revokeObjectURL(prev);
                 return nextUrl;
             });
+            const opened = typeof window !== "undefined" ? window.open(nextUrl, "_blank", "noopener,noreferrer") : null;
+            if (!opened)
+                triggerAnchorDownload(blob, filename);
             setShareUnsupportedOpen(true);
             setExportMessage("");
         }
@@ -494,7 +386,7 @@ export default function PosterPreviewPage() {
         finally {
             setShareBusy(false);
         }
-    }, [buildPosterDataUrl, draft?.caption, exportBusy, hasPoster, isConfirmed, posterDataUrl]);
+    }, [buildPosterDataUrl, draft?.caption, draftIdForFilename, exportBusy, hasPoster, isConfirmed]);
     const copyCaption = useCallback(async () => {
         try {
             await navigator.clipboard.writeText(draft?.caption || "");
@@ -520,16 +412,15 @@ export default function PosterPreviewPage() {
         return base;
     }, [draft?.posterDesign, draft?.posterStyle]);
     return (<div className="posterPage">
+      <div id="poster-export-mount" className="posterExportMount" aria-hidden="true">
+        {!loading && draft?.imageDataUrl ? (<PosterTemplate key={`${draft?._id ?? "draft"}-${draft.imageDataUrl.length}`} imageUrl={draft.imageDataUrl} design={effectivePosterDesign}/>) : null}
+      </div>
       <div className="posterShell">
         <section className="posterCanvas">
           <div className="posterViewport">
-            <div id="poster-canvas" ref={posterRef} className={`posterFrame ${regenerating ? "posterFrameDim" : ""}`} aria-busy={regenerating}>
+            <div id="poster-canvas" ref={posterRef} className="posterFrame">
               {loading ? (<div className="placeholder">Loading draft...</div>) : draft?.imageDataUrl ? (<PosterTemplate imageUrl={draft.imageDataUrl} design={effectivePosterDesign}/>) : (<div className="placeholder">No draft image found.</div>)}
             </div>
-            {regenerating && (<div className="posterBusyOverlay" role="status">
-                <span className="posterBusySpinner" aria-hidden/>
-                Regenerating poster...
-              </div>)}
           </div>
         </section>
 
@@ -543,12 +434,8 @@ export default function PosterPreviewPage() {
           {exportMessage ? <p className="shareSheetHint">{exportMessage}</p> : null}
 
           <div className="actionStack">
-            <button type="button" className="secondaryBtn fullWidth" disabled={regenerating || exportBusy} onClick={() => router.push("/biz-editor")}>
+            <button type="button" className="secondaryBtn fullWidth" disabled={exportBusy} onClick={() => router.push("/biz-editor")}>
               Back
-            </button>
-
-            <button type="button" className="outlineAccentBtn fullWidth" disabled={actionsLocked || !hasPoster || exportBusy} onClick={() => void regeneratePoster()}>
-              {regenerating ? "Regenerating..." : "Regenerate Poster"}
             </button>
 
             <button type="button" className="primaryBtn fullWidth" disabled={actionsLocked || !hasPoster || isConfirmed || exportBusy} onClick={() => void confirmPoster()}>
@@ -556,10 +443,10 @@ export default function PosterPreviewPage() {
             </button>
 
             <div className="actionRow">
-              <button type="button" className="secondaryBtn flex1" disabled={regenerating || !hasPoster || !isConfirmed || exportBusy} onClick={() => void handleDownload()}>
+              <button type="button" className="secondaryBtn flex1" disabled={!hasPoster || !isConfirmed || exportBusy} onClick={() => void handleDownload()}>
                 {downloadBusy ? "Exporting..." : "Download"}
               </button>
-              <button type="button" className="secondaryBtn flex1" disabled={regenerating || !hasPoster || !isConfirmed || exportBusy} onClick={() => void handleShare()}>
+              <button type="button" className="secondaryBtn flex1" disabled={!hasPoster || !isConfirmed || exportBusy} onClick={() => void handleShare()}>
                 {shareBusy ? "Exporting..." : "Share"}
               </button>
             </div>
@@ -573,13 +460,23 @@ export default function PosterPreviewPage() {
             }}>
           <div className="shareSheet">
             <div className="shareSheetHead">
-              <h2 id="shareUnsupportedTitle">Sharing not supported</h2>
+              <h2 id="shareUnsupportedTitle">Share poster image</h2>
               <button type="button" className="iconClose" onClick={() => setShareUnsupportedOpen(false)} aria-label="Close">
                 x
               </button>
             </div>
-            <p className="shareSheetHint">Native image share is unavailable. Use these fallback options.</p>
+            <p className="shareSheetHint">This is your exported poster (square PNG)—not the review page. Download or open it, then attach it in Instagram, WhatsApp, etc.</p>
+            {shareImageUrl ? (<div className="sharePosterPreviewWrap">
+                <img src={shareImageUrl} alt="" className="sharePosterPreview"/>
+              </div>) : null}
             <div className="unsupportedActions">
+              <button type="button" className="primaryBtn fullWidth" disabled={exportBusy} onClick={() => void handleDownload()}>
+                Download poster PNG
+              </button>
+              {shareImageUrl ? (<a className="secondaryBtn fullWidth shareLinkBtn" href={shareImageUrl} download={`bizboost-poster-${draftIdForFilename}.png`}>
+                  Save image link
+                </a>) : null}
+              <p className="shareSectionLabel">Share link to this review page (caption + URL only, no image)</p>
               <a className="secondaryBtn fullWidth shareLinkBtn" href={fallbackShareLinks.whatsapp} target="_blank" rel="noopener noreferrer">
                 WhatsApp
               </a>
@@ -595,9 +492,6 @@ export default function PosterPreviewPage() {
               <a className="secondaryBtn fullWidth shareLinkBtn" href={fallbackShareLinks.telegram} target="_blank" rel="noopener noreferrer">
                 Telegram
               </a>
-              <button type="button" className="primaryBtn fullWidth" disabled={exportBusy} onClick={() => void handleDownload()}>
-                Download Poster
-              </button>
               <button type="button" className="secondaryBtn fullWidth" onClick={() => void copyCaption()}>
                 {captionCopied ? "Caption copied" : "Copy caption"}
               </button>
@@ -634,53 +528,43 @@ export default function PosterPreviewPage() {
         .posterFrame {
           position: relative;
           width: 100%;
+          max-width: min(100%, 560px);
+          margin: 0 auto;
+          aspect-ratio: 1 / 1;
           overflow: hidden;
           border-radius: 14px;
           background: transparent;
           display: flex;
           flex-direction: column;
-        }
-        .posterFrameDim {
-          filter: brightness(0.92);
-        }
-        .posterBusyOverlay {
-          position: absolute;
-          inset: 0;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 12px;
-          background: rgba(15, 23, 42, 0.35);
-          color: #f8fafc;
-          font-size: 14px;
-          font-weight: 700;
-          z-index: 2;
-        }
-        .posterBusySpinner {
-          width: 28px;
-          height: 28px;
-          border-radius: 50%;
-          border: 3px solid rgba(248, 250, 252, 0.35);
-          border-top-color: #38bdf8;
-          animation: spin 0.75s linear infinite;
-        }
-        @keyframes spin {
-          to {
-            transform: rotate(360deg);
-          }
-        }
-        .posterFrame img {
-          display: block;
-          width: 100%;
-          height: 100%;
-          min-height: 520px;
-          object-fit: cover;
+          align-items: stretch;
         }
         .placeholder {
           color: #94a3b8;
           font-size: 14px;
           margin: auto;
+        }
+        .posterExportMount {
+          position: fixed;
+          left: -10000px;
+          top: 0;
+          width: 1080px;
+          height: 1080px;
+          margin: 0;
+          padding: 0;
+          border: none;
+          overflow: hidden;
+          pointer-events: none;
+          z-index: 0;
+          background: transparent;
+        }
+        .posterExportMount :global(.posterWrap) {
+          width: 100% !important;
+          height: 100% !important;
+          max-width: none !important;
+          margin: 0 !important;
+          border-radius: 0 !important;
+          box-shadow: none !important;
+          aspect-ratio: auto !important;
         }
         .posterOverlayBottom {
           position: absolute;
@@ -729,9 +613,9 @@ export default function PosterPreviewPage() {
           gap: 8px;
           padding: 8px 12px;
           border-radius: 999px;
-          background: rgba(16, 185, 129, 0.12);
-          border: 1px solid rgba(16, 185, 129, 0.35);
-          color: #047857;
+          background: #f5f5f5;
+          border: 1px solid #e5e5e5;
+          color: #111111;
           font-size: 13px;
           font-weight: 700;
         }
@@ -752,8 +636,8 @@ export default function PosterPreviewPage() {
           width: 100%;
         }
         .primaryBtn {
-          border: 1px solid rgba(16, 185, 129, 0.3);
-          background: linear-gradient(145deg, #10b981, #059669);
+          border: 1px solid #111111;
+          background: #111111;
           color: #fff;
           border-radius: 10px;
           padding: 11px 14px;
@@ -776,20 +660,6 @@ export default function PosterPreviewPage() {
           cursor: pointer;
         }
         .secondaryBtn:disabled {
-          opacity: 0.55;
-          cursor: not-allowed;
-        }
-        .outlineAccentBtn {
-          border: 1px solid rgba(14, 165, 233, 0.45);
-          background: rgba(240, 249, 255, 0.95);
-          color: #0369a1;
-          border-radius: 10px;
-          padding: 11px 14px;
-          font-size: 13px;
-          font-weight: 700;
-          cursor: pointer;
-        }
-        .outlineAccentBtn:disabled {
           opacity: 0.55;
           cursor: not-allowed;
         }
@@ -838,6 +708,31 @@ export default function PosterPreviewPage() {
           font-size: 13px;
           color: #64748b;
         }
+        .sharePosterPreviewWrap {
+          margin-top: 12px;
+          border-radius: 12px;
+          overflow: hidden;
+          border: 1px solid rgba(148, 163, 184, 0.35);
+          background: #0f172a;
+          aspect-ratio: 1 / 1;
+          max-height: min(52vh, 360px);
+          margin-left: auto;
+          margin-right: auto;
+        }
+        .sharePosterPreview {
+          display: block;
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
+        }
+        .shareSectionLabel {
+          margin: 10px 0 0;
+          font-size: 11px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          color: #94a3b8;
+        }
         .unsupportedActions {
           margin-top: 16px;
           display: flex;
@@ -853,9 +748,6 @@ export default function PosterPreviewPage() {
         @media (max-width: 980px) {
           .posterShell {
             grid-template-columns: 1fr;
-          }
-          .posterFrame {
-            min-height: 420px;
           }
         }
       `}</style>

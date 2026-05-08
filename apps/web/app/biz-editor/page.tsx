@@ -6,7 +6,8 @@ import { DEFAULT_POSTER_DESIGN, POSTER_STYLE_META, PosterDesign, PosterStyle, Po
 import { PosterTemplatePicker } from "@/src/components/poster/PosterTemplatePicker";
 import { getPosterTemplateById } from "@/src/lib/posterTemplateCatalog";
 import { pickPosterTemplateForContext } from "@/src/lib/posterTemplateSelection";
-import { buildPosterSeedFromPlan, pickBrandAccentHex } from "@/src/lib/posterDayTheme";
+import { buildPosterSeedFromPlan, pickBrandAccentHex, type PosterSeedContext } from "@/src/lib/posterDayTheme";
+import type { ActivationFormat, MarketingGoalKey } from "@/src/lib/posterActivationCopy";
 type BusinessProfile = {
     businessName?: string;
     businessType?: string;
@@ -20,16 +21,22 @@ type BusinessProfile = {
     language?: string;
 };
 type MarketingActivationBrief = {
+    whatToPost?: string;
     postBrief?: string;
     contentBrief?: string;
     hook?: string;
+    goal?: "DMs" | "Orders" | "Bookings" | "Footfall" | "Leads";
     cta?: string;
     format?: string;
     platform?: string;
     visualGuide?: string[];
     posterHeadlineHint?: string;
+    posterSubheadline?: string;
+    posterCtaLabel?: string;
+    posterOfferBadge?: string;
     postIdea?: string;
     caption?: string;
+    hashtags?: string[];
     posterHint?: string;
     offerDeadlineHint?: string;
 };
@@ -44,6 +51,31 @@ type DayPlan = {
     hashtags?: string[];
     marketingActivation?: MarketingActivationBrief;
 };
+function firstProductFromBusiness(business: BusinessProfile | null, fallback: string): string {
+    const raw = business?.productsOrServices;
+    if (Array.isArray(raw)) {
+        const hit = raw.map((x) => String(x).trim()).find(Boolean);
+        if (hit)
+            return hit;
+    }
+    if (typeof raw === "string" && raw.trim()) {
+        const line = raw.split(/[,\n]/)[0]?.trim();
+        if (line)
+            return line;
+    }
+    const fb = fallback.trim();
+    if (fb) {
+        const head = fb.split(/[—\-•]/)[0]?.trim();
+        return head || fb;
+    }
+    return "Today's offer";
+}
+function parseActivationFormat(format: unknown): ActivationFormat {
+    return format === "Reel" || format === "Story" || format === "Feed" || format === "Carousel" ? format : "Feed";
+}
+function parseMarketingGoal(goal: unknown): MarketingGoalKey {
+    return goal === "DMs" || goal === "Orders" || goal === "Bookings" || goal === "Footfall" || goal === "Leads" ? goal : "Leads";
+}
 function mapActivationToApi(ma: MarketingActivationBrief | null): {
     activationPostBrief: string;
     activationHook: string;
@@ -396,9 +428,7 @@ export default function BizEditorPage() {
         setOfferText((prev) => (prev.trim() ? prev : queryPostIdea || queryActionTitle || prev));
         setCaption((prev) => {
             const base = prev.trim() ? prev : queryCaption || prev;
-            if (!socialAppendix)
-                return base;
-            return `${base}${base ? "\n\n" : ""}${socialAppendix}`;
+            return base;
         });
         if (dayParam <= 0) {
             const themeForStandalone = editorContext.dayTheme.trim() || undefined;
@@ -418,6 +448,14 @@ export default function BizEditorPage() {
                 marketingActivation: standaloneMa,
                 mainActionTitle: queryActionTitle,
                 posterHintFallback: queryPosterHint,
+                posterContext: {
+                    product: firstProductFromBusiness(business, queryPostIdea || queryActionTitle),
+                    businessName: bn || "Your Brand",
+                    city: business?.city?.trim() || "",
+                    format: "Feed",
+                    dayTheme: themeForStandalone,
+                    goal: "Leads",
+                },
             });
             setPosterDesign((prev) => ({
                 ...DEFAULT_POSTER_DESIGN,
@@ -435,6 +473,7 @@ export default function BizEditorPage() {
             const chunks = [
                 queryActionTitle ? `Main action: ${queryActionTitle}` : "",
                 queryPostIdea ? `Post idea: ${queryPostIdea}` : "",
+                socialAppendix,
                 queryPosterHint ? `Poster hint: ${queryPosterHint}` : "",
             ].filter(Boolean);
             return chunks.join(". ");
@@ -494,18 +533,37 @@ export default function BizEditorPage() {
                                 businessType: bizTypeSeed,
                             });
                             const accent = pickBrandAccentHex(bizNameSeed || "bizboost");
-                            const captionSeed = ma?.caption || dayItem.caption || "";
+                            const captionSeed = queryCaption || ma?.caption || dayItem.caption || "";
+                            const postIdeaSeed = queryPostIdea || ma?.postIdea || dayItem.postIdea || "";
+                            const productLine = firstProductFromBusiness(businessJson.data as BusinessProfile, postIdeaSeed || dayItem.mainActionTitle || "");
+                            const posterContext: PosterSeedContext = {
+                                product: productLine,
+                                businessName: bizNameSeed || "Your Brand",
+                                city: String(businessJson?.data?.city ?? "").trim(),
+                                format: parseActivationFormat(ma?.format),
+                                dayTheme: themeForStyle,
+                                goal: parseMarketingGoal(ma?.goal),
+                                businessGrowthAction: dayItem.businessGrowthAction,
+                            };
+                            const activationSeed = ma
+                                ? {
+                                    ...ma,
+                                    postIdea: postIdeaSeed || ma.postIdea,
+                                    caption: captionSeed || ma.caption,
+                                }
+                                : ma;
                             const seed = buildPosterSeedFromPlan({
                                 businessName: bizNameSeed || "Your Brand",
                                 caption: captionSeed,
-                                marketingActivation: ma,
+                                marketingActivation: activationSeed,
                                 mainActionTitle: dayItem.mainActionTitle,
                                 businessGrowthAction: dayItem.businessGrowthAction,
                                 posterHintFallback: ma?.posterHint || dayItem.posterHint || "",
+                                posterContext,
                             });
-                            setOfferText((prev) => prev || dayItem.mainActionTitle || dayItem.postIdea || "");
-                            setHashtags(Array.isArray(dayItem.hashtags) ? dayItem.hashtags : []);
-                            setCaption((prev) => prev || dayItem.caption || "");
+                            setOfferText((prev) => prev || postIdeaSeed || dayItem.mainActionTitle || "");
+                            setHashtags(Array.isArray(ma?.hashtags) ? ma.hashtags : Array.isArray(dayItem.hashtags) ? dayItem.hashtags : []);
+                            setCaption((prev) => prev || captionSeed || "");
                             setPosterDesign(() => ({
                                 ...DEFAULT_POSTER_DESIGN,
                                 ...seed,
@@ -517,11 +575,11 @@ export default function BizEditorPage() {
                             const summaryParts = [
                                 dayItem.mainActionTitle ? `Main action: ${dayItem.mainActionTitle}` : "",
                                 dayItem.businessGrowthAction ? `Business action: ${dayItem.businessGrowthAction}` : "",
-                                dayItem.postIdea ? `Post idea: ${dayItem.postIdea}` : "",
+                                postIdeaSeed ? `Post idea: ${postIdeaSeed}` : "",
                                 `Day: ${dayItem.dayNumber}`,
                             ].filter(Boolean);
                             setDayPlanSummary(summaryParts.join(". "));
-                            setMarketingActivation(ma);
+                            setMarketingActivation(activationSeed);
                         }
                         else {
                             setMarketingActivation(null);
@@ -1046,8 +1104,8 @@ export default function BizEditorPage() {
         .backBtn,
         .primaryBtn,
         .modalPrimary {
-          border: 1px solid rgba(16, 185, 129, 0.3);
-          background: linear-gradient(145deg, #10b981, #059669);
+          border: 1px solid #111111;
+          background: #111111;
           color: #fff;
           border-radius: 10px;
           padding: 9px 12px;
@@ -1093,8 +1151,8 @@ export default function BizEditorPage() {
           transition: border-color 0.15s ease, background 0.15s ease;
         }
         .dropZone.dragOver {
-          border-color: rgba(16, 185, 129, 0.55);
-          background: rgba(236, 253, 245, 0.92);
+          border-color: #111111;
+          background: #f5f5f5;
         }
         .dropZone input {
           position: absolute;

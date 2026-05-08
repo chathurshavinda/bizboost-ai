@@ -303,18 +303,19 @@ export default function SelectPlanPage() {
           transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
           cursor: pointer;
           overflow: hidden;
+          min-height: 286px;
         }
 
         .planCard:hover {
-          transform: translateY(-4px);
+          transform: none;
           border-color: rgba(148, 163, 184, 0.5);
           box-shadow: 0 24px 54px rgba(15, 23, 42, 0.14);
         }
 
         .planCard.isSelected {
-          transform: translateY(-2px) scale(1.01);
-          border-color: rgba(52, 211, 153, 0.65);
-          box-shadow: 0 26px 60px rgba(16, 185, 129, 0.2);
+          transform: none;
+          border-color: #111111;
+          box-shadow: 0 0 0 2px rgba(17, 17, 17, 0.18), 0 18px 40px rgba(15, 23, 42, 0.12);
         }
 
         .planCard.isDisabled {
@@ -325,7 +326,7 @@ export default function SelectPlanPage() {
         .planCardGlow {
           position: absolute;
           inset: 0;
-          background: radial-gradient(420px 140px at 12% -12%, rgba(16, 185, 129, 0.16), transparent 70%);
+          background: radial-gradient(420px 140px at 12% -12%, rgba(17, 17, 17, 0.08), transparent 70%);
           opacity: 0;
           transition: opacity 0.18s ease;
           pointer-events: none;
@@ -349,9 +350,9 @@ export default function SelectPlanPage() {
           margin-bottom: 10px;
           padding: 4px 8px;
           border-radius: 999px;
-          border: 1px solid rgba(52, 211, 153, 0.45);
-          background: rgba(236, 253, 245, 0.92);
-          color: #047857;
+          border: 1px solid #e5e5e5;
+          background: #f5f5f5;
+          color: #111111;
           font-size: 10px;
           letter-spacing: 0.1em;
           text-transform: uppercase;
@@ -395,9 +396,9 @@ export default function SelectPlanPage() {
 
         .checkCircle.active {
           border-color: transparent;
-          background: linear-gradient(145deg, #34d399, #10b981);
+          background: #111111;
           color: #ffffff;
-          box-shadow: 0 10px 22px rgba(16, 185, 129, 0.35);
+          box-shadow: 0 10px 22px rgba(0, 0, 0, 0.2);
         }
 
         .cardCta {
@@ -415,9 +416,9 @@ export default function SelectPlanPage() {
         }
 
         .cardCta.active {
-          border-color: rgba(16, 185, 129, 0.36);
-          background: rgba(236, 253, 245, 0.9);
-          color: #047857;
+          border-color: #e5e5e5;
+          background: #f5f5f5;
+          color: #111111;
         }
 
         .included {
@@ -448,7 +449,7 @@ export default function SelectPlanPage() {
         }
 
         li span {
-          color: #10b981;
+          color: #111111;
           font-weight: 700;
         }
 
@@ -477,10 +478,10 @@ export default function SelectPlanPage() {
         }
 
         .nextBtn {
-          border: 1px solid rgba(16, 185, 129, 0.32);
-          background: linear-gradient(145deg, #10b981, #059669);
+          border: 1px solid #111111;
+          background: #111111;
           color: #ffffff;
-          box-shadow: 0 14px 28px rgba(16, 185, 129, 0.35);
+          box-shadow: 0 14px 28px rgba(0, 0, 0, 0.2);
         }
 
         .backBtn:hover,

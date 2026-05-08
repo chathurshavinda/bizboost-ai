@@ -173,14 +173,14 @@ export default function BusinessDetailsPage() {
         }
 
         .detailsCard :global(.onboardingInput:focus) {
-          border-color: rgba(16, 185, 129, 0.55);
-          box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.45), 0 0 0 6px rgba(16, 185, 129, 0.12);
+          border-color: #111111;
+          box-shadow: 0 0 0 1px rgba(17, 17, 17, 0.45), 0 0 0 6px rgba(17, 17, 17, 0.08);
           background: #ffffff;
         }
 
         .detailsCard :global(.onboardingSubmitButton) {
-          border: 1px solid rgba(16, 185, 129, 0.3);
-          background: linear-gradient(145deg, #10b981, #059669);
+          border: 1px solid #111111;
+          background: #111111;
           color: #ffffff;
           border-radius: 12px;
           padding: 12px 26px;
@@ -188,7 +188,7 @@ export default function BusinessDetailsPage() {
           letter-spacing: 0.01em;
           font-size: 15px;
           font-weight: 700;
-          box-shadow: 0 14px 28px rgba(16, 185, 129, 0.34);
+          box-shadow: 0 14px 28px rgba(0, 0, 0, 0.2);
         }
 
         @media (max-width: 900px) {
