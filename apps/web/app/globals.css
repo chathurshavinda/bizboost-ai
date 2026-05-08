@@ -1,4 +1,8 @@
-﻿html {
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
   scroll-behavior: smooth;
 }
 
@@ -21,6 +25,51 @@ a {
 
 a:hover {
   text-decoration: none;
+}
+
+:root {
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+  --primary: 222.2 47.4% 11.2%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 222.2 84% 4.9%;
+  --radius: 0.5rem;
+}
+
+html.dark {
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+  --card: 222.2 84% 4.9%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222.2 84% 4.9%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 210 40% 98%;
+  --primary-foreground: 222.2 47.4% 11.2%;
+  --secondary: 217.2 32.6% 17.5%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217.2 32.6% 17.5%;
+  --muted-foreground: 215 20.2% 65.1%;
+  --accent: 217.2 32.6% 17.5%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 217.2 32.6% 17.5%;
+  --input: 217.2 32.6% 17.5%;
+  --ring: 212.7 26.8% 83.9%;
 }
 
 :root {
@@ -730,7 +779,10 @@ body {
 }
 
 .navbar--home {
-  
+  position: fixed;
+  top: 10px;
+  left: 0;
+  right: 0;
 }
 
 .navbar--scrolled {
@@ -3534,5 +3586,253 @@ html.dark .todayTaskCardInner {
   background: rgba(10, 10, 10, 0.82) !important;
   border-color: rgba(255, 255, 255, 0.06) !important;
   color: #e2e8f0 !important;
+}
+
+/* =========================================================
+   GLOBAL MONOCHROME THEME OVERRIDE
+   ========================================================= */
+:root,
+html.dark {
+  --bg: #ffffff !important;
+  --bg2: #ffffff !important;
+  --bg3: #ffffff !important;
+  --page-bg: #ffffff !important;
+  --app-bg: #ffffff !important;
+  --app-text: #111111 !important;
+  --text: #111111 !important;
+  --muted: #444444 !important;
+  --app-muted: #444444 !important;
+  --border: #e5e5e5 !important;
+  --glass-border: #e5e5e5 !important;
+  --app-glass-border: #e5e5e5 !important;
+  --accent: #111111 !important;
+  --accent-hover: #000000 !important;
+  --accent-soft: #f5f5f5 !important;
+  --primary: #111111 !important;
+  --primary-hover: #000000 !important;
+}
+
+html,
+body,
+html.dark body,
+body.home-page,
+html.dark body.home-page {
+  background: #ffffff !important;
+  color: #111111 !important;
+}
+
+/* Remove tinted glows/gradients from page shells and decorative layers */
+.landingRoot,
+.heroShell,
+.heroGradientBase,
+.heroGradientMesh,
+.authWrap,
+.authUnifiedWrap,
+.onboardingWrap,
+.businessProfilePage,
+.businessProfilePage::before,
+.authScene,
+.authRefBg,
+.authRefVisual,
+.authAside,
+.rightPanelModern,
+.rightOrb,
+.authVisual,
+.authVisualGlow,
+.authRefVisualOverlay,
+.bbSideBackdrop,
+.bbSideMenuPanel {
+  background-image: none !important;
+}
+
+/* Normalize core surfaces */
+.glass,
+.card,
+.authCard,
+.rightPanel,
+.onboardingCard,
+.businessProfileShell,
+.businessProfileHero,
+.businessProfilePanel,
+.businessProfileCapabilityCard,
+.authPanel,
+.authRefCard,
+.authRefShell,
+.authUnifiedCard,
+.homeSectionInner,
+.posterCanvas,
+.actionsCard,
+.scrollSection,
+.ctaStrip,
+.homeFooter,
+.todayTaskWrap .homeTaskCard,
+.todayTaskWrap .homePlanCompleteCard {
+  background: #ffffff !important;
+  border-color: #e5e5e5 !important;
+  box-shadow: none !important;
+  color: #111111 !important;
+}
+
+/* Typography */
+.heroTitle,
+.sectionTitle,
+.businessProfileTitle,
+.businessProfilePanelTitle,
+.cardTitle,
+.title,
+.authPanelTitle,
+.authRefTitle,
+.onboardingTitle,
+h1, h2, h3, h4, h5, h6 {
+  color: #111111 !important;
+}
+
+.heroSubtitle,
+.sectionLead,
+.subtitle,
+.authSubtitle,
+.authPanelSubtitle,
+.authRefSubtitle,
+.businessProfileSubtitle,
+.businessProfilePanelHint,
+.homeFooterCopy,
+.onboardingSubtitle,
+.status,
+.link,
+p,
+small,
+.text-muted,
+[class*="Muted"],
+[class*="muted"] {
+  color: #444444 !important;
+}
+
+/* Inputs */
+.ui-input,
+.input,
+.onboardingInput,
+.authInput,
+.authRefInput,
+input,
+textarea,
+select {
+  border: 1px solid #e5e5e5 !important;
+  background: #ffffff !important;
+  color: #111111 !important;
+}
+
+.ui-input:focus,
+.input:focus,
+.onboardingInput:focus,
+.authInput:focus,
+.authRefInput:focus,
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: #111111 !important;
+  box-shadow: 0 0 0 1px #111111 !important;
+}
+
+/* Buttons: primary black, secondary white outlined */
+.btn.primary,
+.ui-button.primary,
+.authPrimaryButton,
+.authRefPrimaryButton,
+.primaryBtn,
+.homeTaskBtnPrimary,
+.navGetStarted,
+.navMobileItem--primary,
+.businessProfileActionButton {
+  background: #111111 !important;
+  border-color: #111111 !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+.btn.primary:hover,
+.ui-button.primary:hover,
+.authPrimaryButton:hover,
+.authRefPrimaryButton:hover:not(:disabled),
+.primaryBtn:hover,
+.homeTaskBtnPrimary:hover,
+.navGetStarted:hover,
+.navMobileItem--primary:hover,
+.businessProfileActionButton:hover {
+  background: #000000 !important;
+  border-color: #000000 !important;
+}
+
+.btn,
+.ui-button,
+.ui-button.secondary,
+.btn.secondary,
+.secondaryBtn,
+.homeTaskBtnSecondary,
+.heroBtnGhost,
+.authRefProviderButton {
+  background: #ffffff !important;
+  border: 1px solid #111111 !important;
+  color: #111111 !important;
+}
+
+.btn:hover,
+.ui-button:hover,
+.ui-button.secondary:hover,
+.btn.secondary:hover,
+.secondaryBtn:hover,
+.homeTaskBtnSecondary:hover,
+.heroBtnGhost:hover,
+.authRefProviderButton:hover:not(:disabled) {
+  background: #f5f5f5 !important;
+  border-color: #111111 !important;
+  color: #111111 !important;
+}
+
+.btn:disabled,
+.ui-button:disabled,
+button:disabled,
+.secondaryBtn:disabled,
+.primaryBtn:disabled {
+  color: #9ca3af !important;
+  border-color: #e5e5e5 !important;
+  background: #f5f5f5 !important;
+}
+
+/* Success/status pills -> neutral */
+.confirmedPill,
+.homePlanCompleteCard,
+.homeTaskCelebration,
+[class*="success"],
+[class*="Success"],
+[class*="complete"],
+[class*="Complete"] {
+  background: #f5f5f5 !important;
+  border-color: #e5e5e5 !important;
+  color: #111111 !important;
+  box-shadow: none !important;
+}
+
+/* Progress and active indicators -> grayscale */
+.businessProfileMeterTrack {
+  background: #e5e5e5 !important;
+}
+
+.businessProfileMeterFill,
+.navLink--active::after,
+[role="progressbar"] > div {
+  background: #111111 !important;
+  background-image: none !important;
+}
+
+/* Any explicit green utility-like classes fallback */
+[class*="text-green"],
+[class*="bg-green"],
+[class*="border-green"],
+[class*="emerald"],
+[class*="teal"],
+[class*="lime"] {
+  color: #111111 !important;
+  border-color: #e5e5e5 !important;
+  background-color: #ffffff !important;
 }
 
