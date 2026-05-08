@@ -4,6 +4,7 @@ export type MarketingPlanDay = {
     dateISO: string;
     dateLabel: string;
     dayTheme?: string;
+    mainTitle?: string;
     mainActionTitle: string;
     businessGrowthAction: string;
     marketingActivation?: {
@@ -12,9 +13,13 @@ export type MarketingPlanDay = {
         bestTime?: string;
         goal?: "DMs" | "Orders" | "Bookings" | "Footfall" | "Leads";
         postBrief?: string;
+        whatToPost?: string;
         hook?: string;
         visualGuide?: string[];
         posterHeadlineHint?: string;
+        posterSubheadline?: string;
+        posterCtaLabel?: string;
+        posterOfferBadge?: string;
         channel?: "instagram" | "facebook" | "both";
         formatPlan?: Array<"Reel" | "Story" | "FeedPost" | "Carousel">;
         contentBrief?: string;
@@ -102,6 +107,7 @@ export function buildLifecyclePlanDays(rawPlanDays: Array<Partial<MarketingPlanD
             dateISO: toISODateString(date),
             dateLabel: typeof raw.dateLabel === "string" && raw.dateLabel.trim() ? raw.dateLabel : toDateLabel(date),
             ...(dayTheme ? { dayTheme } : {}),
+            mainTitle: typeof raw.mainTitle === "string" ? raw.mainTitle : typeof raw.mainActionTitle === "string" ? raw.mainActionTitle : `Day ${dayNumber} Growth Action`,
             mainActionTitle: typeof raw.mainActionTitle === "string" ? raw.mainActionTitle : `Day ${dayNumber} Growth Action`,
             businessGrowthAction: typeof raw.businessGrowthAction === "string" ? raw.businessGrowthAction : "",
             marketingActivation: typeof raw.marketingActivation === "object" && raw.marketingActivation
@@ -125,14 +131,20 @@ export function buildLifecyclePlanDays(rawPlanDays: Array<Partial<MarketingPlanD
                         ? (String((raw.marketingActivation as Record<string, unknown>).goal ?? "") as "DMs" | "Orders" | "Bookings" | "Footfall" | "Leads")
                         : "Leads",
                     postBrief: String((raw.marketingActivation as Record<string, unknown>).postBrief ?? ""),
+                    whatToPost: String((raw.marketingActivation as Record<string, unknown>).whatToPost ??
+                        (raw.marketingActivation as Record<string, unknown>).postIdea ??
+                        ""),
                     hook: String((raw.marketingActivation as Record<string, unknown>).hook ?? ""),
                     contentBrief: String((raw.marketingActivation as Record<string, unknown>).contentBrief ?? ""),
                     visualGuide: Array.isArray((raw.marketingActivation as Record<string, unknown>).visualGuide)
                         ? ((raw.marketingActivation as Record<string, unknown>).visualGuide as unknown[])
                             .map((s) => String(s))
-                            .slice(0, 2)
+                            .slice(0, 3)
                         : [],
                     posterHeadlineHint: String((raw.marketingActivation as Record<string, unknown>).posterHeadlineHint ?? ""),
+                    posterSubheadline: String((raw.marketingActivation as Record<string, unknown>).posterSubheadline ?? ""),
+                    posterCtaLabel: String((raw.marketingActivation as Record<string, unknown>).posterCtaLabel ?? ""),
+                    posterOfferBadge: String((raw.marketingActivation as Record<string, unknown>).posterOfferBadge ?? ""),
                     postIdea: String((raw.marketingActivation as Record<string, unknown>).postIdea ?? ""),
                     caption: String((raw.marketingActivation as Record<string, unknown>).caption ?? ""),
                     hashtags: Array.isArray((raw.marketingActivation as Record<string, unknown>).hashtags)
