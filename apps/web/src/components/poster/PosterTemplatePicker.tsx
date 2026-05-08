@@ -282,28 +282,19 @@ export function PosterTemplatePicker({ selectedTemplateId, selectedStyle, recomm
           border-color: #334155;
 
           box-shadow:
-
-            0 0 0 4px rgba(51, 65, 85, 0.12),
-
-            0 10px 26px rgba(51, 65, 85, 0.15),
-
-            0 12px 36px rgba(15, 23, 42, 0.1);
+            0 0 0 2px rgba(17, 17, 17, 0.22),
+            0 10px 26px rgba(15, 23, 42, 0.1);
 
           background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
 
         }
 
         .templateCard.selected:hover {
-
-          transform: translateY(-2px);
+          transform: none;
 
           box-shadow:
-
-            0 0 0 4px rgba(51, 65, 85, 0.16),
-
-            0 14px 32px rgba(51, 65, 85, 0.19),
-
-            0 14px 40px rgba(15, 23, 42, 0.11);
+            0 0 0 2px rgba(17, 17, 17, 0.28),
+            0 14px 32px rgba(15, 23, 42, 0.12);
 
         }
 
