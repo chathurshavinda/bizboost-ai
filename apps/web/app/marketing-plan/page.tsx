@@ -596,7 +596,7 @@ export default function MarketingPlanPage() {
               <div className="todayTaskHead">
                 <h3>
                   {isTodayTaskCompleted
-                ? "Today completed 🎉"
+                ? "Today completed!"
                 : isFallbackTask
                     ? "Next Task"
                     : "Today’s Task"}
@@ -821,8 +821,8 @@ export default function MarketingPlanPage() {
         }
 
         .generateBtn {
-          border: 1px solid rgba(16, 185, 129, 0.32);
-          background: linear-gradient(145deg, #10b981, #059669);
+          border: 1px solid #111111;
+          background: #111111;
           color: #ffffff;
           border-radius: 14px;
           min-width: 250px;
@@ -833,7 +833,7 @@ export default function MarketingPlanPage() {
           align-items: center;
           justify-content: center;
           gap: 8px;
-          box-shadow: 0 14px 30px rgba(16, 185, 129, 0.35);
+          box-shadow: none;
           cursor: pointer;
           transition: transform 0.15s ease, filter 0.15s ease;
         }
@@ -890,9 +890,9 @@ export default function MarketingPlanPage() {
           padding: 14px 16px;
         }
         .todayTaskCelebration {
-          border-color: rgba(16, 185, 129, 0.38);
-          background: rgba(236, 253, 245, 0.78);
-          box-shadow: 0 18px 44px rgba(16, 185, 129, 0.16);
+          border-color: #e5e5e5;
+          background: #f5f5f5;
+          box-shadow: none;
         }
         .todayTaskHead h3 {
           margin: 0;
@@ -900,7 +900,7 @@ export default function MarketingPlanPage() {
           font-size: 17px;
         }
         .todayTaskCelebration .todayTaskHead h3 {
-          color: #047857;
+          color: #111111;
         }
         .todayTaskBody {
           margin-top: 10px;
@@ -949,8 +949,8 @@ export default function MarketingPlanPage() {
           width: fit-content;
         }
         .todayTaskBtnPrimary {
-          background: linear-gradient(145deg, #10b981, #059669);
-          border-color: rgba(16, 185, 129, 0.3);
+          background: #111111;
+          border-color: #111111;
           color: #ffffff;
         }
         .todayTaskBtnSecondary {
@@ -985,9 +985,9 @@ export default function MarketingPlanPage() {
 
         .daysBadge {
           border-radius: 999px;
-          border: 1px solid rgba(16, 185, 129, 0.32);
-          background: rgba(236, 253, 245, 0.9);
-          color: #047857;
+          border: 1px solid #e5e5e5;
+          background: #f5f5f5;
+          color: #111111;
           font-size: 12px;
           font-weight: 700;
           padding: 6px 10px;
@@ -1015,9 +1015,9 @@ export default function MarketingPlanPage() {
         }
         .savedBadge {
           border-radius: 999px;
-          border: 1px solid rgba(16, 185, 129, 0.35);
-          background: rgba(236, 253, 245, 0.95);
-          color: #047857;
+          border: 1px solid #e5e5e5;
+          background: #f5f5f5;
+          color: #111111;
           font-size: 12px;
           font-weight: 700;
           padding: 6px 10px;
@@ -1034,8 +1034,8 @@ export default function MarketingPlanPage() {
         }
         .planCompleteCard {
           border-radius: 14px;
-          border: 1px solid rgba(16, 185, 129, 0.34);
-          background: rgba(236, 253, 245, 0.72);
+          border: 1px solid #e5e5e5;
+          background: #f5f5f5;
           padding: 12px;
           margin-bottom: 12px;
         }
@@ -1045,11 +1045,11 @@ export default function MarketingPlanPage() {
         .planCompleteTitle {
           margin: 0;
           font-weight: 800;
-          color: #047857;
+          color: #111111;
         }
         .planCompleteText {
           margin: 8px 0 0;
-          color: #065f46;
+          color: #444444;
           font-size: 13px;
         }
         .planCompleteActions {
@@ -1091,13 +1091,13 @@ export default function MarketingPlanPage() {
 
         .dayRow:hover {
           transform: translateY(-2px);
-          border-color: rgba(52, 211, 153, 0.55);
-          box-shadow: 0 22px 44px rgba(16, 185, 129, 0.18);
+          border-color: #111111;
+          box-shadow: 0 22px 44px rgba(0, 0, 0, 0.12);
         }
 
         .dayRowCompleted {
-          border-color: rgba(16, 185, 129, 0.38);
-          background: linear-gradient(160deg, rgba(236, 253, 245, 0.86), rgba(220, 252, 231, 0.7));
+          border-color: #e5e5e5;
+          background: linear-gradient(160deg, rgba(245, 245, 245, 0.92), rgba(255, 255, 255, 0.85));
         }
 
         .dayCheckWrap {
@@ -1129,9 +1129,9 @@ export default function MarketingPlanPage() {
         }
 
         .dayCheck:checked + .dayCheckVisual {
-          border-color: rgba(5, 150, 105, 0.52);
-          background: #10b981;
-          box-shadow: 0 8px 18px rgba(16, 185, 129, 0.24);
+          border-color: #111111;
+          background: #111111;
+          box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
         }
 
         .dayCheck:disabled + .dayCheckVisual {
@@ -1178,9 +1178,9 @@ export default function MarketingPlanPage() {
           line-height: 1.2;
         }
         .miniChip.business {
-          color: #047857;
-          background: rgba(16, 185, 129, 0.14);
-          border-color: rgba(16, 185, 129, 0.32);
+          color: #111111;
+          background: #f5f5f5;
+          border-color: #e5e5e5;
         }
         .miniChip.marketing {
           color: #1d4ed8;
@@ -1229,8 +1229,8 @@ export default function MarketingPlanPage() {
         }
 
         .dayRowCompleted .dateBlock {
-          background: rgba(16, 185, 129, 0.1);
-          border-color: rgba(16, 185, 129, 0.3);
+          background: #f5f5f5;
+          border-color: #e5e5e5;
         }
 
         .rowTitle {
@@ -1260,8 +1260,8 @@ export default function MarketingPlanPage() {
         }
 
         .dayRow:hover .rowArrow {
-          border-color: rgba(16, 185, 129, 0.45);
-          color: #047857;
+          border-color: #111111;
+          color: #111111;
         }
 
         .modalOverlay {
@@ -1323,8 +1323,8 @@ export default function MarketingPlanPage() {
         }
 
         .btn.primary {
-          border: 1px solid rgba(16, 185, 129, 0.32);
-          background: linear-gradient(145deg, #10b981, #059669);
+          border: 1px solid #111111;
+          background: #111111;
           color: #ffffff;
         }
 
@@ -1399,7 +1399,7 @@ export default function MarketingPlanPage() {
           font-weight: 800;
           letter-spacing: -0.005em;
           padding-bottom: 6px;
-          border-bottom: 2px solid rgba(16, 185, 129, 0.35);
+          border-bottom: 2px solid rgba(17, 17, 17, 0.35);
         }
 
         .narrativeBody :global(.mdH3) {

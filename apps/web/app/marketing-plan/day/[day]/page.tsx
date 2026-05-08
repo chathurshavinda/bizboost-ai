@@ -17,6 +17,7 @@ type DayPlan = {
         format?: "Reel" | "Story" | "Feed" | "Carousel";
         bestTime?: string;
         goal?: "DMs" | "Orders" | "Bookings" | "Footfall" | "Leads";
+        whatToPost?: string;
         postBrief?: string;
         hook?: string;
         visualGuide?: string[];
@@ -349,7 +350,8 @@ export default function MarketingPlanDayPage() {
         const format = ma?.format ?? "Feed";
         const bestTime = ma?.bestTime || ma?.postingTime || "7:30 PM";
         const goal = ma?.goal ?? "Leads";
-        const whatToPost = squash(ma?.postBrief || ma?.contentBrief || ma?.postIdea || currentDay.postIdea || "", 200);
+        const whatToPost = squash(ma?.whatToPost || ma?.contentBrief || ma?.postBrief || "", 220);
+        const postIdeaText = squash(ma?.postIdea || currentDay.postIdea || "", 260);
         const hookLine = squash(ma?.hook || "", 160);
         const whyWorks = squash(ma?.matchNote || `Lines up with today's task and nudges people toward ${goal.toLowerCase()}.`, 190);
         const defaultVisuals = [
@@ -371,6 +373,7 @@ export default function MarketingPlanDayPage() {
             format,
             bestTime,
             whatToPost,
+            postIdeaText,
             hookLine,
             whyWorks,
             visuals,
@@ -451,9 +454,9 @@ export default function MarketingPlanDayPage() {
             </p>
           </div>
           <div className="heroActions">
-            {isCompleted && <span className="completedBadge">Completed ✅</span>}
+            {isCompleted && <span className="completedBadge">✓ Completed</span>}
             <button type="button" onClick={() => void toggleDayCompleted()} className="completeBtn" disabled={isLoading || !currentDay || isCompleting || isCompleted}>
-              {isCompleting ? "Saving..." : isCompleted ? "Completed ✅" : "Mark Day Completed"}
+              {isCompleting ? "Saving..." : "Mark Day Completed"}
             </button>
             <button type="button" onClick={() => router.push("/marketing-plan")} className="backBtn">
               Back to Plan
@@ -520,6 +523,11 @@ export default function MarketingPlanDayPage() {
                           <p className="activationSubLabel">Hook line</p>
                           <p className="activationHookLine">{activationView.hookLine}</p>
                         </>) : null}
+                    </div>
+
+                    <div className="activationCard activationCardPostIdea">
+                      <h3 className="activationCardLabel">Post Idea</h3>
+                      <p className="activationOneLiner">{activationView.postIdeaText || "—"}</p>
                     </div>
 
                     <div className="activationCard">
@@ -677,7 +685,7 @@ export default function MarketingPlanDayPage() {
         }
         .dateMeta {
           margin: 10px 0 0;
-          color: #0f766e;
+          color: #111111;
           font-size: 15px;
           font-weight: 800;
         }
@@ -685,8 +693,8 @@ export default function MarketingPlanDayPage() {
         .completeBtn,
         .copyBtn,
         .modalPrimary {
-          border: 1px solid rgba(16, 185, 129, 0.3);
-          background: linear-gradient(145deg, #10b981, #059669);
+          border: 1px solid #111111;
+          background: #111111;
           color: #fff;
           border-radius: 10px;
           padding: 9px 12px;
@@ -708,9 +716,9 @@ export default function MarketingPlanDayPage() {
         }
         .completedBadge {
           border-radius: 999px;
-          border: 1px solid rgba(16, 185, 129, 0.32);
-          background: rgba(209, 250, 229, 0.86);
-          color: #047857;
+          border: 1px solid #e5e5e5;
+          background: #f5f5f5;
+          color: #111111;
           font-size: 13px;
           font-weight: 800;
           padding: 8px 11px;
@@ -735,11 +743,11 @@ export default function MarketingPlanDayPage() {
         .editorBtn:hover {
           transform: translateY(-1px);
           background: #ffffff;
-          border-color: rgba(16, 185, 129, 0.45);
-          box-shadow: 0 14px 26px rgba(16, 185, 129, 0.16);
+          border-color: #111111;
+          box-shadow: 0 14px 26px rgba(0, 0, 0, 0.12);
         }
         .editorBtn:focus-visible {
-          outline: 2px solid rgba(16, 185, 129, 0.42);
+          outline: 2px solid rgba(17, 17, 17, 0.45);
           outline-offset: 2px;
         }
         .editorBtnIcon {
@@ -876,8 +884,8 @@ export default function MarketingPlanDayPage() {
           padding-left: 2px;
         }
         .activationCardCaption {
-          border-color: rgba(16, 185, 129, 0.28);
-          background: rgba(240, 253, 250, 0.55);
+          border-color: #e5e5e5;
+          background: #f5f5f5;
         }
         .activationCardCaptionHead {
           display: flex;
@@ -900,9 +908,9 @@ export default function MarketingPlanDayPage() {
           letter-spacing: 0.04em;
           text-transform: uppercase;
           vertical-align: middle;
-          background: rgba(16, 185, 129, 0.18);
-          color: #047857;
-          border: 1px solid rgba(16, 185, 129, 0.35);
+          background: #f5f5f5;
+          color: #111111;
+          border: 1px solid #e5e5e5;
         }
         .activationCaptionPre {
           margin: 0;
@@ -947,9 +955,9 @@ export default function MarketingPlanDayPage() {
           text-transform: uppercase;
         }
         .pillGrowth {
-          background: rgba(16, 185, 129, 0.14);
-          color: #047857;
-          border: 1px solid rgba(16, 185, 129, 0.35);
+          background: #f5f5f5;
+          color: #111111;
+          border: 1px solid #e5e5e5;
         }
         .pillActivation {
           background: rgba(59, 130, 246, 0.12);
@@ -1003,7 +1011,7 @@ export default function MarketingPlanDayPage() {
           font-size: 14px;
         }
         .sectionGrowth {
-          border-color: rgba(16, 185, 129, 0.22);
+          border-color: #e5e5e5;
         }
         .sectionActivation {
           border-color: rgba(59, 130, 246, 0.2);
@@ -1056,7 +1064,7 @@ export default function MarketingPlanDayPage() {
         .barFill {
           height: 100%;
           border-radius: 999px;
-          background: linear-gradient(90deg, #0ea5e9, #22c55e);
+          background: #111111;
           transition: width 0.28s ease;
         }
         .scoreColumns {
@@ -1134,9 +1142,9 @@ export default function MarketingPlanDayPage() {
         .stepBadge {
           margin-top: 1px;
           border-radius: 999px;
-          border: 1px solid rgba(16, 185, 129, 0.3);
-          background: rgba(16, 185, 129, 0.12);
-          color: #047857;
+          border: 1px solid #e5e5e5;
+          background: #f5f5f5;
+          color: #111111;
           font-size: 11px;
           font-weight: 800;
           letter-spacing: 0.04em;

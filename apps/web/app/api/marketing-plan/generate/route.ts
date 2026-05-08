@@ -3,10 +3,12 @@ import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { buildDateRange, buildLifecyclePlanDays, computeProgress, startOfLocalDay } from "@/src/lib/marketingPlan";
 import { deriveDayThemeForPlan } from "@/src/lib/posterDayTheme";
+import { buildMarketingActivationCopyPack } from "@/src/lib/posterActivationCopy";
 type DayPlan = {
     dayNumber: number;
     dateLabel?: string;
     dayTheme?: string;
+    mainTitle?: string;
     mainActionTitle: string;
     businessGrowthAction: string;
     marketingActivation?: {
@@ -15,9 +17,13 @@ type DayPlan = {
         bestTime?: string;
         goal?: "DMs" | "Orders" | "Bookings" | "Footfall" | "Leads";
         postBrief?: string;
+        whatToPost?: string;
         hook?: string;
         visualGuide?: string[];
         posterHeadlineHint?: string;
+        posterSubheadline?: string;
+        posterCtaLabel?: string;
+        posterOfferBadge?: string;
         postIdea: string;
         caption: string;
         hashtags: string[];
@@ -45,10 +51,12 @@ type DayPlan = {
     notes?: string;
 };
 type ThemeKey = "promo_offer" | "highlight" | "review_collection" | "behind_scenes" | "engagement" | "growth_push" | "track_improve";
-type CategoryKey = "food" | "retail" | "salon" | "services" | "generic";
+type BusinessCategoryKey = "FOOD_CAFE" | "RETAIL_ONLINE" | "SERVICES" | "BEAUTY_SALON" | "EDUCATION_TUITION" | "GENERIC";
+type CategoryKey = "food" | "retail" | "salon" | "services" | "education" | "generic";
 type TemplateContext = {
     businessName: string;
     businessType: string;
+    businessCategory: BusinessCategoryKey;
     city: string;
     country: string;
     location: string;
@@ -63,10 +71,10 @@ type TemplateContext = {
     priceRange: string;
     preferredChannels: string[];
 };
-const PLAN_TEMPLATE_VERSION = "growth-action-cycle-v10";
+const PLAN_TEMPLATE_VERSION = "growth-action-cycle-v11-library-matched";
 const SPAM_HASHTAG = /like4like|follow4follow|followforfollow|f4f|l4l|followers|growthhack/i;
 const baseHashtags = ["#BizBoostAI"];
-function normalizeCategoryFromText(...parts: string[]): CategoryKey {
+function resolveBusinessCategory(...parts: string[]): BusinessCategoryKey {
     const value = parts
         .join(" ")
         .toLowerCase()
@@ -81,33 +89,63 @@ function normalizeCategoryFromText(...parts: string[]): CategoryKey {
         value.includes("juice") ||
         value.includes("kottu") ||
         value.includes("rice and curry"))
-        return "food";
+        return "FOOD_CAFE";
     if (value.includes("retail") ||
         value.includes("store") ||
         value.includes("shop") ||
         value.includes("ecommerce") ||
+        value.includes("e-commerce") ||
         value.includes("online store") ||
+        value.includes("cod") ||
         value.includes("fashion") ||
-        value.includes("boutique"))
-        return "retail";
+        value.includes("boutique") ||
+        value.includes("clothing"))
+        return "RETAIL_ONLINE";
     if (value.includes("salon") ||
         value.includes("beauty") ||
         value.includes("spa") ||
         value.includes("nail") ||
         value.includes("makeup") ||
         value.includes("bridal"))
-        return "salon";
+        return "BEAUTY_SALON";
+    if (value.includes("tuition") ||
+        value.includes("class") ||
+        value.includes("education") ||
+        value.includes("school") ||
+        value.includes("course") ||
+        value.includes("academy") ||
+        value.includes("teacher") ||
+        value.includes("tutor"))
+        return "EDUCATION_TUITION";
     if (value.includes("service") ||
         value.includes("agency") ||
         value.includes("freelance") ||
         value.includes("repair") ||
-        value.includes("tuition") ||
-        value.includes("class") ||
         value.includes("consult") ||
         value.includes("training")) {
-        return "services";
+        return "SERVICES";
     }
-    return "generic";
+    return "GENERIC";
+}
+function businessCategoryToCategoryKey(category: BusinessCategoryKey): CategoryKey {
+    switch (category) {
+        case "FOOD_CAFE":
+            return "food";
+        case "RETAIL_ONLINE":
+            return "retail";
+        case "BEAUTY_SALON":
+            return "salon";
+        case "EDUCATION_TUITION":
+            return "education";
+        case "SERVICES":
+            return "services";
+        case "GENERIC":
+        default:
+            return "generic";
+    }
+}
+function normalizeCategoryFromText(...parts: string[]): CategoryKey {
+    return businessCategoryToCategoryKey(resolveBusinessCategory(...parts));
 }
 function normalizeCategory(businessType: string, productsOrServices: string[] = []): CategoryKey {
     return normalizeCategoryFromText(businessType, productsOrServices.join(" "));
@@ -163,7 +201,8 @@ function resolveProfileContext(profile: Record<string, unknown>, body: Record<st
     requestedPlanStartDateISO: string;
 } {
     const products = toStringArray(profile.productsOrServices ?? profile.products ?? profile.services ?? profile.items ?? "");
-    const inferredCategory = normalizeCategoryFromText(toCleanString(profile.businessType), products.join(" "), toCleanString(profile.industry));
+    const businessCategory = resolveBusinessCategory(toCleanString(profile.businessType), products.join(" "), toCleanString(profile.industry));
+    const inferredCategory = businessCategoryToCategoryKey(businessCategory);
     const inferredBusinessType = toCleanString(profile.businessType, inferredCategory !== "generic" ? inferredCategory : "generic");
     const businessGoals = toCleanString(profile.businessGoals ?? profile.goals ?? body.goals, "Grow sales");
     const targetCustomers = toCleanString(profile.targetCustomers ?? profile.targetAudience, "Local customers");
@@ -180,6 +219,7 @@ function resolveProfileContext(profile: Record<string, unknown>, body: Record<st
     const context: TemplateContext = {
         businessName,
         businessType: inferredBusinessType,
+        businessCategory,
         city,
         country,
         location,
@@ -502,6 +542,7 @@ const categoryHashtags: Record<CategoryKey, string[]> = {
     retail: ["#ShopLocal", "#CODAvailable"],
     salon: ["#BeautyBusiness", "#BookNow"],
     services: ["#ServiceBusiness", "#FreeConsultation"],
+    education: ["#TuitionClass", "#LearnWithUs"],
     generic: ["#LocalBusiness", "#SMEGrowth"],
 };
 const categoryStrategyPools: Record<CategoryKey, CategoryStrategyPool> = {
@@ -622,6 +663,45 @@ const categoryStrategyPools: Record<CategoryKey, CategoryStrategyPool> = {
             review_optimize: ["Pipeline conversion by stage", "Win rate trend", "Channel ROI improvement"],
         },
     },
+    education: {
+        actionTypes: ["lead_capture", "trust_proof", "sales_offer", "operations", "retention", "partnership", "review_optimize"],
+        titles: {
+            sales_offer: ["Package trial class + monthly plan", "Launch exam prep mini-batch", "Set sibling referral enrolment offer"],
+            retention: ["Set parent follow-up and renewal rhythm", "Create attendance recovery flow", "Build student progress check-in system"],
+            lead_capture: ["Launch free assessment lead funnel", "Capture parent inquiries from WhatsApp", "Turn trial class interest into enrolments"],
+            operations: ["Standardize lesson delivery checklist", "Improve attendance and reminder workflow", "Create class capacity and slot system"],
+            trust_proof: ["Publish result proof and parent testimonials", "Collect student progress stories", "Build credibility kit for new parents"],
+            partnership: ["Partner with school supply or bookshop", "Run local parent workshop collaboration", "Create referral exchange with nearby classes"],
+            review_optimize: ["Review attendance and conversion data", "Optimize class offer using progress KPIs", "Adjust subject batches by demand"],
+        },
+        actions: {
+            sales_offer: ["Package {product} into a clear trial-to-monthly path.", "Create a limited {product} exam batch with capped seats.", "Use a sibling or friend referral for qualified enrolments."],
+            retention: ["Keep students continuing through visible progress and parent follow-up.", "Recover absent students before they silently drop out.", "Create repeat-term commitment for {product}."],
+            lead_capture: ["Capture parent leads for {product} with one assessment CTA.", "Move WhatsApp inquiries into booked trial classes.", "Qualify students by grade, subject, and exam timeline."],
+            operations: ["Improve lesson consistency for {product} with a repeatable class checklist.", "Reduce no-shows with reminders, attendance marks, and parent updates.", "Map class capacity so new leads get the right slot fast."],
+            trust_proof: ["Use student results and parent words to reduce enrolment hesitation.", "Collect progress proof for {product} after every assessment cycle.", "Answer parent objections with simple credibility assets."],
+            partnership: ["Reach new parent groups through a trusted local partner.", "Run a study-skills collab that introduces {product}.", "Exchange referrals with complementary education businesses."],
+            review_optimize: ["Use attendance, trial, and enrolment data to tune {product}.", "Shift effort toward subjects and grades with strongest conversion.", "Improve weak class batches using parent and student feedback."],
+        },
+        activations: {
+            sales_offer: ["Feed offer card: trial class + monthly plan + WhatsApp CTA.", "Carousel explaining exam batch seats and deadline.", "Story reminder for sibling/friend referral enrolment."],
+            retention: ["Parent update story with renewal reminder.", "Progress check-in post with next-term CTA.", "Attendance recovery WhatsApp story prompt."],
+            lead_capture: ["Free assessment Reel with WhatsApp booking CTA.", "Story Q&A for parent questions.", "Carousel: grade/subject fit + trial class steps."],
+            operations: ["BTS lesson planning post.", "Story showing attendance/reminder system.", "Feed note about class capacity and time slots."],
+            trust_proof: ["Parent testimonial carousel.", "Student progress proof feed post.", "Result recap story with enrolment CTA."],
+            partnership: ["Workshop announcement with partner tag.", "Joint study tips Reel.", "Referral code post for local parent groups."],
+            review_optimize: ["Weekly progress recap feed post.", "Story poll for subject demand.", "Carousel explaining improved class schedule."],
+        },
+        metrics: {
+            sales_offer: ["Trial class bookings", "Trial-to-enrolment rate", "Monthly plan signups"],
+            retention: ["Attendance rate", "Renewal rate", "Absent student recovery count"],
+            lead_capture: ["Parent inquiries", "Assessment bookings", "Lead-to-trial conversion"],
+            operations: ["Class capacity fill rate", "Reminder response rate", "No-show rate"],
+            trust_proof: ["Parent testimonials collected", "Proof-assisted enrolments", "Review count"],
+            partnership: ["Workshop signups", "Partner-sourced leads", "Referral enrolments"],
+            review_optimize: ["Subject demand lift", "Batch conversion rate", "Week-over-week enrolment change"],
+        },
+    },
     salon: {
         actionTypes: ["sales_offer", "retention", "lead_capture", "operations", "trust_proof", "partnership", "review_optimize"],
         titles: {
@@ -701,6 +781,249 @@ const categoryStrategyPools: Record<CategoryKey, CategoryStrategyPool> = {
         },
     },
 };
+type BusinessGrowthAction = {
+    actionType: ActionType;
+    title: string;
+    task: string;
+    executionSteps: string[];
+};
+type SocialMediaActivation = {
+    actionType: ActionType;
+    platform: "Instagram" | "Facebook" | "Both";
+    format: "Feed" | "Story" | "Reel" | "Carousel";
+    whatToPost: string;
+    visualGuide: string[];
+    CTA: string;
+    bestTime: string;
+    hashtagsSeed: string[];
+};
+type KpiItem = {
+    actionType: ActionType;
+    label: string;
+    target: number;
+    unit: string;
+};
+type CategoryActionLibrary = {
+    businessGrowthActions: BusinessGrowthAction[];
+    socialMediaActivations: SocialMediaActivation[];
+    kpis: KpiItem[];
+};
+const actionTypeLabels: Record<ActionType, string> = {
+    sales_offer: "Offer",
+    retention: "Retention",
+    lead_capture: "Lead Capture",
+    operations: "Operations",
+    trust_proof: "Proof",
+    partnership: "Partnership",
+    review_optimize: "Review",
+};
+const actionTypeThemes: Record<ActionType, ThemeKey> = {
+    sales_offer: "promo_offer",
+    retention: "engagement",
+    lead_capture: "growth_push",
+    operations: "behind_scenes",
+    trust_proof: "review_collection",
+    partnership: "highlight",
+    review_optimize: "track_improve",
+};
+const socialFormatCycle: Array<SocialMediaActivation["format"]> = ["Feed", "Story", "Reel", "Carousel"];
+const categoryLibraryTargets: Record<CategoryKey, Record<ActionType, number>> = {
+    food: {
+        sales_offer: 18,
+        retention: 12,
+        lead_capture: 16,
+        operations: 10,
+        trust_proof: 8,
+        partnership: 7,
+        review_optimize: 6,
+    },
+    retail: {
+        sales_offer: 12,
+        retention: 8,
+        lead_capture: 15,
+        operations: 8,
+        trust_proof: 6,
+        partnership: 5,
+        review_optimize: 6,
+    },
+    salon: {
+        sales_offer: 8,
+        retention: 6,
+        lead_capture: 10,
+        operations: 8,
+        trust_proof: 5,
+        partnership: 4,
+        review_optimize: 5,
+    },
+    services: {
+        sales_offer: 4,
+        retention: 4,
+        lead_capture: 8,
+        operations: 6,
+        trust_proof: 4,
+        partnership: 3,
+        review_optimize: 5,
+    },
+    education: {
+        sales_offer: 5,
+        retention: 7,
+        lead_capture: 10,
+        operations: 6,
+        trust_proof: 5,
+        partnership: 4,
+        review_optimize: 5,
+    },
+    generic: {
+        sales_offer: 6,
+        retention: 5,
+        lead_capture: 8,
+        operations: 5,
+        trust_proof: 4,
+        partnership: 3,
+        review_optimize: 4,
+    },
+};
+function categoryNoun(category: CategoryKey): string {
+    switch (category) {
+        case "food":
+            return "menu item";
+        case "retail":
+            return "product";
+        case "salon":
+            return "service";
+        case "services":
+            return "service package";
+        case "education":
+            return "class";
+        case "generic":
+        default:
+            return "offer";
+    }
+}
+function buildChecklistTemplates(actionType: ActionType, noun: string): string[] {
+    const trackerByAction: Record<ActionType, string> = {
+        sales_offer: "orders",
+        retention: "repeat customers",
+        lead_capture: "qualified leads",
+        operations: "completion time",
+        trust_proof: "reviews",
+        partnership: "partner leads",
+        review_optimize: "conversion change",
+    };
+    return [
+        `Choose the exact ${noun}, price, deadline, and owner.`,
+        "Write one reply script for DMs, calls, and walk-ins.",
+        "Update the customer-facing note before any promotion goes live.",
+        "Message warm customers first, then answer every reply same day.",
+        `Record today's ${trackerByAction[actionType]}, source, revenue, and follow-up owner.`,
+    ];
+}
+function buildCategoryActionLibrary(category: CategoryKey): CategoryActionLibrary {
+    const pool = categoryStrategyPools[category] ?? categoryStrategyPools.generic;
+    const noun = categoryNoun(category);
+    const businessGrowthActions = pool.actionTypes.flatMap((actionType) => {
+        const titles = pool.titles[actionType] ?? [];
+        const actions = pool.actions[actionType] ?? [];
+        return Array.from({ length: 5 }, (_, index) => {
+            const titleSeed = titles[index % Math.max(titles.length, 1)] ?? `${actionTypeLabels[actionType]} system`;
+            const actionSeed = actions[index % Math.max(actions.length, 1)] ?? `Improve the ${noun} system with a measurable owner.`;
+            return {
+                actionType,
+                title: `${titleSeed} · ${actionTypeLabels[actionType]} ${index + 1}`,
+                task: actionSeed,
+                executionSteps: buildChecklistTemplates(actionType, noun),
+            };
+        });
+    });
+    const socialMediaActivations = pool.actionTypes.flatMap((actionType) => {
+        const activations = pool.activations[actionType] ?? [];
+        return socialFormatCycle.map((format, index) => {
+            const activationSeed = activations[index % Math.max(activations.length, 1)] ?? `Show the ${noun} value with a direct CTA.`;
+            const theme = actionTypeThemes[actionType];
+            return {
+                actionType,
+                platform: "Both" as const,
+                format,
+                whatToPost: activationSeed,
+                visualGuide: [
+                    `${noun} hero visual with one clear benefit line.`,
+                    `Simple proof, price, or process detail in the second frame.`,
+                    `CTA strip visible before viewers scroll away.`,
+                ],
+                CTA: actionType === "sales_offer"
+                    ? "DM to order or book before today's cutoff."
+                    : actionType === "retention"
+                        ? "Reply to claim your returning-customer perk."
+                        : actionType === "trust_proof"
+                            ? "Message us for proof, reviews, or next steps."
+                            : "DM us and we will guide the next step.",
+                bestTime: format === "Story" ? "12:30 PM" : format === "Reel" ? "6:30 PM" : "7:30 PM",
+                hashtagsSeed: [toHashTag(actionTypeLabels[actionType]), ...categoryHashtags[category], ...themeSpecificHashtagCandidates(category, theme, "", "", noun)].filter(Boolean),
+            };
+        });
+    });
+    const kpis = pool.actionTypes.flatMap((actionType) => {
+        const metrics = pool.metrics[actionType] ?? [];
+        return metrics.map((label, index) => ({
+            actionType,
+            label,
+            target: (categoryLibraryTargets[category]?.[actionType] ?? 5) + index * 2,
+            unit: /rate|conversion|margin|roi|adherence|fill/i.test(label) ? "%" : "count",
+        }));
+    });
+    return {
+        businessGrowthActions: businessGrowthActions.slice(0, Math.max(35, businessGrowthActions.length)),
+        socialMediaActivations: socialMediaActivations.slice(0, Math.max(25, socialMediaActivations.length)),
+        kpis: kpis.slice(0, Math.max(20, kpis.length)),
+    };
+}
+const CATEGORY_ACTION_LIBRARIES: Record<CategoryKey, CategoryActionLibrary> = {
+    food: buildCategoryActionLibrary("food"),
+    retail: buildCategoryActionLibrary("retail"),
+    services: buildCategoryActionLibrary("services"),
+    salon: buildCategoryActionLibrary("salon"),
+    education: buildCategoryActionLibrary("education"),
+    generic: buildCategoryActionLibrary("generic"),
+};
+function pickLibraryItem<T extends { actionType: ActionType }>(items: T[], actionType: ActionType, variant: number): T | undefined {
+    const scoped = items.filter((item) => item.actionType === actionType);
+    return scoped.length ? scoped[variant % scoped.length] : items[variant % items.length];
+}
+const GENERIC_TITLE_RE = /\b(growth focus|boost engagement|business growth action|day \d+ growth action|drive business growth)\b/i;
+function wordCount(value: string): number {
+    return value.trim().split(/\s+/).filter(Boolean).length;
+}
+function normalizeExecutionChecklist(steps: string[], category: CategoryKey, product: string, metric: string): string[] {
+    const noun = categoryNoun(category);
+    const fallback = [
+        `Choose the exact ${product || noun} offer, price, deadline, and owner.`,
+        "Write one reply script for DMs, calls, and walk-ins.",
+        "Update the customer-facing note before promotion goes live today.",
+        "Message warm customers first, then answer every reply same day.",
+        `Record today's ${metric || "results"}, source, revenue, and follow-up owner.`,
+    ];
+    const cleaned = steps
+        .map((step) => conciseStep(step).replace(/^[\-•\s]+/, ""))
+        .filter((step) => {
+            const count = wordCount(step);
+            return count >= 8 && count <= 14;
+        });
+    const merged = dedupeKeepOrder([...cleaned, ...fallback]);
+    return merged.slice(0, 5);
+}
+function avoidRepeatedFormat(format: CaptionFormatKey, previous: CaptionFormatKey | null, dayNumber: number): CaptionFormatKey {
+    if (format !== previous)
+        return format;
+    const cycle: CaptionFormatKey[] = ["Feed", "Story", "Reel", "Carousel"];
+    return cycle[(cycle.indexOf(format) + dayNumber) % cycle.length] ?? "Feed";
+}
+function hasTargetMetric(successMetric: string): boolean {
+    return /\b(target|at least|minimum|aim for)\b/i.test(successMetric) && /\d/.test(successMetric);
+}
+function isMissingActivationField(day: DayBuilderOutput): boolean {
+    const activation = day.marketingActivation;
+    return !activation?.cta || !activation?.format || !activation?.postIdea || !activation?.caption;
+}
 function productForDay(ctx: TemplateContext, index: number): string {
     const products = ctx.productsOrServices.length ? ctx.productsOrServices : [ctx.productLine];
     return products[index % products.length] || ctx.businessType || "your offer";
@@ -736,9 +1059,13 @@ function normalizeDayOutput(output: DayBuilderOutput): DayBuilderOutput {
             postBrief: String(output.marketingActivation?.postBrief ?? output.postIdea ?? ""),
             hook: String(output.marketingActivation?.hook ?? `Need better ${output.postIdea || "results"}?`),
             visualGuide: Array.isArray(output.marketingActivation?.visualGuide)
-                ? output.marketingActivation?.visualGuide.slice(0, 2).map((item) => String(item))
+                ? output.marketingActivation?.visualGuide.slice(0, 3).map((item) => String(item))
                 : [],
             posterHeadlineHint: String(output.marketingActivation?.posterHeadlineHint ?? output.posterHint ?? ""),
+            posterSubheadline: String(output.marketingActivation?.posterSubheadline ?? ""),
+            posterCtaLabel: String(output.marketingActivation?.posterCtaLabel ?? ""),
+            posterOfferBadge: String(output.marketingActivation?.posterOfferBadge ?? ""),
+            whatToPost: String(output.marketingActivation?.whatToPost ?? output.marketingActivation?.postIdea ?? output.postIdea ?? ""),
             postIdea: String(output.postIdea ?? ""),
             caption: String(output.caption ?? ""),
             hashtags: Array.isArray(output.hashtags) ? output.hashtags.slice(0, 10) : [],
@@ -809,7 +1136,9 @@ function themeSpecificHashtagCandidates(category: CategoryKey, theme: ThemeKey, 
                 ? "BeautyLK"
                 : category === "services"
                     ? "ServicesLK"
-                    : "LKBusiness");
+            : category === "education"
+                ? "TuitionLK"
+                : "LKBusiness");
     const businessTypeTag = toHashTag(businessType || "LocalBiz");
     const cityTag = toHashTag(city || "");
     const productTag = toHashTag(product || "");
@@ -827,7 +1156,7 @@ function sanitizeHashtagList(tags: string[], minCount = 6, maxCount = 10): strin
     const cleaned = dedupeKeepOrder(tags.filter(Boolean))
         .map((t) => (t.startsWith("#") ? t : `#${t.replace(/^#+/, "")}`))
         .filter((t) => !SPAM_HASHTAG.test(t));
-    const padPool = ["#SmallBizLK", "#ColomboFood", "#Entrepreneurs", "#ShopSmall", "#LocalFirst", "#SriLanka"];
+    const padPool = ["#SmallBizLK", "#ColomboFood", "#Entrepreneurs", "#ShopSmall", "#LocalFirst", "#SriLanka", "#SriLankaBusiness", "#SupportLocalLK", "#LocalDeals", "#WhatsAppOrders"];
     const out = [...cleaned];
     let pad = 0;
     while (out.length < minCount && pad < padPool.length) {
@@ -1389,6 +1718,163 @@ function buildPublishableCaptionBundle(args: {
 function tripleHookFallback(slots: CaptionSlots): string {
     return `${slots.businessName}${slots.locationPhrase} — ${slots.product}`;
 }
+function cleanActivationText(value: string): string {
+    return value
+        .replace(/\s+/g, " ")
+        .replace(/\s+([,.!?;:])/g, "$1")
+        .replace(/\b(optional|support content|activation)\s*[:\-]\s*/gi, "")
+        .trim();
+}
+function activationFeatureLine(value: string): string {
+    return cleanActivationText(value)
+        .replace(/^(feed|story|reel|carousel)\s+(offer\s+card|post|reminder|explaining|announcement|update|prompt|tile|graphic)\s*[:\-]?\s*/i, "")
+        .replace(/^(one\s+)?(post|share|publish|create|show)\s+(a|an|the)?\s*/i, "")
+        .replace(/\s*\+\s*/g, " + ")
+        .trim();
+}
+function buildPostIdeaFromActivation(args: {
+    format: CaptionFormatKey;
+    whatToPost: string;
+    visualGuide: string[];
+}): string {
+    const source = cleanActivationText(args.whatToPost || args.visualGuide[0] || "Share today's offer with a clear CTA.");
+    const withoutInstruction = activationFeatureLine(source)
+        .replace(/^(one|short|feed|story|reel|carousel)\s+/i, "")
+        .replace(/\bpost\b/gi, "feature")
+        .trim();
+    const lineOne = `${args.format} idea: ${withoutInstruction.charAt(0).toUpperCase()}${withoutInstruction.slice(1)}`;
+    const lineTwo = args.visualGuide[0] ? `Show it with ${cleanActivationText(args.visualGuide[0]).replace(/\.$/, "").toLowerCase()}.` : "";
+    return [lineOne, lineTwo].filter(Boolean).join("\n");
+}
+function extractHashtagSeeds(...values: string[]): string[] {
+    const stop = new Set(["with", "from", "today", "your", "this", "that", "into", "clear", "post", "story", "feed", "reel", "carousel", "whatsapp", "message"]);
+    return values
+        .join(" ")
+        .split(/[^a-zA-Z0-9]+/g)
+        .map((word) => word.trim())
+        .filter((word) => word.length >= 4 && !stop.has(word.toLowerCase()))
+        .slice(0, 8)
+        .map(toHashTag)
+        .filter(Boolean);
+}
+function buildActivationHashtags(args: {
+    category: CategoryKey;
+    ctx: TemplateContext;
+    product: string;
+    whatToPost: string;
+    postIdea: string;
+}): string[] {
+    const categoryTag = args.category === "food"
+        ? "#FoodBusinessLK"
+        : args.category === "retail"
+            ? "#ShopSriLanka"
+            : args.category === "salon"
+                ? "#SalonSriLanka"
+                : args.category === "education"
+                    ? "#TuitionSriLanka"
+                    : args.category === "services"
+                        ? "#ServiceBusinessLK"
+                        : "#LocalBusinessLK";
+    const seeds = [
+        ...categoryHashtags[args.category],
+        categoryTag,
+        toHashTag(args.ctx.city),
+        toHashTag(args.ctx.businessType),
+        toHashTag(args.product),
+        ...extractHashtagSeeds(args.whatToPost, args.postIdea),
+        "#SriLanka",
+        "#SmallBusinessLK",
+        "#BizBoostAI",
+    ];
+    return sanitizeHashtagList(seeds.filter(Boolean), 8, 12);
+}
+function buildCaptionFromActivation(args: {
+    format: CaptionFormatKey;
+    platform: "Instagram" | "Facebook" | "Both";
+    bestTime: string;
+    hookLine: string;
+    postIdea: string;
+    whatToPost: string;
+    visualGuide: string[];
+    cta: string;
+    ctx: TemplateContext;
+    hashtags: string[];
+}): string {
+    const location = args.ctx.city.trim() ? ` in ${args.ctx.city.trim()}` : "";
+    const brandLine = `${args.ctx.businessName}${location}`;
+    const feature = activationFeatureLine(args.whatToPost || args.postIdea).replace(/\.$/, "");
+    const hook = cleanActivationText(args.hookLine) || `${brandLine}: ${feature}`;
+    const visualLine = args.visualGuide[0] ? cleanActivationText(args.visualGuide[0]).replace(/\.$/, "") : "simple visuals, clear benefit, and direct contact details";
+    const urgency = /\blimited|deadline|cutoff|few|stock|slots|today|weekend\b/i.test(feature)
+        ? "Limited window, so message early if this fits you."
+        : "";
+    const cta = cleanActivationText(args.cta || "DM or WhatsApp us to order, book, or ask for details.");
+    const tagLine = args.hashtags.join(" ");
+    let body = "";
+    switch (args.format) {
+        case "Reel":
+            body = `${hook}\nQuick look: ${feature}.\nYou will see ${visualLine.toLowerCase()}.\n${urgency ? `${urgency}\n` : ""}${cta}`;
+            break;
+        case "Carousel":
+            body = `${hook}\nSlide 1: ${feature}.\nSlide 2: Why it helps customers choose faster.\nSlide 3: ${visualLine}.\n${urgency ? `${urgency}\n` : ""}${cta}`;
+            break;
+        case "Story":
+            body = `${hook}\n${feature}.\nReply here or tap DM if you want details.\n${urgency ? `${urgency}\n` : ""}${cta}`;
+            break;
+        case "Feed":
+        default:
+            body = `${hook}\n${feature}.\n${brandLine} is keeping it simple: clear value, clear next step.\n${urgency ? `${urgency}\n` : ""}${cta}`;
+            break;
+    }
+    return `${clipEmojis(body.trim(), 2)}\n\n${tagLine}`;
+}
+function buildActivationMatchedPostBundle(args: {
+    category: CategoryKey;
+    ctx: TemplateContext;
+    product: string;
+    format: CaptionFormatKey;
+    platform: "Instagram" | "Facebook" | "Both";
+    bestTime: string;
+    hookLine: string;
+    whatToPost: string;
+    visualGuide: string[];
+    cta: string;
+    postIdeaOverride?: string;
+}): {
+    postIdea: string;
+    caption: string;
+    hashtags: string[];
+    hookUi: string;
+} {
+    const visualGuide = args.visualGuide.map(cleanActivationText).filter(Boolean).slice(0, 3);
+    const postIdea = args.postIdeaOverride ?? buildPostIdeaFromActivation({
+        format: args.format,
+        whatToPost: args.whatToPost,
+        visualGuide,
+    });
+    const hashtags = buildActivationHashtags({
+        category: args.category,
+        ctx: args.ctx,
+        product: args.product,
+        whatToPost: args.whatToPost,
+        postIdea,
+    });
+    const caption = buildCaptionFromActivation({
+        format: args.format,
+        platform: args.platform,
+        bestTime: args.bestTime,
+        hookLine: args.hookLine,
+        postIdea,
+        whatToPost: args.whatToPost,
+        visualGuide,
+        cta: args.cta,
+        ctx: args.ctx,
+        hashtags,
+    });
+    const hookTrim = cleanActivationText(args.hookLine).slice(0, 160);
+    const hookUi = hookTrim || captionBodyMinusHashtags(caption).split("\n")[0] || postIdea.split("\n")[0] || "";
+    return { postIdea, caption, hashtags, hookUi };
+}
 function variantValue<T>(items: T[], input: DayBuilderInput): T {
     return items[(input.weekIndex + input.variantIndex) % items.length];
 }
@@ -1417,6 +1903,7 @@ function growthPushFormat(input: DayBuilderInput): string {
         retail: ["limited-stock alert", "COD delivery push", "cart recovery follow-up", "restock waitlist drive"],
         salon: ["booking slots push", "loyalty rebooking drive", "before-after appointment campaign", "package upgrade push"],
         services: ["lead magnet launch", "free consultation push", "appointment slots campaign", "case study lead drive"],
+        education: ["trial class push", "parent inquiry follow-up", "exam batch enrolment drive", "attendance recovery push"],
         generic: ["limited slots campaign", "referral push", "live demo invite", "follow-up lead drive"],
     };
     return variantValue(growthTitles[input.category], input);
@@ -1486,6 +1973,7 @@ function buildPromoDay(input: DayBuilderInput): DayBuilderOutput {
             retail: `Discount bundle push for ${product} (COD / delivery ready)${vTag}`,
             salon: `${product} service bundle + add-on at checkout${vTag}`,
             services: `Starter ${product} bundle (scoped hours / deliverables)${vTag}`,
+            education: `Trial ${product} class + monthly enrolment path${vTag}`,
             generic: `Launch a ${product} bundle with a hard deadline${vTag}`,
         };
         return {
@@ -1612,6 +2100,7 @@ function buildHighlightDay(input: DayBuilderInput): DayBuilderOutput {
         retail: `Position ${product}: stock, delivery, and why buy now`,
         salon: `Clarify ${product} outcome + ideal client + booking path`,
         services: `Sharpen ${product} offer: problem → result → proof`,
+        education: `Clarify ${product}: result, grade fit, and enrolment path`,
         generic: `Clarify your core offer: ${product} (${format})`,
     };
     return {
@@ -1667,6 +2156,7 @@ function buildBehindScenesDay(input: DayBuilderInput): DayBuilderOutput {
         retail: `Fulfillment quality check before ${product} ships`,
         salon: `Sterilisation & timing standards for ${product}`,
         services: `Delivery workflow: how ${product} gets done on time`,
+        education: `Lesson delivery checklist for ${product}`,
         generic: `Process trust pack (${format}) for ${product}`,
     };
     return {
@@ -1840,11 +2330,16 @@ function buildDayOutput(theme: ThemeKey, input: DayBuilderInput): DayBuilderOutp
     const actions = pool.actions[resolvedActionType];
     const activations = pool.activations[resolvedActionType];
     const metrics = pool.metrics[resolvedActionType];
-    const titleTemplate = titles[(input.dayNumber + input.variantIndex) % titles.length] ?? "Drive business growth with focused execution";
-    const actionTemplate = actions[(input.dayNumber + input.weekIndex) % actions.length] ?? "Run one focused business growth action for {product}.";
-    const activationTemplate = activations[(input.dayNumber + input.variantIndex + input.weekIndex) % activations.length] ??
+    const library = CATEGORY_ACTION_LIBRARIES[input.category] ?? CATEGORY_ACTION_LIBRARIES.generic;
+    const libraryVariant = input.dayNumber + input.weekIndex * 7 + input.variantIndex;
+    const libraryAction = pickLibraryItem(library.businessGrowthActions, resolvedActionType, libraryVariant);
+    const librarySocial = pickLibraryItem(library.socialMediaActivations, resolvedActionType, libraryVariant);
+    const libraryKpi = pickLibraryItem(library.kpis, resolvedActionType, libraryVariant);
+    const titleTemplate = libraryAction?.title ?? titles[(input.dayNumber + input.variantIndex) % titles.length] ?? "Drive business growth with focused execution";
+    const actionTemplate = libraryAction?.task ?? actions[(input.dayNumber + input.weekIndex) % actions.length] ?? "Run one focused business growth action for {product}.";
+    const activationTemplate = librarySocial?.whatToPost ?? activations[(input.dayNumber + input.variantIndex + input.weekIndex) % activations.length] ??
         "Share one focused activation that supports today’s business action.";
-    const metric = metrics[(input.dayNumber + input.variantIndex) % metrics.length] ?? "Measured business outcome";
+    const metric = libraryKpi?.label ?? metrics[(input.dayNumber + input.variantIndex) % metrics.length] ?? "Measured business outcome";
     const product = input.product || input.ctx.productLine || "your offer";
     const businessAction = actionTemplate
         .replace(/\{product\}/g, product)
@@ -1867,15 +2362,16 @@ function buildDayOutput(theme: ThemeKey, input: DayBuilderInput): DayBuilderOutp
         retail: "Select",
         services: "Package",
         salon: "Set",
+        education: "Schedule",
         generic: "Choose",
     };
-    const steps = [
+    const steps = (libraryAction?.executionSteps ?? [
         `${firstVerbByCategory[input.category]} one clear offer for ${product}.`,
         "Write the price, deadline, and customer benefit.",
         `Send the offer to ${input.ctx.targetCustomers || "your target customers"} via ${channelsText}.`,
         "Use one simple script when customers reply.",
         `Record results in a sheet: ${metric}.`,
-    ];
+    ]).map((step) => step.replace(/\{product\}/g, product).replace(/\{businessName\}/g, input.ctx.businessName));
     if (locationText) {
         steps.splice(2, 0, `Mention ${locationText} in your message.`);
     }
@@ -1906,7 +2402,7 @@ function buildDayOutput(theme: ThemeKey, input: DayBuilderInput): DayBuilderOutp
         partnership: "Leads",
         review_optimize: "Leads",
     };
-    const primaryFormat = primaryFormatByActionType[resolvedActionType] ?? "Feed";
+    const primaryFormat = librarySocial?.format ?? primaryFormatByActionType[resolvedActionType] ?? "Feed";
     const primaryGoal = primaryGoalByActionType[resolvedActionType] ?? "Leads";
     const socialChannel: "instagram" | "facebook" | "both" = input.ctx.preferredChannels.some((c) => /instagram/i.test(c)) && input.ctx.preferredChannels.some((c) => /facebook/i.test(c))
         ? "both"
@@ -1919,24 +2415,40 @@ function buildDayOutput(theme: ThemeKey, input: DayBuilderInput): DayBuilderOutp
     const bestTime = input.weekend ? "11:00 AM" : "7:30 PM";
     const reviewSubtype = theme === "review_collection" ? reviewPostFormat(input) : "";
     const concisePostBrief = activationToPostBrief(marketingActivation, product, input.ctx.businessName);
-    const visualGuideHints = themeVisualGuide(theme, product, input.ctx, theme === "review_collection" ? reviewSubtype : marketingActivation);
-    const primaryCta = buildThemedCta(theme, primaryGoal, product, input.ctx, primaryFormat);
-    const hashtagCandidates = [
-        ...baseHashtags,
-        ...themeSpecificHashtagCandidates(input.category, theme, input.ctx.businessType, input.ctx.city, product),
-    ];
-    const cap = buildPublishableCaptionBundle({
-        theme,
+    const visualGuideHints = librarySocial?.visualGuide ?? themeVisualGuide(theme, product, input.ctx, theme === "review_collection" ? reviewSubtype : marketingActivation);
+    const primaryCta = librarySocial?.CTA ?? buildThemedCta(theme, primaryGoal, product, input.ctx, primaryFormat);
+    const offerDeadlineHint = [input.weekend ? "This weekend" : "", input.ctx.priceRange.trim()]
+        .filter(Boolean)
+        .join(" · ");
+    const copyPack = buildMarketingActivationCopyPack({
+        rawActivation: marketingActivation,
+        product,
+        businessName: input.ctx.businessName,
+        businessGrowthAction: businessAction,
+        city: input.ctx.city,
         format: primaryFormat,
-        input,
-        reviewSubtype,
-        cta: primaryCta,
-        hashtagCandidates,
-        variantBase: input.dayNumber + input.variantIndex * 17,
-        visualGuideHints,
+        theme,
+        weekend: input.weekend,
+        goal: primaryGoal,
+        visualGuide: visualGuideHints.slice(0, 3),
+        offerDeadlineHint,
     });
-    const caption = cap.caption;
-    const hashtags = cap.hashtags;
+    const matchedPost = buildActivationMatchedPostBundle({
+        category: input.category,
+        ctx: input.ctx,
+        product,
+        format: primaryFormat,
+        platform: platformValue,
+        bestTime,
+        hookLine: copyPack.hookLine,
+        whatToPost: copyPack.whatToPostInstruction,
+        visualGuide: visualGuideHints,
+        cta: primaryCta,
+        postIdeaOverride: copyPack.postIdeaCreative,
+    });
+    const postIdea = matchedPost.postIdea;
+    const caption = matchedPost.caption;
+    const hashtags = matchedPost.hashtags;
     const storyFrames = primaryFormat === "Story"
         ? [
             `Beat 1 — the pinch people feel around ${product}.`,
@@ -1951,19 +2463,16 @@ function buildDayOutput(theme: ThemeKey, input: DayBuilderInput): DayBuilderOutp
             cta: primaryCta.length > 140 ? `${primaryCta.slice(0, 137)}...` : primaryCta,
         }
         : undefined;
-    const posterHeadlineHint = `${product}: clear value today`;
-    const matchNote = `This post supports today's business focus by pushing ${primaryGoal.toLowerCase()} for ${product}.`;
-    const offerDeadlineHint = [input.weekend ? "This weekend" : "", input.ctx.priceRange.trim()]
-        .filter(Boolean)
-        .join(" · ");
+    const posterHeadlineHint = copyPack.poster.headline;
+    const matchNote = copyPack.whyThisWorks;
     return {
         mainActionTitle,
         businessGrowthAction: businessAction,
         executionSteps: cleanSteps,
-        postIdea: marketingActivation,
+        postIdea,
         caption,
         hashtags,
-        successMetric: `${metric} for ${product}`,
+        successMetric: `${metric}: target ${libraryKpi?.target ?? 5}${libraryKpi?.unit === "%" ? "%" : ""} for ${product}`,
         posterHint: `${product.toUpperCase()} · ${input.ctx.businessName}`,
         notes: input.weekend ? weekendNote(input.category) : undefined,
         marketingActivation: {
@@ -1971,16 +2480,20 @@ function buildDayOutput(theme: ThemeKey, input: DayBuilderInput): DayBuilderOutp
             format: primaryFormat,
             bestTime,
             goal: primaryGoal,
-            postBrief: concisePostBrief,
-            hook: cap.hookUi,
-            visualGuide: cap.visualGuide,
+            postBrief: copyPack.postIdeaCreative,
+            hook: copyPack.hookLine,
+            visualGuide: visualGuideHints.slice(0, 3),
             posterHeadlineHint,
+            posterSubheadline: copyPack.poster.subheadline,
+            posterCtaLabel: copyPack.poster.ctaLabel,
+            posterOfferBadge: copyPack.poster.offerBadge,
             channel: socialChannel,
             formatPlan: [primaryFormat === "Feed" ? "FeedPost" : primaryFormat],
-            contentBrief: concisePostBrief,
-            postIdea: marketingActivation,
-            caption,
-            hashtags,
+            contentBrief: copyPack.postIdeaCreative,
+            whatToPost: copyPack.whatToPostInstruction,
+            postIdea: matchedPost.postIdea,
+            caption: matchedPost.caption,
+            hashtags: matchedPost.hashtags,
             cta: primaryCta,
             matchNote,
             postingTime: bestTime,
@@ -1992,10 +2505,11 @@ function buildDayOutput(theme: ThemeKey, input: DayBuilderInput): DayBuilderOutp
     };
 }
 function buildPlan(planDays: number, context: TemplateContext, startDate: Date): DayPlan[] {
-    const category = normalizeCategory(context.businessType);
+    const category = businessCategoryToCategoryKey(context.businessCategory || resolveBusinessCategory(context.businessType, context.productsOrServices.join(" ")));
     const resolvedCategory: CategoryKey = category;
     const themes = buildThemeSequence(planDays);
     const usedTitles = new Set<string>();
+    let previousFormat: CaptionFormatKey | null = null;
     const memory: RepeatMemory = {
         recentThemes: [],
         recentOfferTypes: [],
@@ -2053,78 +2567,98 @@ function buildPlan(planDays: number, context: TemplateContext, startDate: Date):
         };
         const normalized = selectedOutput ?? normalizeDayOutput(buildDayOutput(theme, fallbackInput));
         const metadata = selectedMetadata ?? repeatMetadata(theme, selectedInput ?? fallbackInput, normalized);
-        const mainActionTitle = uniqueTitle(normalized.mainActionTitle, usedTitles, dayNumber);
+        const initialTitle = GENERIC_TITLE_RE.test(normalized.mainActionTitle)
+            ? `${product} ${deriveDayThemeForPlan(theme, weekend, festival)} plan`
+            : normalized.mainActionTitle;
+        const mainActionTitle = uniqueTitle(initialTitle, usedTitles, dayNumber);
         memory.recentThemes = rememberRecent(memory.recentThemes, theme);
         memory.recentOfferTypes = rememberRecent(memory.recentOfferTypes, metadata.offerType);
         memory.recentStepTemplates = rememberRecent(memory.recentStepTemplates, metadata.stepTemplate);
         memory.similarityCounts[metadata.similarityKey] = (memory.similarityCounts[metadata.similarityKey] ?? 0) + 1;
-        const formatValue = (normalized.marketingActivation?.format ?? "Feed") as CaptionFormatKey;
-        const captionBundleInput: DayBuilderInput = {
-            ctx: context,
-            category: resolvedCategory,
-            dayNumber,
-            weekNumber,
-            weekIndex: Math.floor((dayNumber - 1) / 7),
-            variantIndex: selectedInput?.variantIndex ?? 0,
-            product,
-            weekend: isWeekendForDate(startDate, index),
-            planDays,
-            weekday,
-            dateLabel,
-        };
-        const reviewSubtypeFinalize = theme === "review_collection" ? metadata.postFormat : "";
-        const ctaFinalize = normalized.marketingActivation?.cta ?? "DM us now.";
-        const mergedVisualGuide = Array.isArray(normalized.marketingActivation?.visualGuide)
-            ? normalized.marketingActivation.visualGuide.slice(0, 2).map((x) => String(x))
+        const formatValue = avoidRepeatedFormat((normalized.marketingActivation?.format ?? "Feed") as CaptionFormatKey, previousFormat, dayNumber);
+        previousFormat = formatValue;
+        const needsActivationFix = isMissingActivationField(normalized);
+        const ctaFinalize = needsActivationFix ? "DM us now to order, book, or ask for details." : normalized.marketingActivation?.cta ?? "DM us now.";
+        const safeSuccessMetric = hasTargetMetric(normalized.successMetric)
+            ? normalized.successMetric
+            : `${normalized.successMetric || "Qualified responses"}: target ${5 + dayNumber}`;
+        const safeExecutionSteps = normalizeExecutionChecklist(normalized.executionSteps, resolvedCategory, product, safeSuccessMetric);
+        const mergedVisualGuideRaw = Array.isArray(normalized.marketingActivation?.visualGuide)
+            ? normalized.marketingActivation.visualGuide.slice(0, 3).map((x) => String(x))
             : [];
-        const finalizeCap = buildPublishableCaptionBundle({
-            theme,
+        const mergedVisualGuide = mergedVisualGuideRaw.length
+            ? mergedVisualGuideRaw
+            : themeVisualGuide(theme, product, context, normalized.postIdea).slice(0, 3);
+        const finalWhatToPost = normalized.marketingActivation?.whatToPost ??
+            normalized.marketingActivation?.postIdea ??
+            normalized.postIdea;
+        const finalPlatform = normalized.marketingActivation?.platform ?? "Both";
+        const finalBestTime = normalized.marketingActivation?.bestTime ?? normalized.marketingActivation?.postingTime ?? "7:30 PM";
+        const offerHint = String(normalized.marketingActivation?.offerDeadlineHint ?? "").trim();
+        const copyPackFinal = buildMarketingActivationCopyPack({
+            rawActivation: finalWhatToPost,
+            product,
+            businessName: context.businessName,
+            businessGrowthAction: normalized.businessGrowthAction ?? "",
+            city: context.city,
             format: formatValue,
-            input: captionBundleInput,
-            reviewSubtype: reviewSubtypeFinalize,
+            theme,
+            weekend,
+            goal: normalized.marketingActivation?.goal ?? "Leads",
+            visualGuide: mergedVisualGuide,
+            offerDeadlineHint: offerHint,
+        });
+        const finalPost = buildActivationMatchedPostBundle({
+            category: resolvedCategory,
+            ctx: context,
+            product,
+            format: formatValue,
+            platform: finalPlatform,
+            bestTime: finalBestTime,
+            hookLine: copyPackFinal.hookLine,
+            whatToPost: copyPackFinal.whatToPostInstruction,
+            visualGuide: mergedVisualGuide,
             cta: ctaFinalize,
-            hashtagCandidates: [
-                ...baseHashtags,
-                ...themeSpecificHashtagCandidates(resolvedCategory, theme, context.businessType, context.city, product),
-            ],
-            variantBase: dayNumber * 29 + (selectedInput?.variantIndex ?? 0) * 7,
-            visualGuideHints: mergedVisualGuide.length ? mergedVisualGuide : undefined,
+            postIdeaOverride: copyPackFinal.postIdeaCreative,
         });
         return {
             dayNumber,
             dateLabel,
             ...normalized,
             dayTheme: deriveDayThemeForPlan(theme, weekend, festival),
+            mainTitle: festival ? `${mainActionTitle} (${festival} special)` : mainActionTitle,
             mainActionTitle: festival ? `${mainActionTitle} (${festival} special)` : mainActionTitle,
-            postIdea: festival ? `${normalized.postIdea} Theme it for ${festival}.` : normalized.postIdea,
-            caption: finalizeCap.caption,
-            hashtags: finalizeCap.hashtags,
+            postIdea: finalPost.postIdea,
+            caption: finalPost.caption,
+            hashtags: finalPost.hashtags,
+            executionSteps: safeExecutionSteps,
+            successMetric: safeSuccessMetric,
             marketingActivation: {
-                platform: normalized.marketingActivation?.platform ?? "Both",
-                format: normalized.marketingActivation?.format ?? "Feed",
-                bestTime: normalized.marketingActivation?.bestTime ?? normalized.marketingActivation?.postingTime ?? "7:30 PM",
+                platform: finalPlatform,
+                format: formatValue,
+                bestTime: finalBestTime,
                 goal: normalized.marketingActivation?.goal ?? "Leads",
-                postBrief: normalized.marketingActivation?.postBrief ??
-                    normalized.marketingActivation?.contentBrief ??
-                    `Today's social slice keeps ${product} aligned with ${context.businessName}'s core action.`,
-                hook: finalizeCap.hookUi,
-                visualGuide: finalizeCap.visualGuide,
-                posterHeadlineHint: normalized.marketingActivation?.posterHeadlineHint ?? normalized.posterHint,
+                whatToPost: copyPackFinal.whatToPostInstruction,
+                postBrief: copyPackFinal.postIdeaCreative,
+                hook: copyPackFinal.hookLine,
+                visualGuide: mergedVisualGuide,
+                posterHeadlineHint: copyPackFinal.poster.headline,
+                posterSubheadline: copyPackFinal.poster.subheadline,
+                posterCtaLabel: copyPackFinal.poster.ctaLabel,
+                posterOfferBadge: copyPackFinal.poster.offerBadge,
                 channel: normalized.marketingActivation?.channel ?? "both",
-                formatPlan: normalized.marketingActivation?.formatPlan ?? ["FeedPost"],
-                contentBrief: normalized.marketingActivation?.contentBrief ??
-                    `Publish on ${normalized.marketingActivation?.channel ?? "both"} to support today's action.`,
-                postIdea: festival ? `${normalized.postIdea} Theme it for ${festival}.` : normalized.postIdea,
-                caption: finalizeCap.caption,
-                hashtags: finalizeCap.hashtags,
-                postingTime: normalized.marketingActivation?.postingTime ?? normalized.marketingActivation?.bestTime ?? "7:30 PM",
-                cta: normalized.marketingActivation?.cta ?? "DM us now to order/book.",
-                matchNote: normalized.marketingActivation?.matchNote ??
-                    `This post supports today's business action: ${normalized.mainActionTitle}.`,
+                formatPlan: [formatValue === "Feed" ? "FeedPost" : formatValue],
+                contentBrief: copyPackFinal.postIdeaCreative,
+                postIdea: finalPost.postIdea,
+                caption: finalPost.caption,
+                hashtags: finalPost.hashtags,
+                postingTime: finalBestTime,
+                cta: ctaFinalize,
+                matchNote: copyPackFinal.whyThisWorks,
                 storyFrames: normalized.marketingActivation?.storyFrames ?? [],
                 reelScript: normalized.marketingActivation?.reelScript,
-                posterHint: normalized.posterHint,
-                offerDeadlineHint: normalized.marketingActivation?.offerDeadlineHint,
+                posterHint: copyPackFinal.poster.headline,
+                ...(offerHint ? { offerDeadlineHint: offerHint } : {}),
             },
             notes: festival
                 ? `${festival} seasonal day: adapt offer and messaging to festival demand.`
@@ -2184,13 +2718,14 @@ export async function POST(req: Request) {
             }
         }
         const { context, inferredBusinessType, planStartDate, requestedPlanStartDateISO } = resolveProfileContext(profile as Record<string, unknown>, body);
-        const resolvedCategory = normalizeCategory(context.businessType, context.productsOrServices);
+        const resolvedCategory = businessCategoryToCategoryKey(context.businessCategory);
         console.info("[marketing-plan/generate] profile fields", {
             firebase_uid,
             businessName: context.businessName,
             businessTypeRaw: toCleanString((profile as Record<string, unknown>).businessType),
             inferredBusinessType,
             category: resolvedCategory,
+            businessCategory: context.businessCategory,
             location: context.location,
             productsOrServices: context.productsOrServices,
             goals: context.businessGoals,
@@ -2246,6 +2781,7 @@ export async function POST(req: Request) {
             businessSnapshot: {
                 businessName: context.businessName,
                 businessType: context.businessType,
+                businessCategory: context.businessCategory,
                 city: context.city,
                 country: context.country,
                 location: context.location,

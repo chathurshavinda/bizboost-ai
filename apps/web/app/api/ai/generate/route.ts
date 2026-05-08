@@ -1,6 +1,13 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
+
+/** Allow retry/backoff for Gemini on serverless hosts (e.g. Vercel). */
+export const maxDuration = 60;
+
+/** Lite + stable IDs first; avoid deprecated gemini-1.5-* (404 on v1beta). *-latest maps to Gemini 3.x — heavy; kept as last resorts. */
 const DEFAULT_MODEL_CANDIDATES = [
+    "gemini-2.5-flash-lite",
+    "gemini-2.0-flash-lite",
     "gemini-2.5-flash",
     "gemini-2.0-flash",
     "gemini-flash-latest",
@@ -13,6 +20,62 @@ function resolveModelCandidates(): string[] {
     }
     return DEFAULT_MODEL_CANDIDATES;
 }
+function formatGeminiError(error: unknown): string {
+    if (error instanceof Error) {
+        const e = error as Error & { status?: number };
+        const m = e.message || String(error);
+        return typeof e.status === "number" && Number.isFinite(e.status) ? `${m} (HTTP ${e.status})` : m;
+    }
+    return String(error);
+}
+function collectTextFromCandidates(response: { candidates?: Array<{ content?: { parts?: unknown[] } }> }): string {
+    const parts = response.candidates?.[0]?.content?.parts;
+    if (!Array.isArray(parts))
+        return "";
+    let out = "";
+    for (const p of parts) {
+        if (p && typeof p === "object" && "text" in p && typeof (p as { text: unknown }).text === "string") {
+            out += (p as { text: string }).text;
+        }
+    }
+    return out.trim();
+}
+function extractGeneratedText(result: { response: { text: () => string; candidates?: Array<{ content?: { parts?: unknown[] } }> } }): string {
+    try {
+        const raw = result.response.text();
+        if (typeof raw === "string" && raw.trim())
+            return raw.trim();
+    }
+    catch {
+        // e.g. text() throws when no candidate text — try parts
+    }
+    return collectTextFromCandidates(result.response);
+}
+/** When retry/backoff or another model may help (excludes retryable 429 — handled separately). */
+function isTransientGeminiFailure(message: string): boolean {
+    if (/\(HTTP 429\)|\[429 Too Many Requests\]/i.test(message))
+        return false;
+    return /503|504|502|500|529|overload|service unavailable|high demand|rate limit|temporarily|UNAVAILABLE|RESOURCE_EXHAUSTED|try again|deadline exceeded|DEADLINE|timeout|ETIMEDOUT|ECONNRESET|EAI_AGAIN|fetch failed|network error|internal error/i.test(message);
+}
+/** Daily / disabled free-tier quota: retrying immediately will not help. */
+function isGemini429NonRetryable(message: string): boolean {
+    if (!/\(HTTP 429\)|\[429 Too Many Requests\]/i.test(message))
+        return false;
+    if (/GenerateRequestsPerDayPerProjectPerModel|GenerateContentInputTokensPerModelPerDay/i.test(message))
+        return true;
+    if (/Quota exceeded/i.test(message) && /,\s*limit:\s*0\b/i.test(message))
+        return true;
+    return false;
+}
+function isRetryableHttp429(message: string): boolean {
+    return /\(HTTP 429\)|\[429 Too Many Requests\]/i.test(message) && !isGemini429NonRetryable(message);
+}
+/** User-facing: show real quota message instead of “busy”. */
+function isGeminiQuotaExceededUserFacing(message: string): boolean {
+    return /\(HTTP 429\)|\[429 Too Many Requests\]/i.test(message) &&
+        /exceeded your current quota|Quota exceeded|RESOURCE_EXHAUSTED/i.test(message);
+}
+const GEMINI_QUOTA_USER_MESSAGE = "Google Gemini blocked this request because your API key hit its free-tier quota (daily limits per model, or this model is not available on free tier). Open Google AI Studio → check usage and billing, wait until limits reset tomorrow, or create a new API key/project. Details: https://ai.google.dev/gemini-api/docs/rate-limits";
 const SUPPORTED_TYPES = [
     "marketing-plan",
     "poster",
@@ -202,130 +265,130 @@ function buildPosterDesignPrompt(details: BusinessDetails): string {
         !!details.activationVisualSummary ||
         !!details.activationPosterHint;
     const activationBlock = hasActivationContext
-        ? `
-Today's marketing activation (the poster MUST match this campaign — same message, no contradictions):
-- Platform: ${details.activationPlatform || "Instagram / Facebook"}
-- Format: ${details.activationFormat || "Feed"}
-- What to post (brief): ${details.activationPostBrief || "N/A"}
-- Hook line / angle: ${details.activationHook || "N/A"}
-- CTA to reinforce (poster button text should echo this): ${details.activationCta || "N/A"}
-- Visual direction: ${details.activationVisualSummary || "N/A"}
-- Poster headline hint (if provided): ${details.activationPosterHint || "N/A"}
-- Timing / deadline or price cue for badge (if provided): ${details.activationOfferDeadline || "N/A"}
+        ? `
+Today's marketing activation (the poster MUST match this campaign — same message, no contradictions):
+- Platform: ${details.activationPlatform || "Instagram / Facebook"}
+- Format: ${details.activationFormat || "Feed"}
+- What to post (brief): ${details.activationPostBrief || "N/A"}
+- Hook line / angle: ${details.activationHook || "N/A"}
+- CTA to reinforce (poster button text should echo this): ${details.activationCta || "N/A"}
+- Visual direction: ${details.activationVisualSummary || "N/A"}
+- Poster headline hint (if provided): ${details.activationPosterHint || "N/A"}
+- Timing / deadline or price cue for badge (if provided): ${details.activationOfferDeadline || "N/A"}
 `
         : "";
     const captionAlignBlock = finalCaptionHint.length > 0
-        ? `
-Draft caption already written for this post (distill — do NOT paste verbatim; match tone and offer):
-"""${finalCaptionHint.slice(0, 900)}"""
+        ? `
+Draft caption already written for this post (distill — do NOT paste verbatim; match tone and offer):
+"""${finalCaptionHint.slice(0, 900)}"""
 `
         : "";
     const hasLockedStyle = !!details.lockedStyle;
     const accentLockedHex = /^#[0-9a-fA-F]{6}$/.test(details.brandAccentLocked ?? "") ? details.brandAccentLocked! : "";
     const hasVariationHints = !!details.avoidHeadline || !!details.avoidSubheadline || (!accentLockedHex && !!details.avoidAccentColor) || !!details.variationHint;
     const lockedStyleBlock = hasLockedStyle
-        ? `
+        ? `
 STYLE IS LOCKED — you MUST use style="${details.lockedStyle}". Do NOT pick any other style for this output.`
         : "";
     const brandingAccentBlock = accentLockedHex
-        ? `
-BRAND ACCENT IS LOCKED — you MUST output accentColor="${accentLockedHex}" exactly. Do NOT change this hex across runs or variations.
-
+        ? `
+BRAND ACCENT IS LOCKED — you MUST output accentColor="${accentLockedHex}" exactly. Do NOT change this hex across runs or variations.
+
 Logo / layout consistency — keep typography hierarchy clean: headline largest, brand name tucked in logo-safe zone at top corner, CTA anchored at bottom.`
-        : `
+        : `
 Logo-safe zone — keep brandName compact at the TOP (logo corner). Headline dominates center; subhead supports; offerBadge stays small near headline or badge strip; CTA reads at bottom.`;
     const dayThemeBlock = details.dayTheme && details.dayTheme.trim().length > 0
-        ? `
-Poster campaign theme tag: "${details.dayTheme.trim()}"
-Tune emphasis to this story type without contradicting Today's marketing activation.
-- Promo: punchy urgency, offerBadge can carry deadline/offer.
-- ProductHighlight: product promise and clarity beats hype.
-- Testimonial/proof-feel: softer headline supported by credible subhead.
-- BTS / Engagement: conversational, approachable tone.
-- WeekendSpecial: friendly weekend urgency.
+        ? `
+Poster campaign theme tag: "${details.dayTheme.trim()}"
+Tune emphasis to this story type without contradicting Today's marketing activation.
+- Promo: punchy urgency, offerBadge can carry deadline/offer.
+- ProductHighlight: product promise and clarity beats hype.
+- Testimonial/proof-feel: softer headline supported by credible subhead.
+- BTS / Engagement: conversational, approachable tone.
+- WeekendSpecial: friendly weekend urgency.
 - GrowthPush: action-forward framing.`
         : "";
     const templateCatalogBlock = details.posterTemplateId || details.posterTemplateHint
-        ? `
-BizBoost template library pick (user-facing template — align copy & hierarchy to this intent):
-- Template id: ${details.posterTemplateId || "N/A"}
-- Intent: ${details.posterTemplateHint || "N/A"}
+        ? `
+BizBoost template library pick (user-facing template — align copy & hierarchy to this intent):
+- Template id: ${details.posterTemplateId || "N/A"}
+- Intent: ${details.posterTemplateHint || "N/A"}
 The JSON "style" field must still match STYLE LOCK rules and locked layout; this block guides wording priority and which content fields to emphasize.`
         : "";
     const variationBlock = hasVariationHints
-        ? `
-VARIATION REQUEST — this is a regeneration. Produce a DIFFERENT, IMPROVED variation of the design. Change the wording, angle, hierarchy, and overlay as needed.${accentLockedHex ? " KEEP accentColor locked to the hex above." : " Feel free to tweak palette while staying on-brand."} Specifically:
-${details.avoidHeadline ? `- Do NOT reuse this previous headline: "${details.avoidHeadline}". Use different words and a different angle.` : ""}
-${details.avoidSubheadline ? `- Do NOT reuse this previous subheadline: "${details.avoidSubheadline}". Write a fresh supporting line.` : ""}
-${accentLockedHex || !details.avoidAccentColor ? "" : `- Do NOT reuse this accent color: "${details.avoidAccentColor}". Pick a different bold hex color that still fits the style.`}
-${details.variationHint ? `- Variation seed: ${details.variationHint}` : ""}
-- Vary overlay (light / dark / none) if it improves readability over the photo.
+        ? `
+VARIATION REQUEST — this is a regeneration. Produce a DIFFERENT, IMPROVED variation of the design. Change the wording, angle, hierarchy, and overlay as needed.${accentLockedHex ? " KEEP accentColor locked to the hex above." : " Feel free to tweak palette while staying on-brand."} Specifically:
+${details.avoidHeadline ? `- Do NOT reuse this previous headline: "${details.avoidHeadline}". Use different words and a different angle.` : ""}
+${details.avoidSubheadline ? `- Do NOT reuse this previous subheadline: "${details.avoidSubheadline}". Write a fresh supporting line.` : ""}
+${accentLockedHex || !details.avoidAccentColor ? "" : `- Do NOT reuse this accent color: "${details.avoidAccentColor}". Pick a different bold hex color that still fits the style.`}
+${details.variationHint ? `- Variation seed: ${details.variationHint}` : ""}
+- Vary overlay (light / dark / none) if it improves readability over the photo.
 - The NEW design must feel fresher than the previous one without breaking locked style rules.`
         : "";
-    return `You are a senior brand designer creating a single social-media poster concept for a small business in Sri Lanka.
-
-Business details:
-- Business Name: ${details.businessName}
-- Business Type: ${details.businessType}
-- Location: ${details.location}
-- Products/Services: ${details.productsOrServices}
-- Target Customers: ${details.targetCustomers}
-- Offer/Promotion: ${offer || "N/A"}
-- Selected Day Plan: ${dayPlan || "General promo"}
-- Photo Context: ${photoContext}
-- Preferred Language: ${details.language || "English"}
-${activationBlock}${captionAlignBlock}${dayThemeBlock}${templateCatalogBlock}${brandingAccentBlock}${lockedStyleBlock}${variationBlock}
-
-Task:
-Produce a clean, bold poster concept inspired by professional brand posters (like Nike and Adidas style social posters). The poster will be rendered as typography and shapes overlaid on the user's real photo.
-
-Style options (pick ONE that best fits the business, photo, and offer):
-- "bold-statement": giant 2-3 word headline dominating the poster (fashion, athletic, statement brands)
-- "landscape-action": split layout, product name + short tagline + CTA button (products, combos, launches)
-- "hero-product": product-focused centered composition with strong top label + centered brand + bottom CTA (e-commerce, product drops)
-- "editorial": fashion-magazine feel with italic serif headline + small info grid (lifestyle, apparel, premium)
-- "minimal-clean": calm Apple-style composition with lots of whitespace and thin elegant serif headline (tech, premium services, studios)
-- "luxury-dark": black + gold premium palette with centered serif brand mark (jewellery, weddings, high-end salons, boutique hotels)
-- "neon-tech": futuristic drop feel with monospace tags and neon accent word (tech brands, gadgets, gaming, modern cafes)
-- "festival-vibrant": warm vibrant celebratory vibe for Sri Lanka festivals and promotions (Avurudu, Vesak, Christmas, Deepavali, launch parties, food specials)
-- "testimonial-quote": centered quote typography, reputation / review led, softer hierarchy
-- "image-first": large visual field upper area; compact headline & CTA in a anchored lower band — product / photo-forward
-- "offer-card": frosted/card frame overlapping the photo; sharp offer focus in the glass panel
-- "social-stack": vertical story-style rails + stacked headline block + wide footer “sticker” CTA — modern reels/story feel
-
-Rules:
-- If "Today's marketing activation" is present, headline, subheadline, offerBadge, and ctaLabel MUST read as one coherent campaign with that brief and CTA. Do not invent a different promo than the activation describes.
-- If a draft caption is provided, headline/subhead must echo its promise (same product/offer angle) without copying long sentences.
-- Pick the style that matches the brand vibe AND the activation format (e.g. Story/Reel → bolder, fewer words; Carousel → can carry one extra supporting line in subheadline).
-- Pick the style that matches the brand vibe, NOT always bold-statement.
-- If the offer/dayPlan mentions a Sri Lankan festival (e.g. Avurudu, Vesak, Christmas, Deepavali, Ramadan), prefer "festival-vibrant".
-- If the business is jewellery / salon / wedding / luxury / boutique, prefer "luxury-dark".
-- If the business is tech / gadgets / modern / studio / co-working / gaming, prefer "neon-tech" or "minimal-clean".
-- If the business is fashion / lifestyle magazine-style, prefer "editorial".
-- If it is a strong product drop / e-commerce item, prefer "hero-product" or "landscape-action".
-- headline: 2 to 6 words MAX, uppercase-friendly, punchy.
-- subheadline: 3 to 10 words, optional supporting line.
-- offerBadge: short (max 3 words) like "20% OFF", "NEW", "BUY 1 GET 1" — or empty string if no offer.
-- ctaLabel: 1 to 3 words like "BUY NOW", "ORDER TODAY", "VIEW ONLINE", "BOOK NOW", "RESERVE NOW".
-- brandName: use the given business name as-is (short version if too long).
-- accentColor: ${accentLockedHex ? `must be exactly "${accentLockedHex}" per brand lock above` : `a single bold hex that fits the style (e.g. "#E11D48" bold, "#D4AF37" luxury, "#22D3EE" neon, "#F59E0B" festival)`}.
-- textColor: "#FFFFFF" or "#0F172A" — whichever gives the best contrast over a photo.
-- overlay: "light" | "dark" | "none" — dark overlay darkens the photo for better white text readability; light for dark photos; none for clean photos.
-- Do NOT include the photo in the text. Do NOT describe the photo.
-- Keep everything short and brand-like.
-
-Output STRICT JSON only. No markdown, no code fences, no commentary. Use this exact shape:
-
-{
-  "style": "bold-statement" | "landscape-action" | "hero-product" | "editorial" | "minimal-clean" | "luxury-dark" | "neon-tech" | "festival-vibrant" | "testimonial-quote" | "image-first" | "offer-card" | "social-stack",
-  "brandName": "string",
-  "headline": "string",
-  "subheadline": "string",
-  "offerBadge": "string",
-  "ctaLabel": "string",
-  "accentColor": "#RRGGBB",
-  "textColor": "#RRGGBB",
-  "overlay": "light" | "dark" | "none"
+    return `You are a senior brand designer creating a single social-media poster concept for a small business in Sri Lanka.
+
+Business details:
+- Business Name: ${details.businessName}
+- Business Type: ${details.businessType}
+- Location: ${details.location}
+- Products/Services: ${details.productsOrServices}
+- Target Customers: ${details.targetCustomers}
+- Offer/Promotion: ${offer || "N/A"}
+- Selected Day Plan: ${dayPlan || "General promo"}
+- Photo Context: ${photoContext}
+- Preferred Language: ${details.language || "English"}
+${activationBlock}${captionAlignBlock}${dayThemeBlock}${templateCatalogBlock}${brandingAccentBlock}${lockedStyleBlock}${variationBlock}
+
+Task:
+Produce a clean, bold poster concept inspired by professional brand posters (like Nike and Adidas style social posters). The poster will be rendered as typography and shapes overlaid on the user's real photo.
+
+Style options (pick ONE that best fits the business, photo, and offer):
+- "bold-statement": giant 2-3 word headline dominating the poster (fashion, athletic, statement brands)
+- "landscape-action": split layout, product name + short tagline + CTA button (products, combos, launches)
+- "hero-product": product-focused centered composition with strong top label + centered brand + bottom CTA (e-commerce, product drops)
+- "editorial": fashion-magazine feel with italic serif headline + small info grid (lifestyle, apparel, premium)
+- "minimal-clean": calm Apple-style composition with lots of whitespace and thin elegant serif headline (tech, premium services, studios)
+- "luxury-dark": black + gold premium palette with centered serif brand mark (jewellery, weddings, high-end salons, boutique hotels)
+- "neon-tech": futuristic drop feel with monospace tags and neon accent word (tech brands, gadgets, gaming, modern cafes)
+- "festival-vibrant": warm vibrant celebratory vibe for Sri Lanka festivals and promotions (Avurudu, Vesak, Christmas, Deepavali, launch parties, food specials)
+- "testimonial-quote": centered quote typography, reputation / review led, softer hierarchy
+- "image-first": large visual field upper area; compact headline & CTA in a anchored lower band — product / photo-forward
+- "offer-card": frosted/card frame overlapping the photo; sharp offer focus in the glass panel
+- "social-stack": vertical story-style rails + stacked headline block + wide footer “sticker” CTA — modern reels/story feel
+
+Rules:
+- If "Today's marketing activation" is present, headline, subheadline, offerBadge, and ctaLabel MUST read as one coherent campaign with that brief and CTA. Do not invent a different promo than the activation describes.
+- If a draft caption is provided, headline/subhead must echo its promise (same product/offer angle) without copying long sentences.
+- Pick the style that matches the brand vibe AND the activation format (e.g. Story/Reel → bolder, fewer words; Carousel → can carry one extra supporting line in subheadline).
+- Pick the style that matches the brand vibe, NOT always bold-statement.
+- If the offer/dayPlan mentions a Sri Lankan festival (e.g. Avurudu, Vesak, Christmas, Deepavali, Ramadan), prefer "festival-vibrant".
+- If the business is jewellery / salon / wedding / luxury / boutique, prefer "luxury-dark".
+- If the business is tech / gadgets / modern / studio / co-working / gaming, prefer "neon-tech" or "minimal-clean".
+- If the business is fashion / lifestyle magazine-style, prefer "editorial".
+- If it is a strong product drop / e-commerce item, prefer "hero-product" or "landscape-action".
+- headline: 2 to 6 words MAX, uppercase-friendly, punchy.
+- subheadline: 3 to 10 words, optional supporting line.
+- offerBadge: short (max 3 words) like "20% OFF", "NEW", "BUY 1 GET 1" — or empty string if no offer.
+- ctaLabel: 1 to 3 words like "BUY NOW", "ORDER TODAY", "VIEW ONLINE", "BOOK NOW", "RESERVE NOW".
+- brandName: use the given business name as-is (short version if too long).
+- accentColor: ${accentLockedHex ? `must be exactly "${accentLockedHex}" per brand lock above` : `a single bold hex that fits the style (e.g. "#E11D48" bold, "#D4AF37" luxury, "#22D3EE" neon, "#F59E0B" festival)`}.
+- textColor: "#FFFFFF" or "#0F172A" — whichever gives the best contrast over a photo.
+- overlay: "light" | "dark" | "none" — dark overlay darkens the photo for better white text readability; light for dark photos; none for clean photos.
+- Do NOT include the photo in the text. Do NOT describe the photo.
+- Keep everything short and brand-like.
+
+Output STRICT JSON only. No markdown, no code fences, no commentary. Use this exact shape:
+
+{
+  "style": "bold-statement" | "landscape-action" | "hero-product" | "editorial" | "minimal-clean" | "luxury-dark" | "neon-tech" | "festival-vibrant" | "testimonial-quote" | "image-first" | "offer-card" | "social-stack",
+  "brandName": "string",
+  "headline": "string",
+  "subheadline": "string",
+  "offerBadge": "string",
+  "ctaLabel": "string",
+  "accentColor": "#RRGGBB",
+  "textColor": "#RRGGBB",
+  "overlay": "light" | "dark" | "none"
 }`;
 }
 function buildMarketingPlanPrompt(details: BusinessDetails): string {
@@ -350,75 +413,75 @@ function buildMarketingPlanPrompt(details: BusinessDetails): string {
     ]
         .filter(Boolean)
         .join("\n");
-    return `You are a senior marketing strategist who specializes in small businesses (SMEs) in Sri Lanka.
-Write in ${language}.
-
-You MUST personalize the plan using ONLY the business details below. Do NOT invent unrelated industries. Do NOT give generic advice. Every recommendation MUST reference the business name, location, products/services, target customers, budget, or platforms.
-
-Business details:
-${knownLines}
-
-Task:
-Produce the best, most practical, and highly actionable marketing plan for this exact business.
-
-Global rules:
-- Tailor everything to Sri Lanka: local cities, Sinhala/Tamil/English language mix where relevant, Sri Lankan payment methods (Cash on Delivery, bank transfer, Koko, Mintpay), Sri Lankan festivals (Avurudu, Vesak, Poson, Deepavali, Christmas, Ramadan), Sri Lankan social habits (WhatsApp first, Facebook dominant, Instagram growing, TikTok for discovery).
-- Budget realism: match every suggested action to the stated budget level and monthly marketing budget. Low budget = free + WhatsApp + organic + referrals. Medium = boosted posts + small Meta ads (LKR 5k–25k/month). High = structured Meta + Google Search + influencer micro-partners.
-- Use clear Markdown: each section starts with "## <n>. <Section Title>". Use short, scannable bullets. Quantify where possible (LKR amounts, % targets, days, frequency).
-- If a detail is missing (e.g. no competitors), briefly acknowledge the assumption you made before the advice.
-- Avoid fluff words, avoid "leverage / synergize", do not repeat the same idea across sections.
-- Do NOT add any commentary before "## 1." or after "## 10.". Do NOT use code fences.
-
-Required output (exactly these 10 sections, in this order, in clean Markdown):
-
-## 1. Business Summary
-One concise paragraph (3–5 lines) summarizing ${details.businessName || "the business"}: what it sells, who it serves, where it operates, and its main growth goal.
-
-## 2. Target Audience Analysis
-- 2–3 clearly named customer personas (age range, area inside ${details.location || "Sri Lanka"}, income band, motivations, objections).
-- Where they spend time online (platform + typical behaviour).
-- What they would pay for / what blocks them from buying.
-
-## 3. Best Marketing Strategy
-- 3–5 strategic pillars chosen specifically for this business (e.g. "Hyperlocal WhatsApp referral", "Instagram reels around ${details.productsOrServices || "the product"}").
-- For each pillar: one-line rationale + expected outcome.
-- A short unique-selling-point (USP) statement derived from the inputs.
-
-## 4. Weekly Marketing Plan
-Write a 7-day Markdown table with columns: Day | Focus | Action | Channel | Time | Expected Outcome.
-Seven rows (Mon–Sun). Each row must be specific (mention ${details.businessName || "the business"}, a product, or a channel).
-
-## 5. Social Media Content Ideas
-Give 7 concrete content ideas. Each as:
-- **Title** — 1-line post idea
-- Caption (ready to post, 1–2 sentences, 1 emoji max)
-- Hashtags (3–6, mix #LK + #${(details.location || "Colombo").replace(/[^a-zA-Z0-9]/g, "")} + niche)
-
-## 6. Promotion Ideas
-- 4–6 promo mechanics fitted to the budget and the products (bundles, BOGO, festival-tied offers, referral bonus, loyalty stamp, collab with a local creator/shop).
-- For each: audience it hits, channel to run it on, estimated cost (LKR), and simple success sign.
-
-## 7. Paid Advertising Suggestions
-- Channel mix recommendation with split in percentages and LKR (Meta Ads vs Google vs TikTok vs local directories), matched to the stated budget.
-- 2 starter ad campaign briefs:
-  - Campaign name
-  - Objective (awareness / traffic / messages / purchases)
-  - Audience targeting (age, area, interests)
-  - Budget (daily LKR, duration days)
-  - Creative direction (1 line) + suggested CTA
-- Realistic CPM/CPC expectations for Sri Lanka if possible.
-
-## 8. Customer Growth Strategy
-- Lead capture path (where people first see the business → first message → first purchase → repeat).
-- Referral mechanic (what the business can offer to reward word-of-mouth).
-- Retention mechanic (1 simple monthly touchpoint suitable for ${details.businessType || "this business"}).
-- One partnership idea with a complementary local Sri Lankan business.
-
-## 9. Simple KPI Tracking
-Write a Markdown table with columns: KPI | How to measure | Target (4 weeks) | Tool.
-Include 6 KPIs appropriate to the business (e.g. WhatsApp inquiries/day, Instagram reach, conversion rate, avg order value in LKR, repeat customer rate, cost per lead).
-
-## 10. Practical Next Steps
+    return `You are a senior marketing strategist who specializes in small businesses (SMEs) in Sri Lanka.
+Write in ${language}.
+
+You MUST personalize the plan using ONLY the business details below. Do NOT invent unrelated industries. Do NOT give generic advice. Every recommendation MUST reference the business name, location, products/services, target customers, budget, or platforms.
+
+Business details:
+${knownLines}
+
+Task:
+Produce the best, most practical, and highly actionable marketing plan for this exact business.
+
+Global rules:
+- Tailor everything to Sri Lanka: local cities, Sinhala/Tamil/English language mix where relevant, Sri Lankan payment methods (Cash on Delivery, bank transfer, Koko, Mintpay), Sri Lankan festivals (Avurudu, Vesak, Poson, Deepavali, Christmas, Ramadan), Sri Lankan social habits (WhatsApp first, Facebook dominant, Instagram growing, TikTok for discovery).
+- Budget realism: match every suggested action to the stated budget level and monthly marketing budget. Low budget = free + WhatsApp + organic + referrals. Medium = boosted posts + small Meta ads (LKR 5k–25k/month). High = structured Meta + Google Search + influencer micro-partners.
+- Use clear Markdown: each section starts with "## <n>. <Section Title>". Use short, scannable bullets. Quantify where possible (LKR amounts, % targets, days, frequency).
+- If a detail is missing (e.g. no competitors), briefly acknowledge the assumption you made before the advice.
+- Avoid fluff words, avoid "leverage / synergize", do not repeat the same idea across sections.
+- Do NOT add any commentary before "## 1." or after "## 10.". Do NOT use code fences.
+
+Required output (exactly these 10 sections, in this order, in clean Markdown):
+
+## 1. Business Summary
+One concise paragraph (3–5 lines) summarizing ${details.businessName || "the business"}: what it sells, who it serves, where it operates, and its main growth goal.
+
+## 2. Target Audience Analysis
+- 2–3 clearly named customer personas (age range, area inside ${details.location || "Sri Lanka"}, income band, motivations, objections).
+- Where they spend time online (platform + typical behaviour).
+- What they would pay for / what blocks them from buying.
+
+## 3. Best Marketing Strategy
+- 3–5 strategic pillars chosen specifically for this business (e.g. "Hyperlocal WhatsApp referral", "Instagram reels around ${details.productsOrServices || "the product"}").
+- For each pillar: one-line rationale + expected outcome.
+- A short unique-selling-point (USP) statement derived from the inputs.
+
+## 4. Weekly Marketing Plan
+Write a 7-day Markdown table with columns: Day | Focus | Action | Channel | Time | Expected Outcome.
+Seven rows (Mon–Sun). Each row must be specific (mention ${details.businessName || "the business"}, a product, or a channel).
+
+## 5. Social Media Content Ideas
+Give 7 concrete content ideas. Each as:
+- **Title** — 1-line post idea
+- Caption (ready to post, 1–2 sentences, 1 emoji max)
+- Hashtags (3–6, mix #LK + #${(details.location || "Colombo").replace(/[^a-zA-Z0-9]/g, "")} + niche)
+
+## 6. Promotion Ideas
+- 4–6 promo mechanics fitted to the budget and the products (bundles, BOGO, festival-tied offers, referral bonus, loyalty stamp, collab with a local creator/shop).
+- For each: audience it hits, channel to run it on, estimated cost (LKR), and simple success sign.
+
+## 7. Paid Advertising Suggestions
+- Channel mix recommendation with split in percentages and LKR (Meta Ads vs Google vs TikTok vs local directories), matched to the stated budget.
+- 2 starter ad campaign briefs:
+  - Campaign name
+  - Objective (awareness / traffic / messages / purchases)
+  - Audience targeting (age, area, interests)
+  - Budget (daily LKR, duration days)
+  - Creative direction (1 line) + suggested CTA
+- Realistic CPM/CPC expectations for Sri Lanka if possible.
+
+## 8. Customer Growth Strategy
+- Lead capture path (where people first see the business → first message → first purchase → repeat).
+- Referral mechanic (what the business can offer to reward word-of-mouth).
+- Retention mechanic (1 simple monthly touchpoint suitable for ${details.businessType || "this business"}).
+- One partnership idea with a complementary local Sri Lankan business.
+
+## 9. Simple KPI Tracking
+Write a Markdown table with columns: KPI | How to measure | Target (4 weeks) | Tool.
+Include 6 KPIs appropriate to the business (e.g. WhatsApp inquiries/day, Instagram reach, conversion rate, avg order value in LKR, repeat customer rate, cost per lead).
+
+## 10. Practical Next Steps
 Numbered list of the FIRST 7 concrete actions the owner should take in the next 14 days, each 1 short sentence, each starting with an action verb. Be specific (mention platform, time-window, LKR amount, or asset).`;
 }
 function buildFinalPostPrompt(details: BusinessDetails): string {
@@ -427,47 +490,47 @@ function buildFinalPostPrompt(details: BusinessDetails): string {
     const offer = details.offer || "No specific offer";
     const tone = details.tone || "Friendly and professional";
     const finalCaption = details.finalCaption || "";
-    return `You are an expert social media post writer for small businesses in Sri Lanka.
-
-Inputs:
-- Business Name: ${details.businessName}
-- Business Type: ${details.businessType}
-- Location: ${details.location}
-- Products/Services: ${details.productsOrServices}
-- Target Customers: ${details.targetCustomers}
-- Selected Day Plan: ${dayPlan}
-- Poster Image/Photo Context: ${photoContext}
-- Offer/Promotion: ${offer}
-- Tone: ${tone}
-- Preferred Language: ${details.language || "English"}
-- User-approved base caption (must be respected and preserved as the core message):
-"""
-${finalCaption}
-"""
-
-Task:
-Using the user-approved caption as the base, polish it and compose a final, complete social media post that is ready to publish on Facebook and Instagram. Do not rewrite the caption from scratch — keep its core message and style, and only lightly refine grammar, clarity, and flow.
-
-The final post must combine:
-- A short product/service highlight (1 line)
-- The refined caption (keep user's meaning)
-- A clear, simple call-to-action (1 line)
-
-Rules:
-- Keep the post short, natural, and easy to read.
-- Professional and suitable for small businesses in Sri Lanka.
-- Use only 1-3 suitable emojis total.
-- Provide 3-6 relevant hashtags (match business type + location + Sri Lanka).
-- Do NOT write long explanations.
-- Do NOT describe the photo.
-- Do NOT output any extra commentary before or after the required sections.
-- Match the writing language to: ${details.language || "English"}.
-
-Output format (strict, no extra text before or after):
-Caption:
-<final ready-to-post caption, including the short highlight at the top, refined caption body, and call-to-action at the end. Keep it compact and readable.>
-
-Hashtags:
+    return `You are an expert social media post writer for small businesses in Sri Lanka.
+
+Inputs:
+- Business Name: ${details.businessName}
+- Business Type: ${details.businessType}
+- Location: ${details.location}
+- Products/Services: ${details.productsOrServices}
+- Target Customers: ${details.targetCustomers}
+- Selected Day Plan: ${dayPlan}
+- Poster Image/Photo Context: ${photoContext}
+- Offer/Promotion: ${offer}
+- Tone: ${tone}
+- Preferred Language: ${details.language || "English"}
+- User-approved base caption (must be respected and preserved as the core message):
+"""
+${finalCaption}
+"""
+
+Task:
+Using the user-approved caption as the base, polish it and compose a final, complete social media post that is ready to publish on Facebook and Instagram. Do not rewrite the caption from scratch — keep its core message and style, and only lightly refine grammar, clarity, and flow.
+
+The final post must combine:
+- A short product/service highlight (1 line)
+- The refined caption (keep user's meaning)
+- A clear, simple call-to-action (1 line)
+
+Rules:
+- Keep the post short, natural, and easy to read.
+- Professional and suitable for small businesses in Sri Lanka.
+- Use only 1-3 suitable emojis total.
+- Provide 3-6 relevant hashtags (match business type + location + Sri Lanka).
+- Do NOT write long explanations.
+- Do NOT describe the photo.
+- Do NOT output any extra commentary before or after the required sections.
+- Match the writing language to: ${details.language || "English"}.
+
+Output format (strict, no extra text before or after):
+Caption:
+<final ready-to-post caption, including the short highlight at the top, refined caption body, and call-to-action at the end. Keep it compact and readable.>
+
+Hashtags:
 <3 to 6 hashtags separated by spaces, each starting with #>`;
 }
 function buildPosterCaptionPrompt(details: BusinessDetails): string {
@@ -475,114 +538,114 @@ function buildPosterCaptionPrompt(details: BusinessDetails): string {
     const photoContext = details.photoContext || "A real photo uploaded by the business";
     const offer = details.offer || "No specific offer";
     const tone = details.tone || "Friendly and professional";
-    return `You are an expert social media caption writer for small businesses in Sri Lanka.
-
-Inputs:
-- Business Name: ${details.businessName}
-- Business Type: ${details.businessType}
-- Location: ${details.location}
-- Products/Services: ${details.productsOrServices}
-- Target Customers: ${details.targetCustomers}
-- Selected Day Plan: ${dayPlan}
-- Poster Image/Photo Context: ${photoContext}
-- Offer/Promotion: ${offer}
-- Tone: ${tone}
-- Preferred Language: ${details.language || "English"}
-
-Task:
-Create a short, attractive caption that matches the selected day's marketing plan and the user's real photo.
-
-Rules:
-- Caption must be short and natural.
-- Must match the purpose of the selected day plan.
-- Must be suitable for Facebook and Instagram posting.
-- Mention the product/service clearly.
-- Include a simple call-to-action.
-- Use 1-3 suitable emojis only.
-- Add 3-6 relevant hashtags.
-- Do not write long explanations.
-- Do not generate a full marketing plan.
-- Do not describe the photo too much.
-- Make it practical for a small business in Sri Lanka.
-- Match the writing language to: ${details.language || "English"}.
-
-Output format (strict, no extra text before or after):
-Caption:
-<short caption text here>
-
-Hashtags:
+    return `You are an expert social media caption writer for small businesses in Sri Lanka.
+
+Inputs:
+- Business Name: ${details.businessName}
+- Business Type: ${details.businessType}
+- Location: ${details.location}
+- Products/Services: ${details.productsOrServices}
+- Target Customers: ${details.targetCustomers}
+- Selected Day Plan: ${dayPlan}
+- Poster Image/Photo Context: ${photoContext}
+- Offer/Promotion: ${offer}
+- Tone: ${tone}
+- Preferred Language: ${details.language || "English"}
+
+Task:
+Create a short, attractive caption that matches the selected day's marketing plan and the user's real photo.
+
+Rules:
+- Caption must be short and natural.
+- Must match the purpose of the selected day plan.
+- Must be suitable for Facebook and Instagram posting.
+- Mention the product/service clearly.
+- Include a simple call-to-action.
+- Use 1-3 suitable emojis only.
+- Add 3-6 relevant hashtags.
+- Do not write long explanations.
+- Do not generate a full marketing plan.
+- Do not describe the photo too much.
+- Make it practical for a small business in Sri Lanka.
+- Match the writing language to: ${details.language || "English"}.
+
+Output format (strict, no extra text before or after):
+Caption:
+<short caption text here>
+
+Hashtags:
 <3 to 6 hashtags separated by spaces>`;
 }
 function buildSocialPostPrompt(details: BusinessDetails): string {
     const offer = details.offer || "No specific offer";
     const marketingGoal = details.marketingGoal || details.businessGoal || "Attract more customers";
     const tone = details.tone || "Friendly and professional";
-    return `You are an expert social media copywriter for small businesses in Sri Lanka.
-
-Business details:
-- Business Name: ${details.businessName}
-- Business Type: ${details.businessType}
-- Location: ${details.location}
-- Products/Services: ${details.productsOrServices}
-- Target Customers: ${details.targetCustomers}
-- Offer/Discount: ${offer}
-- Marketing Goal: ${marketingGoal}
-- Tone: ${tone}
-- Preferred Language: ${details.language || "English"}
-
-Task:
-Generate a social media-ready post based on the business details above.
-
-Output must include these sections, with clear headings:
-1. Catchy headline
-2. Attractive social media caption
-3. Short product/service description
-4. Clear call-to-action
-5. Relevant hashtags
-6. Suggested poster text
-7. Poster visual idea
-
-Rules:
-- Caption must be suitable for Facebook and Instagram posting.
-- Keep it short, attractive, and easy to read.
-- Make it suitable for small businesses in Sri Lanka.
-- Use emojis only where suitable (do not overuse).
-- Hashtags must match the business type and location (include Sri Lanka and city tags).
-- Poster text must be short and clean.
-- Do not include unnecessary long explanations.
+    return `You are an expert social media copywriter for small businesses in Sri Lanka.
+
+Business details:
+- Business Name: ${details.businessName}
+- Business Type: ${details.businessType}
+- Location: ${details.location}
+- Products/Services: ${details.productsOrServices}
+- Target Customers: ${details.targetCustomers}
+- Offer/Discount: ${offer}
+- Marketing Goal: ${marketingGoal}
+- Tone: ${tone}
+- Preferred Language: ${details.language || "English"}
+
+Task:
+Generate a social media-ready post based on the business details above.
+
+Output must include these sections, with clear headings:
+1. Catchy headline
+2. Attractive social media caption
+3. Short product/service description
+4. Clear call-to-action
+5. Relevant hashtags
+6. Suggested poster text
+7. Poster visual idea
+
+Rules:
+- Caption must be suitable for Facebook and Instagram posting.
+- Keep it short, attractive, and easy to read.
+- Make it suitable for small businesses in Sri Lanka.
+- Use emojis only where suitable (do not overuse).
+- Hashtags must match the business type and location (include Sri Lanka and city tags).
+- Poster text must be short and clean.
+- Do not include unnecessary long explanations.
 - Match the writing language to: ${details.language || "English"}.`;
 }
 function buildPosterPrompt(details: BusinessDetails): string {
-    return `You are an expert creative strategist and ad copywriter for small businesses in Sri Lanka.
-
-Business details:
-- Business Name: ${details.businessName}
-- Industry / Business Type: ${details.businessType}
-- Location: ${details.location}
-- Products or Services: ${details.productsOrServices}
-- Target Customers: ${details.targetCustomers}
-- Business Goal: ${details.businessGoal}
-- Budget Level: ${details.budget}
-- Preferred Language: ${details.language || "English"}
-
-Task:
-Generate a professional poster concept and ready-to-use poster copy based on the business details.
-
-Output requirements:
-- Use clear headings and concise bullet points.
-- Keep the concept practical and suitable for social media/local promotions in Sri Lanka.
-- Match the writing language to: ${details.language || "English"}.
-- Keep text persuasive but simple and clear.
-
-The output must include:
-1. Main headline
-2. Short promotional caption
-3. Offer text (if available from the business goal/products)
-4. Call to action
-5. Poster layout idea
-6. Suggested colors
-7. Suggested font style
-8. Image/visual idea
+    return `You are an expert creative strategist and ad copywriter for small businesses in Sri Lanka.
+
+Business details:
+- Business Name: ${details.businessName}
+- Industry / Business Type: ${details.businessType}
+- Location: ${details.location}
+- Products or Services: ${details.productsOrServices}
+- Target Customers: ${details.targetCustomers}
+- Business Goal: ${details.businessGoal}
+- Budget Level: ${details.budget}
+- Preferred Language: ${details.language || "English"}
+
+Task:
+Generate a professional poster concept and ready-to-use poster copy based on the business details.
+
+Output requirements:
+- Use clear headings and concise bullet points.
+- Keep the concept practical and suitable for social media/local promotions in Sri Lanka.
+- Match the writing language to: ${details.language || "English"}.
+- Keep text persuasive but simple and clear.
+
+The output must include:
+1. Main headline
+2. Short promotional caption
+3. Offer text (if available from the business goal/products)
+4. Call to action
+5. Poster layout idea
+6. Suggested colors
+7. Suggested font style
+8. Image/visual idea
 9. Final ready-to-use poster text`;
 }
 function clampHex(input: unknown, fallback: string): string {
@@ -679,10 +742,9 @@ export async function POST(req: Request) {
     const genAI = new GoogleGenerativeAI(apiKey);
     const modelCandidates = resolveModelCandidates();
     const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-    const isOverloadedError = (message: string) => /503|overload|service unavailable|high demand|rate limit|429|quota|temporarily/i.test(message);
     const isModelNotFoundError = (message: string) => /not found|not supported|unsupported model|404/i.test(message);
-    const MAX_RETRIES_PER_MODEL = 2;
-    const RETRY_DELAYS_MS = [800, 1800];
+    const MAX_RETRIES_PER_MODEL = 4;
+    const RETRY_DELAYS_MS = [900, 2000, 4500, 9000];
     let lastError: unknown = null;
     let lastErrorMessage = "";
     const expectJson = validated.type === "poster-design";
@@ -696,20 +758,26 @@ export async function POST(req: Request) {
                         : undefined,
                 });
                 const result = await model.generateContent(prompt);
-                let text = "";
-                try {
-                    const raw = result.response.text();
-                    text = typeof raw === "string" ? raw.trim() : "";
+                const promptFeedback = (result.response as { promptFeedback?: { blockReason?: string } }).promptFeedback;
+                const blockReason = promptFeedback?.blockReason;
+                if (blockReason && blockReason !== "BLOCKED_REASON_UNSPECIFIED") {
+                    console.error(`[api/ai/generate] Prompt blocked (${blockReason}) on ${modelName}`);
+                    return NextResponse.json({
+                        ok: false,
+                        error: "This request could not be processed by the AI safety filters. Try shortening or rephrasing your caption, then try again.",
+                    }, { status: 422 });
                 }
-                catch (extractErr) {
-                    console.error(`[api/ai/generate] Failed to read text from model ${modelName}:`, extractErr);
-                    lastError = extractErr;
-                    lastErrorMessage = extractErr instanceof Error ? extractErr.message : String(extractErr);
-                    break;
-                }
+                const text = extractGeneratedText(result);
                 if (!text) {
-                    console.error(`[api/ai/generate] Empty text from model ${modelName}`);
+                    const finish = result.response.candidates?.[0]?.finishReason;
+                    console.error(`[api/ai/generate] Empty text from model ${modelName}, finishReason=${finish ?? "(none)"}`);
                     lastError = new Error(`Empty text from model ${modelName}`);
+                    if (finish === "SAFETY" || finish === "RECITATION") {
+                        return NextResponse.json({
+                            ok: false,
+                            error: "The AI could not produce text for this input (content policy). Try adjusting your caption or offer text.",
+                        }, { status: 422 });
+                    }
                     lastErrorMessage = `Empty text from model ${modelName}`;
                     break;
                 }
@@ -726,24 +794,38 @@ export async function POST(req: Request) {
                 return NextResponse.json({ ok: true, text, model: modelName });
             }
             catch (error) {
-                const message = error instanceof Error ? error.message : String(error);
+                const message = formatGeminiError(error);
                 console.error(`[api/ai/generate] Gemini error on model ${modelName} (attempt ${attempt + 1}):`, message);
                 lastError = error;
                 lastErrorMessage = message;
-                if (isOverloadedError(message) && attempt < MAX_RETRIES_PER_MODEL) {
-                    await sleep(RETRY_DELAYS_MS[attempt] ?? 1500);
+                if (isGemini429NonRetryable(message)) {
+                    break;
+                }
+                if (isRetryableHttp429(message) && attempt < MAX_RETRIES_PER_MODEL) {
+                    await sleep(RETRY_DELAYS_MS[attempt] ?? 2000);
                     continue;
                 }
-                if (isOverloadedError(message) || isModelNotFoundError(message)) {
+                if (isTransientGeminiFailure(message) && attempt < MAX_RETRIES_PER_MODEL) {
+                    await sleep(RETRY_DELAYS_MS[attempt] ?? 2000);
+                    continue;
+                }
+                if (isTransientGeminiFailure(message) || isRetryableHttp429(message) || isModelNotFoundError(message)) {
                     break;
                 }
                 return NextResponse.json({ ok: false, error: `Gemini generation failed: ${message}` }, { status: 500 });
             }
         }
     }
-    const userMessage = isOverloadedError(lastErrorMessage)
+    if (isGeminiQuotaExceededUserFacing(lastErrorMessage)) {
+        return NextResponse.json({
+            ok: false,
+            error: GEMINI_QUOTA_USER_MESSAGE,
+            errorCode: "gemini_quota_exceeded",
+        }, { status: 429 });
+    }
+    const userMessage = isTransientGeminiFailure(lastErrorMessage) || isRetryableHttp429(lastErrorMessage)
         ? "AI service is busy right now. Please try again in a few seconds."
         : `Gemini generation failed: ${lastError instanceof Error ? lastError.message : "Unknown Gemini error"}`;
-    const statusCode = isOverloadedError(lastErrorMessage) ? 503 : 500;
+    const statusCode = isTransientGeminiFailure(lastErrorMessage) || isRetryableHttp429(lastErrorMessage) ? 503 : 500;
     return NextResponse.json({ ok: false, error: userMessage }, { status: statusCode });
 }

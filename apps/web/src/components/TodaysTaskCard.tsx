@@ -216,9 +216,9 @@ export default function TodaysTaskCard({ loading = false, planDays, days, comple
         }
 
         .statusPill.done {
-          border-color: rgba(16, 185, 129, 0.35);
-          background: rgba(16, 185, 129, 0.14);
-          color: #047857;
+          border-color: #e5e5e5;
+          background: #f5f5f5;
+          color: #111111;
         }
 
         .statusPill.pending {
@@ -260,10 +260,10 @@ export default function TodaysTaskCard({ loading = false, planDays, days, comple
         }
 
         .taskBtn.primary {
-          background: linear-gradient(145deg, #10b981, #059669);
-          border-color: rgba(16, 185, 129, 0.3);
+          background: #111111;
+          border-color: #111111;
           color: #ffffff;
-          box-shadow: 0 10px 20px rgba(16, 185, 129, 0.22);
+          box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
         }
 
         .taskBtn.secondary {

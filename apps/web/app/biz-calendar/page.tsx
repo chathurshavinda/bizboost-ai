@@ -570,9 +570,9 @@ export default function BizCalendarPage() {
         }
 
         .dayCell.completed {
-          border-color: rgba(16, 185, 129, 0.38);
-          background: linear-gradient(180deg, rgba(236, 253, 245, 0.94), rgba(255, 255, 255, 0.88));
-          box-shadow: 0 16px 32px rgba(16, 185, 129, 0.14);
+          border-color: #e5e5e5;
+          background: linear-gradient(180deg, rgba(245, 245, 245, 0.94), rgba(255, 255, 255, 0.88));
+          box-shadow: none;
         }
 
         .dayCellEmpty {
@@ -635,10 +635,10 @@ export default function BizCalendarPage() {
         }
 
         .statusBadge.done {
-          background: rgba(16, 185, 129, 0.14);
-          border-color: rgba(16, 185, 129, 0.36);
-          color: #047857;
-          box-shadow: 0 0 20px rgba(16, 185, 129, 0.18);
+          background: #f5f5f5;
+          border-color: #e5e5e5;
+          color: #111111;
+          box-shadow: none;
         }
 
         .statusBadge.pending {
@@ -668,7 +668,7 @@ export default function BizCalendarPage() {
           position: absolute;
           inset: auto -24px 26px auto;
           transform: rotate(-28deg);
-          color: rgba(5, 150, 105, 0.12);
+          color: rgba(17, 17, 17, 0.12);
           font-size: 20px;
           font-weight: 1000;
           letter-spacing: 0.12em;
@@ -791,7 +791,7 @@ export default function BizCalendarPage() {
 
         .stepList svg {
           margin-top: 4px;
-          color: #059669;
+          color: #111111;
           flex-shrink: 0;
         }
 
