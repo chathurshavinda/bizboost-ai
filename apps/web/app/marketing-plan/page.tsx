@@ -35,7 +35,7 @@ type GeneratedDay = {
     notes?: string;
     completed?: boolean;
 };
-type ModalType = "missingBusiness" | "incompleteBusiness" | "missingPlan" | "serverError" | null;
+type ModalType = "missingBusiness" | "incompleteBusiness" | "missingPlan" | "missingPro" | "serverError" | null;
 type AiGrowthPillar = {
     title?: string;
     why?: string;
@@ -280,7 +280,13 @@ export default function MarketingPlanPage() {
     const [planId, setPlanId] = useState<string>("");
     const [planStatus, setPlanStatus] = useState<"active" | "completed" | "archived">("active");
     const [missingProfileFields, setMissingProfileFields] = useState<string[]>([]);
-    const canGenerate = !isLoading && !!businessDetails && !!selectedPlanDays && !generating && (!hasGenerated || isNewMode);
+    const [hasProSubscription, setHasProSubscription] = useState<boolean | null>(null);
+    const canGenerate = !isLoading &&
+        !!businessDetails &&
+        !!selectedPlanDays &&
+        !generating &&
+        (!hasGenerated || isNewMode) &&
+        hasProSubscription === true;
     const loadInitialData = useCallback(async () => {
         const uid = auth.currentUser?.uid ?? user?.uid;
         console.log("UID", uid);
@@ -289,6 +295,7 @@ export default function MarketingPlanPage() {
         setIsLoading(true);
         setModalType(null);
         setMissingProfileFields([]);
+        setHasProSubscription(null);
         try {
             const businessRes = await fetch(`/api/business-profile?firebase_uid=${encodeURIComponent(uid)}`, {
                 cache: "no-store",
@@ -330,6 +337,17 @@ export default function MarketingPlanPage() {
                 return;
             }
             setSelectedPlanDays(days);
+
+            const subRes = await fetch(`/api/subscription?firebase_uid=${encodeURIComponent(uid)}`, {
+                cache: "no-store",
+            });
+            let pro = false;
+            if (subRes.ok) {
+                const sj = (await subRes.json()) as { ok?: boolean; data?: { status?: string } };
+                pro = sj?.ok === true && sj?.data?.status === "active";
+            }
+            setHasProSubscription(pro);
+
             if (isNewMode) {
                 setGeneratedPlan([]);
                 setHasGenerated(false);
@@ -421,6 +439,10 @@ export default function MarketingPlanPage() {
                 }
                 else if (result?.error === "plan_not_selected") {
                     setModalType("missingPlan");
+                }
+                else if (result?.code === "SUBSCRIPTION_REQUIRED") {
+                    setHasProSubscription(false);
+                    setModalType("missingPro");
                 }
                 else {
                     setModalType("serverError");
@@ -587,6 +609,16 @@ export default function MarketingPlanPage() {
                 secondaryAction: () => setModalType(null),
             };
         }
+        if (modalType === "missingPro") {
+            return {
+                title: "Pro subscription required",
+                text: "Complete PayHere checkout on Select plan to generate your marketing plan.",
+                primaryText: "Subscribe on Select plan",
+                primaryAction: () => router.push("/select-plan"),
+                secondaryText: "Close",
+                secondaryAction: () => setModalType(null),
+            };
+        }
         if (modalType === "serverError") {
             return {
                 title: "Something went wrong",
@@ -646,6 +678,15 @@ export default function MarketingPlanPage() {
               </div>
             </div>
           </div>
+
+          {hasProSubscription === false && !isLoading && businessDetails ? (<div className="proGateBanner">
+              <p>
+                <strong>Pro required.</strong> Complete payment on Select plan to generate or refresh your marketing plan.
+              </p>
+              <button type="button" className="proGateBtn" onClick={() => router.push("/select-plan")}>
+                Go to Select plan
+              </button>
+            </div>) : null}
 
           {!hasGenerated ? (<div className="generateWrap">
               <button type="button" disabled={!canGenerate} onClick={() => void generatePlan()} className="generateBtn">
@@ -1032,6 +1073,39 @@ export default function MarketingPlanPage() {
           font-size: 16px;
           font-weight: 600;
           color: #0f172a;
+        }
+
+        .proGateBanner {
+          margin-top: 16px;
+          padding: 14px 16px;
+          border-radius: 16px;
+          border: 1px solid rgba(99, 102, 241, 0.35);
+          background: rgba(238, 242, 255, 0.95);
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+        }
+
+        .proGateBanner p {
+          margin: 0;
+          font-size: 14px;
+          color: #334155;
+          line-height: 1.5;
+          flex: 1;
+          min-width: 200px;
+        }
+
+        .proGateBtn {
+          border: 1px solid #111111;
+          background: #111111;
+          color: #ffffff;
+          border-radius: 999px;
+          padding: 10px 20px;
+          font-size: 14px;
+          font-weight: 700;
+          cursor: pointer;
         }
 
         .generateWrap {

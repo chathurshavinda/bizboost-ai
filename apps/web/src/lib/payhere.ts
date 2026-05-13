@@ -2,11 +2,6 @@ import crypto from "crypto";
 
 export type PayHereMode = "sandbox" | "live";
 
-export const PAYHERE_CHECKOUT_URLS: Record<PayHereMode, string> = {
-  sandbox: "https://sandbox.payhere.lk/pay/checkout",
-  live: "https://www.payhere.lk/pay/checkout",
-};
-
 export type PlanDays = 7 | 14 | 30;
 
 export type PlanCatalogEntry = {
@@ -54,10 +49,6 @@ export function getPayHereMode(): PayHereMode {
     .toString()
     .toLowerCase();
   return raw === "live" ? "live" : "sandbox";
-}
-
-export function getCheckoutUrl(): string {
-  return PAYHERE_CHECKOUT_URLS[getPayHereMode()];
 }
 
 export function formatAmount(amount: number): string {

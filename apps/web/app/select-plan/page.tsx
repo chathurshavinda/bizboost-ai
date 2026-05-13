@@ -1,7 +1,9 @@
 "use client";
 export const dynamic = "force-dynamic";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Script from "next/script";
+import Link from "next/link";
 import { useAuth } from "@/src/lib/useAuth";
 
 type PlanCardConfig = {
@@ -44,13 +46,57 @@ const plans: PlanCardConfig[] = [
   },
 ];
 
-type CheckoutResponse = {
+type PayHerePopupConfig = {
+  sandbox: boolean;
+  merchant_id: string;
+  return_url?: string | null;
+  cancel_url?: string | null;
+  notify_url: string;
+  order_id: string;
+  items: string;
+  amount: string;
+  currency: string;
+  hash: string;
+  recurrence?: string;
+  duration?: string;
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  country?: string;
+  custom_1?: string;
+  custom_2?: string;
+};
+
+type PayHereSDK = {
+  startPayment: (config: PayHerePopupConfig) => void;
+  onCompleted?: (orderId: string) => void;
+  onDismissed?: () => void;
+  onError?: (error: string) => void;
+};
+
+declare global {
+  interface Window {
+    payhere?: PayHereSDK;
+  }
+}
+
+type InitiateResponse = {
   ok: boolean;
   error?: string;
   data?: {
-    checkoutUrl: string;
     orderId: string;
-    fields: Record<string, string>;
+    popupConfig: PayHerePopupConfig;
+    plan: {
+      name: string;
+      price: number;
+      currency: string;
+      recurrence: string;
+      duration: string;
+      planDays: number;
+    };
   };
 };
 
@@ -58,7 +104,10 @@ type SubscriptionData = {
   status?: string;
   planDays?: number | null;
   planName?: string | null;
+  amount?: number | null;
+  currency?: string | null;
   nextRenewalAt?: string | null;
+  lastPaidAt?: string | null;
 };
 
 type SubscriptionResponse = {
@@ -74,19 +123,34 @@ type ProfileData = {
   country?: string;
 };
 
+type CheckoutStage =
+  | { kind: "idle" }
+  | { kind: "preparing" }
+  | { kind: "opening" }
+  | { kind: "activating"; orderId: string }
+  | { kind: "success"; data: SubscriptionData; orderId: string }
+  | { kind: "pending_notify"; orderId: string }
+  | { kind: "cancelled" }
+  | { kind: "error"; message: string };
+
+const IS_DEV = process.env.NODE_ENV !== "production";
+
 export default function SelectPlanPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
   const isNewMode = searchParams.get("mode") === "new";
+
   const [selected, setSelected] = useState<number | null>(null);
-  const [savingPlanDays, setSavingPlanDays] = useState<number | null>(null);
-  const [errorText, setErrorText] = useState<string | null>(null);
-  const [savingNotice, setSavingNotice] = useState<string | null>(null);
   const [planHydrated, setPlanHydrated] = useState(false);
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
   const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [stage, setStage] = useState<CheckoutStage>({ kind: "idle" });
+  const [sdkReady, setSdkReady] = useState(false);
+  const [devConfirming, setDevConfirming] = useState(false);
+  const [devConfirmError, setDevConfirmError] = useState<string | null>(null);
+
+  const handlersBoundRef = useRef(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -126,33 +190,35 @@ export default function SelectPlanPage() {
     };
   }, [authLoading, user?.uid, isNewMode]);
 
+  const fetchSubscription = useCallback(
+    async (uid: string): Promise<SubscriptionData | null> => {
+      try {
+        const res = await fetch(
+          `/api/subscription?firebase_uid=${encodeURIComponent(uid)}`,
+          { cache: "no-store" },
+        );
+        if (res.status === 404) return null;
+        const data = (await res.json()) as SubscriptionResponse;
+        if (res.ok && data.ok && data.data) return data.data;
+        return null;
+      } catch {
+        return null;
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     if (!user?.uid) return;
     let cancelled = false;
-    const loadSubscription = async () => {
-      try {
-        const res = await fetch(
-          `/api/subscription?firebase_uid=${encodeURIComponent(user.uid)}`,
-          { cache: "no-store" },
-        );
-        if (res.status === 404) {
-          if (!cancelled) setSubscription(null);
-          return;
-        }
-        const data = (await res.json()) as SubscriptionResponse;
-        if (cancelled) return;
-        if (res.ok && data.ok && data.data) {
-          setSubscription(data.data);
-        }
-      } catch {
-        // ignore
-      }
-    };
-    void loadSubscription();
+    void (async () => {
+      const data = await fetchSubscription(user.uid);
+      if (!cancelled) setSubscription(data);
+    })();
     return () => {
       cancelled = true;
     };
-  }, [user?.uid]);
+  }, [user?.uid, fetchSubscription]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -188,45 +254,65 @@ export default function SelectPlanPage() {
     return matched ? `${matched.name} (${matched.label})` : null;
   }, [subscription]);
 
-  async function persistPlan(days: number) {
-    if (!user?.uid) {
-      router.replace("/login");
+  const handleCompleted = useCallback(
+    async (orderId: string) => {
+      if (!user?.uid) return;
+      setStage({ kind: "activating", orderId });
+      // The popup signals success on the client; the real server-side state
+      // change happens via PayHere's `notify_url` webhook. We give the webhook
+      // a brief window to land, then check the subscription exactly once.
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const sub = await fetchSubscription(user.uid);
+      if (sub?.status === "active") {
+        setSubscription(sub);
+        setStage({ kind: "success", data: sub, orderId });
+      } else {
+        setStage({ kind: "pending_notify", orderId });
+      }
+    },
+    [user?.uid, fetchSubscription],
+  );
+
+  const bindPayHereHandlers = useCallback(() => {
+    if (typeof window === "undefined" || !window.payhere) return;
+    if (handlersBoundRef.current) return;
+    handlersBoundRef.current = true;
+
+    window.payhere.onCompleted = (orderId: string) => {
+      void handleCompleted(orderId);
+    };
+    window.payhere.onDismissed = () => {
+      setStage((current) =>
+        current.kind === "opening" || current.kind === "preparing"
+          ? { kind: "cancelled" }
+          : current,
+      );
+    };
+    window.payhere.onError = (error: string) => {
+      setStage({ kind: "error", message: error || "PayHere reported an error." });
+    };
+  }, [handleCompleted]);
+
+  useEffect(() => {
+    if (sdkReady) bindPayHereHandlers();
+  }, [sdkReady, bindPayHereHandlers]);
+
+  const startCheckout = useCallback(async () => {
+    if (!user?.uid || selected === null) return;
+    if (stage.kind === "preparing" || stage.kind === "opening" || stage.kind === "activating") {
       return;
     }
-    try {
-      setErrorText(null);
-      setSavingNotice("Saving...");
-      setSavingPlanDays(days);
-      const res = await fetch("/api/select-plan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          firebase_uid: user.uid,
-          planDays: days,
-          nextPlanDays: days,
-          mode: isNewMode ? "new" : "default",
-        }),
+    if (!sdkReady || typeof window === "undefined" || !window.payhere) {
+      setStage({
+        kind: "error",
+        message: "PayHere is still loading. Please try again in a moment.",
       });
-      const data = await res.json();
-      if (!res.ok || !data?.ok) {
-        throw new Error(data?.error || "Failed to save plan");
-      }
-    } catch (error: unknown) {
-      const text = error instanceof Error ? error.message : "Something went wrong";
-      setErrorText(text);
-      setSavingNotice(null);
-    } finally {
-      setSavingPlanDays(null);
-      setTimeout(() => setSavingNotice(null), 800);
+      return;
     }
-  }
 
-  async function startCheckout() {
-    if (!user?.uid || selected === null) return;
-    if (checkoutLoading) return;
+    setStage({ kind: "preparing" });
+    bindPayHereHandlers();
 
-    setErrorText(null);
-    setCheckoutLoading(true);
     try {
       const displayName = user.displayName ?? "";
       const [firstName, ...rest] = displayName.split(" ").filter(Boolean);
@@ -253,35 +339,66 @@ export default function SelectPlanPage() {
           customer: customerPayload,
         }),
       });
-      const data = (await res.json()) as CheckoutResponse;
+      const data = (await res.json()) as InitiateResponse;
       if (!res.ok || !data.ok || !data.data) {
         throw new Error(data.error || "Failed to start PayHere checkout");
       }
 
-      const form = document.createElement("form");
-      form.method = "POST";
-      form.action = data.data.checkoutUrl;
-      form.style.display = "none";
-
-      for (const [name, value] of Object.entries(data.data.fields)) {
-        const input = document.createElement("input");
-        input.type = "hidden";
-        input.name = name;
-        input.value = String(value ?? "");
-        form.appendChild(input);
-      }
-
-      document.body.appendChild(form);
-      form.submit();
+      setStage({ kind: "opening" });
+      window.payhere.startPayment(data.data.popupConfig);
     } catch (error: unknown) {
       const text = error instanceof Error ? error.message : "Failed to start checkout";
-      setErrorText(text);
-      setCheckoutLoading(false);
+      setStage({ kind: "error", message: text });
     }
-  }
+  }, [user, selected, profile, sdkReady, bindPayHereHandlers, stage.kind]);
+
+  const handleDevConfirm = useCallback(async () => {
+    if (stage.kind !== "pending_notify" || !user?.uid) return;
+    setDevConfirming(true);
+    setDevConfirmError(null);
+    try {
+      const res = await fetch("/api/payhere/dev-confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ firebase_uid: user.uid, order_id: stage.orderId }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error ?? `Dev confirm failed (${res.status}).`);
+      }
+      const sub = await fetchSubscription(user.uid);
+      if (sub?.status !== "active") {
+        throw new Error("Confirmed, but subscription is still not active.");
+      }
+      setSubscription(sub);
+      setStage({ kind: "success", data: sub, orderId: stage.orderId });
+    } catch (err) {
+      setDevConfirmError(err instanceof Error ? err.message : "Could not confirm payment.");
+    } finally {
+      setDevConfirming(false);
+    }
+  }, [stage, user?.uid, fetchSubscription]);
+
+  const checkoutBusy =
+    stage.kind === "preparing" || stage.kind === "opening" || stage.kind === "activating";
+
+  const checkoutButtonLabel = (() => {
+    if (stage.kind === "preparing") return "Preparing checkout…";
+    if (stage.kind === "opening") return "Opening PayHere…";
+    if (stage.kind === "activating") return "Confirming payment…";
+    if (hasActiveSubscription) return "Switch plan & Pay";
+    return "Subscribe & Pay";
+  })();
 
   return (
     <div className="bb-page">
+      <Script
+        src="https://www.payhere.lk/lib/payhere.js"
+        strategy="afterInteractive"
+        onLoad={() => setSdkReady(true)}
+        onReady={() => setSdkReady(true)}
+      />
+
       <section className="bb-hero-dark">
         <div className="bb-hero-dark-inner bb-hero-centered bb-hero-selectPlan mx-auto w-full max-w-3xl px-4 text-center sm:px-6">
           <p className="bb-eyebrow-dark">Plan Selection</p>
@@ -297,7 +414,7 @@ export default function SelectPlanPage() {
       <section className="bb-band-light">
         <div className="bb-shell">
           <div className="selectPlanContent">
-            {hasActiveSubscription && (
+            {hasActiveSubscription && stage.kind !== "success" && (
               <section className="notice noticeSuccess">
                 <p>
                   You already have an active subscription
@@ -307,127 +424,190 @@ export default function SelectPlanPage() {
               </section>
             )}
 
-            {savingNotice && (
-              <section className="notice noticeInfo">
-                <p>{savingNotice}</p>
-                <span className="spinner" />
-              </section>
-            )}
-
-            {errorText && (
+            {stage.kind === "error" && (
               <section className="notice noticeError">
                 <div className="noticeRow">
-                  <p>{errorText}</p>
+                  <p>{stage.message}</p>
                   <button
                     type="button"
-                    onClick={() => selected !== null && void persistPlan(selected)}
+                    onClick={() => setStage({ kind: "idle" })}
                     className="retryBtn"
                   >
-                    Try again
+                    Dismiss
                   </button>
                 </div>
               </section>
             )}
 
-            <section className="planGrid">
-              {plans.map((plan) => {
-                const isSelected = selected === plan.days;
-                const isFeatured = plan.days === 14;
-                return (
+            {stage.kind === "cancelled" && (
+              <section className="notice noticeWarn">
+                <div className="noticeRow">
+                  <p>Checkout was closed before payment was completed. You can try again.</p>
                   <button
-                    key={plan.days}
                     type="button"
-                    onClick={() => {
-                      setSelected(plan.days);
-                      void persistPlan(plan.days);
-                    }}
+                    onClick={() => setStage({ kind: "idle" })}
+                    className="retryBtn"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </section>
+            )}
+
+            {stage.kind === "success" && (
+              <section className="successCard">
+                <div className="successBadge">Subscription active</div>
+                <h2>You&apos;re on Pro</h2>
+                <p>
+                  PayHere confirmed your payment.{" "}
+                  <strong>
+                    {stage.data.planName ?? `${stage.data.planDays ?? ""}-day plan`}
+                  </strong>{" "}
+                  is now active. Pro features are unlocked.
+                </p>
+                {stage.data.nextRenewalAt ? (
+                  <p className="hint">
+                    Next renewal: {new Date(stage.data.nextRenewalAt).toLocaleString()}
+                  </p>
+                ) : null}
+                <div className="successActions">
+                  <Link href="/marketing-plan" className="primaryBtn">
+                    Open marketing plan
+                  </Link>
+                  <Link href="/settings" className="ghostBtn">
+                    Subscription &amp; settings
+                  </Link>
+                </div>
+              </section>
+            )}
+
+            {stage.kind === "pending_notify" && (
+              <section className="notice noticePending">
+                <p>
+                  <strong>Payment received in PayHere.</strong> Activation happens on our server
+                  via PayHere&apos;s callback (<code>notify_url</code>). If your machine isn&apos;t
+                  publicly reachable (e.g. localhost), the callback won&apos;t land here. Open{" "}
+                  <Link href="/settings">Settings</Link> shortly to confirm Pro is active.
+                </p>
+                {IS_DEV ? (
+                  <div className="devBox">
+                    <p className="devLabel">Local dev shortcut</p>
+                    <p className="devHint">
+                      Mark this exact order as paid for local testing only. Disabled in production.
+                    </p>
+                    <button
+                      type="button"
+                      className="devBtn"
+                      onClick={() => void handleDevConfirm()}
+                      disabled={devConfirming}
+                    >
+                      {devConfirming
+                        ? "Confirming…"
+                        : "Mark this order as paid (dev only)"}
+                    </button>
+                    {devConfirmError ? (
+                      <p className="devError">{devConfirmError}</p>
+                    ) : null}
+                  </div>
+                ) : null}
+              </section>
+            )}
+
+            {stage.kind !== "success" && (
+              <>
+                <section className="planGrid">
+                  {plans.map((plan) => {
+                    const isSelected = selected === plan.days;
+                    const isFeatured = plan.days === 14;
+                    const isBusy = authLoading || !planHydrated || checkoutBusy;
+                    return (
+                      <button
+                        key={plan.days}
+                        type="button"
+                        onClick={() => {
+                          setStage((current) =>
+                            current.kind === "error" || current.kind === "cancelled"
+                              ? { kind: "idle" }
+                              : current,
+                          );
+                          setSelected(plan.days);
+                        }}
+                        disabled={isBusy}
+                        className={`planCard ${isFeatured ? "planCardFeatured" : ""} ${
+                          isSelected ? "isSelected" : ""
+                        } ${isBusy ? "isDisabled" : ""}`}
+                      >
+                        <div className="planCardGlow" />
+                        <div className="planTop">
+                          <div>
+                            {isFeatured ? (
+                              <span className="popularTag">Recommended</span>
+                            ) : null}
+                            <div className="planLabel">{plan.label}</div>
+                            <h3>{plan.name}</h3>
+                            <p className="planDays">{plan.days} day plan</p>
+                          </div>
+                          <div className={`checkCircle ${isSelected ? "active" : ""}`}>
+                            {isSelected ? "✓" : "○"}
+                          </div>
+                        </div>
+
+                        <div className="priceRow">
+                          <span className="priceAmount">
+                            {plan.currency} {plan.price.toLocaleString()}
+                          </span>
+                          <span className="priceCadence">{plan.cadence}</span>
+                        </div>
+
+                        <div className={`cardCta ${isSelected ? "active" : ""}`}>
+                          {isSelected ? "Selected" : "Choose this plan"}
+                        </div>
+                        <p className="included">What&apos;s included:</p>
+
+                        <ul>
+                          {plan.bullets.map((bullet) => (
+                            <li key={bullet}>
+                              <span>✓</span>
+                              {bullet}
+                            </li>
+                          ))}
+                        </ul>
+                      </button>
+                    );
+                  })}
+                </section>
+
+                <div className="actions">
+                  <button
+                    type="button"
+                    onClick={() => router.push("/dashboard/profile")}
+                    className="backBtn"
+                  >
+                    Back
+                  </button>
+
+                  <button
+                    type="button"
                     disabled={
-                      savingPlanDays !== null ||
+                      selected === null ||
                       authLoading ||
                       !planHydrated ||
-                      checkoutLoading
+                      !sdkReady ||
+                      checkoutBusy
                     }
-                    className={`planCard ${isFeatured ? "planCardFeatured" : ""} ${
-                      isSelected ? "isSelected" : ""
-                    } ${
-                      savingPlanDays !== null || authLoading || !planHydrated || checkoutLoading
-                        ? "isDisabled"
-                        : ""
-                    }`}
+                    onClick={() => void startCheckout()}
+                    className="nextBtn"
                   >
-                    <div className="planCardGlow" />
-                    <div className="planTop">
-                      <div>
-                        {isFeatured ? (
-                          <span className="popularTag">Recommended</span>
-                        ) : null}
-                        <div className="planLabel">{plan.label}</div>
-                        <h3>{plan.name}</h3>
-                        <p className="planDays">{plan.days} day plan</p>
-                      </div>
-                      <div className={`checkCircle ${isSelected ? "active" : ""}`}>
-                        {isSelected ? "✓" : "○"}
-                      </div>
-                    </div>
-
-                    <div className="priceRow">
-                      <span className="priceAmount">
-                        {plan.currency} {plan.price.toLocaleString()}
-                      </span>
-                      <span className="priceCadence">{plan.cadence}</span>
-                    </div>
-
-                    <div className={`cardCta ${isSelected ? "active" : ""}`}>
-                      {isSelected ? "Selected" : "Choose this plan"}
-                    </div>
-                    <p className="included">What&apos;s included:</p>
-
-                    <ul>
-                      {plan.bullets.map((bullet) => (
-                        <li key={bullet}>
-                          <span>✓</span>
-                          {bullet}
-                        </li>
-                      ))}
-                    </ul>
+                    {checkoutButtonLabel}
                   </button>
-                );
-              })}
-            </section>
+                </div>
 
-            <div className="actions">
-              <button
-                type="button"
-                onClick={() => router.push("/dashboard/profile")}
-                className="backBtn"
-              >
-                Back
-              </button>
-
-              <button
-                type="button"
-                disabled={
-                  selected === null ||
-                  savingPlanDays !== null ||
-                  authLoading ||
-                  !planHydrated ||
-                  checkoutLoading
-                }
-                onClick={() => void startCheckout()}
-                className="nextBtn"
-              >
-                {checkoutLoading
-                  ? "Redirecting to PayHere..."
-                  : hasActiveSubscription
-                    ? "Switch plan & Pay"
-                    : "Subscribe & Pay"}
-              </button>
-            </div>
-
-            <p className="secureNote">
-              Payments are securely processed by PayHere. You can cancel or change your plan
-              anytime.
-            </p>
+                <p className="secureNote">
+                  Payments open in a secure PayHere popup. You can cancel or change your plan
+                  anytime.
+                </p>
+              </>
+            )}
           </div>
         </div>
       </section>
@@ -449,35 +629,42 @@ export default function SelectPlanPage() {
           backdrop-filter: blur(12px);
         }
 
-        .noticeInfo {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 10px;
-        }
-
         .notice p {
           margin: 0;
           font-size: 14px;
           color: #334155;
+          line-height: 1.55;
         }
 
-        .spinner {
-          width: 16px;
-          height: 16px;
-          border-radius: 999px;
-          border: 2px solid #cbd5e1;
-          border-top-color: #0f172a;
-          animation: spin 1s linear infinite;
+        .notice code {
+          background: rgba(0, 0, 0, 0.06);
+          padding: 1px 6px;
+          border-radius: 6px;
+          font-size: 12.5px;
+        }
+
+        .notice a {
+          color: #0f172a;
+          text-decoration: underline;
         }
 
         .noticeError {
           border-color: rgba(251, 113, 133, 0.42);
         }
 
+        .noticeWarn {
+          border-color: rgba(234, 179, 8, 0.42);
+          background: rgba(254, 252, 232, 0.85);
+        }
+
         .noticeSuccess {
           border-color: rgba(34, 197, 94, 0.42);
           background: rgba(240, 253, 244, 0.85);
+        }
+
+        .noticePending {
+          border-color: rgba(99, 102, 241, 0.42);
+          background: rgba(238, 242, 255, 0.85);
         }
 
         .noticeRow {
@@ -497,6 +684,130 @@ export default function SelectPlanPage() {
           font-size: 13px;
           font-weight: 600;
           cursor: pointer;
+        }
+
+        .devBox {
+          margin-top: 14px;
+          padding: 12px 14px;
+          border-radius: 12px;
+          border: 1px dashed rgba(234, 179, 8, 0.55);
+          background: rgba(254, 252, 232, 0.85);
+        }
+
+        .devLabel {
+          margin: 0 0 6px;
+          font-size: 11px;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          font-weight: 700;
+          color: #854d0e;
+        }
+
+        .devHint {
+          margin: 0 0 10px !important;
+          font-size: 12.5px !important;
+          color: #713f12 !important;
+        }
+
+        .devBtn {
+          width: 100%;
+          border-radius: 10px;
+          padding: 10px 14px;
+          border: 1px solid #f59e0b;
+          background: #f59e0b;
+          color: #1f2937;
+          font-size: 13.5px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .devBtn:disabled {
+          opacity: 0.7;
+          cursor: not-allowed;
+        }
+
+        .devError {
+          margin: 10px 0 0 !important;
+          font-size: 12.5px !important;
+          color: #991b1b !important;
+        }
+
+        .successCard {
+          max-width: 680px;
+          margin: 0 auto;
+          padding: 28px 24px;
+          border-radius: 20px;
+          border: 1px solid rgba(34, 197, 94, 0.32);
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(240, 253, 244, 0.95));
+          box-shadow: 0 20px 50px rgba(15, 23, 42, 0.12);
+          text-align: center;
+        }
+
+        .successBadge {
+          display: inline-flex;
+          padding: 6px 12px;
+          border-radius: 999px;
+          background: rgba(34, 197, 94, 0.14);
+          color: #166534;
+          font-size: 11px;
+          letter-spacing: 0.14em;
+          font-weight: 700;
+          text-transform: uppercase;
+          margin-bottom: 14px;
+        }
+
+        .successCard h2 {
+          margin: 0 0 8px;
+          font-size: 24px;
+          color: #0f172a;
+          letter-spacing: -0.01em;
+        }
+
+        .successCard p {
+          margin: 0;
+          font-size: 14px;
+          color: #475569;
+          line-height: 1.6;
+        }
+
+        .successCard .hint {
+          margin-top: 8px;
+          font-size: 13px;
+          color: #64748b;
+        }
+
+        .successActions {
+          margin-top: 18px;
+          display: flex;
+          gap: 10px;
+          justify-content: center;
+          flex-wrap: wrap;
+        }
+
+        .primaryBtn,
+        .ghostBtn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 999px;
+          padding: 12px 22px;
+          font-size: 14px;
+          font-weight: 700;
+          text-decoration: none;
+          cursor: pointer;
+        }
+
+        .primaryBtn {
+          background: #111111;
+          color: #ffffff;
+          border: 1px solid #111111;
+          box-shadow: 0 16px 34px rgba(15, 23, 42, 0.22);
+        }
+
+        .ghostBtn {
+          background: #ffffff;
+          color: #0f172a;
+          border: 1px solid rgba(148, 163, 184, 0.45);
         }
 
         .planGrid {
@@ -767,12 +1078,6 @@ export default function SelectPlanPage() {
           text-align: center;
           color: #64748b;
           font-size: 12px;
-        }
-
-        @keyframes spin {
-          to {
-            transform: rotate(360deg);
-          }
         }
 
         @media (max-width: 900px) {

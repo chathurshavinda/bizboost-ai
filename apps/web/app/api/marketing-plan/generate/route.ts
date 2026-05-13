@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
+import { requireActiveSubscription } from "@/lib/subscriptionAccess";
 import { buildDateRange, buildLifecyclePlanDays, computeProgress, startOfLocalDay } from "@/src/lib/marketingPlan";
 import { deriveDayThemeForPlan } from "@/src/lib/posterDayTheme";
 import { buildMarketingActivationCopyPack } from "@/src/lib/posterActivationCopy";
@@ -2685,6 +2686,13 @@ export async function POST(req: Request) {
             return NextResponse.json({ ok: false, error: "firebase_uid is required" }, { status: 400 });
         }
         const db = await getDb();
+        const subGate = await requireActiveSubscription(db, firebase_uid);
+        if (subGate) {
+            return NextResponse.json(
+                { ok: false, error: subGate.error, code: subGate.code },
+                { status: 403 },
+            );
+        }
         const profile = await db.collection("business_profiles").findOne({ firebase_uid });
         if (!profile) {
             return NextResponse.json({ ok: false, error: "business_profile_not_found" }, { status: 404 });

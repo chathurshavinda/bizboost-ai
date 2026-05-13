@@ -5,11 +5,12 @@ import {
   buildOrderId,
   formatAmount,
   generateInitiationHash,
-  getCheckoutUrl,
+  getPayHereMode,
   isPlanDays,
 } from "@/lib/payhere";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 type CustomerInput = {
   first_name?: string;
@@ -45,6 +46,13 @@ function resolveBaseUrl(req: Request): string {
   }
 }
 
+/**
+ * POST /api/payhere/initiate
+ *
+ * Generates a signed payment configuration the client passes directly to the
+ * PayHere JS SDK via `payhere.startPayment(config)`. There is no redirect.
+ * Server-side confirmation still happens through the `notify_url` webhook.
+ */
 export async function POST(req: Request) {
   try {
     const merchantId = process.env.PAYHERE_MERCHANT_ID?.trim();
@@ -91,15 +99,21 @@ export async function POST(req: Request) {
     const baseUrl = resolveBaseUrl(req);
     const customer = payload.customer ?? {};
 
-    const fields: Record<string, string> = {
+    // PayHere still requires return_url / cancel_url to be sent even in popup
+    // mode (for validation). They will not be redirected to when using
+    // payhere.startPayment, but we point them at /select-plan as a safe
+    // fallback in case the gateway ever falls back to a full-page redirect.
+    const popupConfig = {
+      sandbox: getPayHereMode() === "sandbox",
       merchant_id: merchantId,
-      return_url: `${baseUrl}/payhere/return?order_id=${encodeURIComponent(orderId)}`,
-      cancel_url: `${baseUrl}/payhere/cancel?order_id=${encodeURIComponent(orderId)}`,
+      return_url: `${baseUrl}/select-plan`,
+      cancel_url: `${baseUrl}/select-plan`,
       notify_url: `${baseUrl}/api/payhere/notify`,
       order_id: orderId,
       items: `BizBoost AI - ${plan.name} Plan (${planDaysRaw} days)`,
-      currency,
       amount: formatAmount(amount),
+      currency,
+      hash,
       recurrence: plan.recurrence,
       duration: plan.duration,
       first_name: cleanString(customer.first_name, "Customer"),
@@ -111,7 +125,6 @@ export async function POST(req: Request) {
       country: cleanString(customer.country, "Sri Lanka"),
       custom_1: firebase_uid,
       custom_2: String(planDaysRaw),
-      hash,
     };
 
     const db = await getDb();
@@ -134,9 +147,8 @@ export async function POST(req: Request) {
       {
         ok: true,
         data: {
-          checkoutUrl: getCheckoutUrl(),
           orderId,
-          fields,
+          popupConfig,
           plan: {
             name: plan.name,
             price: plan.price,

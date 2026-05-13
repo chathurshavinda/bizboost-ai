@@ -140,6 +140,29 @@ export async function POST(req: Request) {
         { upsert: true },
       );
 
+      // Persist the user's plan choice only AFTER PayHere confirms a successful
+      // payment. The select-plan page never writes to this collection.
+      const planName = `${planDays} Day Plan`;
+      await db.collection("selected_plans").updateOne(
+        { firebase_uid },
+        {
+          $set: {
+            firebase_uid,
+            planDays,
+            nextPlanDays: planDays,
+            selectionMode: "paid",
+            planName,
+            price: Number.isFinite(amountNumber) ? amountNumber : undefined,
+            currency: payhere_currency || "LKR",
+            lastOrderId: order_id,
+            lastPaymentId: payment_id || null,
+            selectedAt: now,
+            updatedAt: now,
+          },
+        },
+        { upsert: true },
+      );
+
       await db.collection("subscription_payments").insertOne({
         firebase_uid,
         planDays,
