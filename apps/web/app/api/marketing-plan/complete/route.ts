@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { computeProgress, normalizePlanDocument } from "@/src/lib/marketingPlan";

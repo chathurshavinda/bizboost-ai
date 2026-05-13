@@ -1,4 +1,5 @@
 "use client";
+export const dynamic = "force-dynamic";
 import { toPng } from "html-to-image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";

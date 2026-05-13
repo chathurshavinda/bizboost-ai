@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { getDb } from "@/src/lib/mongodb";
 export async function GET(req: Request) {
