@@ -48,10 +48,7 @@ function dataUrlToBlob(dataUrl: string): Blob {
         bytes[i] = binary.charCodeAt(i);
     return new Blob([bytes], { type: mime });
 }
-
-/** Instagram-style square export — only the poster graphic, no card/page chrome. */
 const POSTER_EXPORT_PX = 1080;
-
 function resolvePosterWrapElement(container: HTMLElement | null): HTMLElement | null {
     if (!container)
         return null;
@@ -60,41 +57,32 @@ function resolvePosterWrapElement(container: HTMLElement | null): HTMLElement | 
     const inner = container.querySelector(".posterWrap");
     return inner instanceof HTMLElement ? inner : null;
 }
-
 async function posterWrapToPngDataUrl(posterWrap: HTMLElement): Promise<string> {
     await waitForImages(posterWrap);
     await waitForFontsAndPaint();
-
     const w = Math.max(1, Math.round(posterWrap.offsetWidth || posterWrap.getBoundingClientRect().width));
     const h = Math.max(1, Math.round(posterWrap.offsetHeight || posterWrap.getBoundingClientRect().height));
     if (w !== h) {
         console.warn("[poster-preview] Export posterWrap is not square; output may be letterboxed. Size:", w, h);
     }
-
-    const boxShadow = posterWrap.style.boxShadow,
-        borderRadius = posterWrap.style.borderRadius,
-        outline = posterWrap.style.outline,
-        filter = posterWrap.style.filter;
+    const boxShadow = posterWrap.style.boxShadow, borderRadius = posterWrap.style.borderRadius, outline = posterWrap.style.outline, filter = posterWrap.style.filter;
     posterWrap.style.boxShadow = "none";
     posterWrap.style.borderRadius = "0";
     posterWrap.style.outline = "none";
     posterWrap.style.filter = "none";
-
     const toPngOpts = {
-                cacheBust: true,
-                pixelRatio: 1,
+        cacheBust: true,
+        pixelRatio: 1,
         width: POSTER_EXPORT_PX,
         height: POSTER_EXPORT_PX,
-        /** No matte — art is edge-to-edge on the square. */
         backgroundColor: "rgba(0,0,0,0)",
-                skipFonts: true,
+        skipFonts: true,
     };
-
     try {
         return await toPng(posterWrap, toPngOpts);
-        }
-        catch {
-            const { default: html2canvas } = await import("html2canvas");
+    }
+    catch {
+        const { default: html2canvas } = await import("html2canvas");
         const side = Math.min(w, h);
         const scale = POSTER_EXPORT_PX / side;
         const canvas = await html2canvas(posterWrap, {
@@ -106,8 +94,8 @@ async function posterWrapToPngDataUrl(posterWrap: HTMLElement): Promise<string> 
             windowHeight: h,
             x: 0,
             y: 0,
-                useCORS: true,
-                allowTaint: false,
+            useCORS: true,
+            allowTaint: false,
             logging: false,
         });
         const out = document.createElement("canvas");
@@ -126,7 +114,6 @@ async function posterWrapToPngDataUrl(posterWrap: HTMLElement): Promise<string> 
         posterWrap.style.filter = filter;
     }
 }
-
 async function posterWrapFromExportMountOrPreview(posterCanvasEl: HTMLElement | null): Promise<string | null> {
     const mount = typeof document !== "undefined" ? document.getElementById("poster-export-mount") : null;
     const mountWrap = mount ? resolvePosterWrapElement(mount) : null;
@@ -178,7 +165,6 @@ export default function PosterPreviewPage() {
     const [imageCopied, setImageCopied] = useState(false);
     const [posterDataUrl, setPosterDataUrl] = useState<string | null>(null);
     const posterRef = useRef<HTMLDivElement>(null);
-    /** Blob for “Copy image” in the share fallback sheet (native share must stay synchronous; see handleShare). */
     const shareFallbackBlobRef = useRef<Blob | null>(null);
     const hasPoster = Boolean(draft?.imageDataUrl);
     const actionsLocked = loading;
@@ -332,7 +318,6 @@ export default function PosterPreviewPage() {
             setDownloadBusy(false);
         }
     }, [buildPosterDataUrl, draftIdForFilename, exportBusy, hasPoster, isConfirmed]);
-
     const openShareFallbackSheet = useCallback((blob: Blob) => {
         shareFallbackBlobRef.current = blob;
         const nextUrl = URL.createObjectURL(blob);
@@ -344,78 +329,61 @@ export default function PosterPreviewPage() {
         setShareUnsupportedOpen(true);
         setExportMessage("");
     }, []);
-
-    /**
-     * Web Share with files must be triggered with no prior `await` in the same event turn (Chrome / Safari user activation).
-     * So we only call `navigator.share({ files })` when `posterDataUrl` is already in memory (after Confirm or background export).
-     * If it is missing, we async-export then open the fallback sheet only (clipboard + download + links).
-     */
     const handleShare = useCallback(() => {
         if (exportBusy || !hasPoster || !isConfirmed)
             return;
         setExportMessage("");
-
         const captionText = (draft?.caption || "").trim().slice(0, 2000);
         const filename = `bizboost-poster-${draftIdForFilename}.png`;
-
-        /** No `setState` before `navigator.share` — React updates can drop user activation (Chrome). */
         const runNativeShareSync = (dataUrl: string) => {
             const blob = dataUrlToBlob(dataUrl);
-
             const finishOrFallback = () => {
                 setShareBusy(false);
                 openShareFallbackSheet(blob);
             };
-
             if (typeof navigator === "undefined" || typeof navigator.share !== "function") {
                 finishOrFallback();
                 return;
             }
-
             const file = new File([blob], filename, { type: "image/png", lastModified: Date.now() });
-
             if (typeof navigator.canShare === "function" && !navigator.canShare({ files: [file] })) {
                 finishOrFallback();
                 return;
             }
-
             const payload: ShareData = {
                 files: [file],
                 title: "BizBoost Poster",
                 text: captionText,
             };
-
             navigator.share(payload)
                 .catch((err: unknown) => {
-                    const e = err as DOMException;
-                    if (e?.name === "AbortError")
-                        return;
-                    console.warn("[Poster Preview] navigator.share:", err);
-                    openShareFallbackSheet(blob);
-                })
+                const e = err as DOMException;
+                if (e?.name === "AbortError")
+                    return;
+                console.warn("[Poster Preview] navigator.share:", err);
+                openShareFallbackSheet(blob);
+            })
                 .finally(() => {
-                    setShareBusy(false);
-                });
+                setShareBusy(false);
+            });
         };
-
         const cached = posterDataUrl;
         if (cached) {
             runNativeShareSync(cached);
             return;
         }
-
         setShareBusy(true);
         void buildPosterDataUrl()
             .then((built) => {
-                setShareBusy(false);
-                if (!built) {
-                    setExportMessage("Could not prepare the poster image. Confirm the poster again, then tap Share.");
-                    setShareUnsupportedOpen(true);
-                    return;
-                }
-                setPosterDataUrl(built);
-                const blob = dataUrlToBlob(built);
-                shareFallbackBlobRef.current = blob;
+            setShareBusy(false);
+            if (!built) {
+                setExportMessage("Could not prepare the poster image. Confirm the poster again, then tap Share.");
+                setShareUnsupportedOpen(true);
+                return;
+            }
+            setPosterDataUrl(built);
+            const blob = dataUrlToBlob(built);
+            shareFallbackBlobRef.current = blob;
             const nextUrl = URL.createObjectURL(blob);
             setShareImageUrl((prev) => {
                 if (prev)
@@ -423,15 +391,14 @@ export default function PosterPreviewPage() {
                 return nextUrl;
             });
             setShareUnsupportedOpen(true);
-                setExportMessage("Your browser needs a saved image to share here — use Copy image or Download, then paste or attach in your app.");
-            })
+            setExportMessage("Your browser needs a saved image to share here — use Copy image or Download, then paste or attach in your app.");
+        })
             .catch(() => {
-                setShareBusy(false);
-                setExportMessage("Could not export the poster. Try Download.");
-                setShareUnsupportedOpen(true);
-            });
+            setShareBusy(false);
+            setExportMessage("Could not export the poster. Try Download.");
+            setShareUnsupportedOpen(true);
+        });
     }, [buildPosterDataUrl, draft?.caption, draftIdForFilename, exportBusy, hasPoster, isConfirmed, openShareFallbackSheet, posterDataUrl]);
-
     const copyPosterImageToClipboard = useCallback(async () => {
         const blob = shareFallbackBlobRef.current;
         if (!blob || typeof navigator === "undefined" || !navigator.clipboard?.write) {

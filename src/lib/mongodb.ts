@@ -8,11 +8,11 @@ const globalForMongo = globalThis as GlobalThisWithMongo;
 let warnedAboutNodeVersion = false;
 let dnsFallbackApplied = false;
 let dnsPrimedForAtlas = false;
-
-/** Prefer public resolvers + IPv4 before Atlas SRV lookups (helps flaky ISP / Windows DNS). */
 function primeDnsForMongoAtlas(): void {
-    if (dnsPrimedForAtlas) return;
-    if (process.env.MONGODB_SKIP_PUBLIC_DNS === "1") return;
+    if (dnsPrimedForAtlas)
+        return;
+    if (process.env.MONGODB_SKIP_PUBLIC_DNS === "1")
+        return;
     dnsPrimedForAtlas = true;
     try {
         dns.setServers(["1.1.1.1", "8.8.8.8", "1.0.0.1"]);
@@ -21,10 +21,8 @@ function primeDnsForMongoAtlas(): void {
         }
     }
     catch {
-        // non-fatal
     }
 }
-
 function walkErrorChain(error: unknown, visit: (e: Error) => void): void {
     let current: unknown = error;
     const seen = new Set<unknown>();
@@ -32,17 +30,21 @@ function walkErrorChain(error: unknown, visit: (e: Error) => void): void {
     while (current instanceof Error && depth < 8 && !seen.has(current)) {
         seen.add(current);
         visit(current);
-        current = (current as Error & { cause?: unknown }).cause;
+        current = (current as Error & {
+            cause?: unknown;
+        }).cause;
         depth += 1;
     }
 }
-
 function isDnsLookupFailure(error: unknown): boolean {
     const parts: string[] = [];
     walkErrorChain(error, (e) => {
         parts.push(e.message);
-        const code = "code" in e ? String((e as { code?: string }).code ?? "") : "";
-        if (code) parts.push(code);
+        const code = "code" in e ? String((e as {
+            code?: string;
+        }).code ?? "") : "";
+        if (code)
+            parts.push(code);
     });
     const blob = parts.join(" ");
     return /ENOTFOUND|EAI_AGAIN|querySrv/i.test(blob);
@@ -68,7 +70,6 @@ function getMongoUri(): string {
 }
 export async function getClient(): Promise<MongoClient> {
     primeDnsForMongoAtlas();
-
     const clientOptions = {
         appName: "Cluster0",
         serverSelectionTimeoutMS: 12000,
@@ -86,16 +87,13 @@ export async function getClient(): Promise<MongoClient> {
                     dns.setServers(["8.8.4.4", "1.1.1.1", "8.8.8.8"]);
                 }
                 catch {
-                    // ignore
                 }
                 console.warn("[MongoDB] Retrying Atlas connection with alternate DNS server order.");
                 return new MongoClient(getMongoUri(), clientOptions).connect();
             }
             if (isDnsLookupFailure(error)) {
-                console.error(
-                    "[MongoDB] Cannot resolve Atlas hostnames (ENOTFOUND). Try: (1) ipconfig /flushdns on Windows, " +
-                        "(2) another network or mobile hotspot, (3) Node.js 20 LTS, (4) confirm MONGODB_URI in Atlas → Connect.",
-                );
+                console.error("[MongoDB] Cannot resolve Atlas hostnames (ENOTFOUND). Try: (1) ipconfig /flushdns on Windows, " +
+                    "(2) another network or mobile hotspot, (3) Node.js 20 LTS, (4) confirm MONGODB_URI in Atlas → Connect.");
             }
             throw error;
         }

@@ -1,16 +1,7 @@
 import type { PosterDesign } from "@/src/components/poster/PosterTemplate";
-
 export type ActivationFormat = "Reel" | "Story" | "Feed" | "Carousel";
-export type InternalPlanTheme =
-    | "promo_offer"
-    | "highlight"
-    | "review_collection"
-    | "behind_scenes"
-    | "engagement"
-    | "growth_push"
-    | "track_improve";
+export type InternalPlanTheme = "promo_offer" | "highlight" | "review_collection" | "behind_scenes" | "engagement" | "growth_push" | "track_improve";
 export type MarketingGoalKey = "DMs" | "Orders" | "Bookings" | "Footfall" | "Leads";
-
 export type MarketingActivationCopyPack = {
     whatToPostInstruction: string;
     hookLine: string;
@@ -18,14 +9,12 @@ export type MarketingActivationCopyPack = {
     whyThisWorks: string;
     poster: Pick<PosterDesign, "headline" | "subheadline" | "offerBadge" | "ctaLabel">;
 };
-
 function squash(s: string, max: number): string {
     const t = (s || "").replace(/\s+/g, " ").trim();
     if (!t)
         return "";
     return t.length <= max ? t : `${t.slice(0, max - 1).trim()}…`;
 }
-
 function cleanRawActivation(value: string): string {
     return value
         .replace(/\s+/g, " ")
@@ -33,7 +22,6 @@ function cleanRawActivation(value: string): string {
         .replace(/\b(?:optional|support only|activation)\s*[:\-]?\s*/gi, "")
         .trim();
 }
-
 function stripPlanningPrefixes(s: string): string {
     return cleanRawActivation(s)
         .replace(/^(feed|story|reel|carousel)\s+[:\-]?\s*/i, "")
@@ -41,11 +29,9 @@ function stripPlanningPrefixes(s: string): string {
         .replace(/^(counter|checkout|whatsapp|banner)\s+/i, "")
         .trim();
 }
-
 function normKey(s: string): string {
     return s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
-
 function tokensTooSimilar(a: string, b: string): boolean {
     const na = normKey(a);
     const nb = normKey(b);
@@ -59,7 +45,6 @@ function tokensTooSimilar(a: string, b: string): boolean {
         return true;
     return false;
 }
-
 export function buildWhatToPostInstruction(raw: string, product: string, format: ActivationFormat): string {
     const core = stripPlanningPrefixes(raw || `Promote ${product} with one clear ${format.toLowerCase()} and CTA.`);
     if (/^(create|publish|post|film|design|run|share)\b/i.test(core))
@@ -68,7 +53,6 @@ export function buildWhatToPostInstruction(raw: string, product: string, format:
         return squash(`Create content that ${core.charAt(0).toLowerCase()}${core.slice(1)}`, 220);
     return squash(`Create a ${format} that ${core.charAt(0).toLowerCase()}${core.slice(1)}`, 220);
 }
-
 function intentFromInstruction(instruction: string, product: string): {
     preOrder: boolean;
     weekend: boolean;
@@ -86,16 +70,14 @@ function intentFromInstruction(instruction: string, product: string): {
     return {
         preOrder: (/\bpre\b/.test(t) && /\border/.test(t)) || t.includes("preorder") || t.includes("pre order"),
         weekend: t.includes("weekend") || t.includes("saturday") || t.includes("sunday"),
-        limited:
-            /\blimited\b/.test(t) ||
+        limited: /\blimited\b/.test(t) ||
             t.includes("deadline") ||
             t.includes("cutoff") ||
             t.includes("cut off") ||
             t.includes("flash") ||
             t.includes("few slots") ||
             t.includes("stock cap"),
-        bestSeller:
-            t.includes("best seller") ||
+        bestSeller: t.includes("best seller") ||
             t.includes("bestseller") ||
             t.includes("weekly favorite") ||
             t.includes("hero sku") ||
@@ -103,8 +85,7 @@ function intentFromInstruction(instruction: string, product: string): {
         review: t.includes("review") || t.includes("testimonial") || t.includes("google map") || t.includes("maps") || t.includes("quote"),
         booking: t.includes("book") || t.includes("slot") || t.includes("appointment") || t.includes("reserve"),
         bundle: t.includes("bundle") || t.includes("combo") || t.includes("package"),
-        bts:
-            t.includes("behind") ||
+        bts: t.includes("behind") ||
             t.includes("process") ||
             t.includes("prep") ||
             t.includes("hygiene") ||
@@ -114,7 +95,6 @@ function intentFromInstruction(instruction: string, product: string): {
         fresh: p.includes("coffee") || p.includes("bake") || t.includes("fresh today") || t.includes("daily"),
     };
 }
-
 export function buildCatchyHookLine(args: {
     instruction: string;
     product: string;
@@ -172,7 +152,6 @@ export function buildCatchyHookLine(args: {
     }
     return squash(picks[hash % picks.length]!, 160);
 }
-
 export function buildPostIdeaCreative(args: {
     instruction: string;
     product: string;
@@ -181,10 +160,7 @@ export function buildPostIdeaCreative(args: {
     city: string;
 }): string {
     const v1 = args.visualGuide[0] ? stripPlanningPrefixes(args.visualGuide[0]) : "";
-    const lineA = squash(
-        `Creative direction: Lead with ${args.product.trim() || "your offer"}, keep the ${args.format.toLowerCase()} pacing tight, and make the payoff obvious before people scroll.`,
-        200,
-    );
+    const lineA = squash(`Creative direction: Lead with ${args.product.trim() || "your offer"}, keep the ${args.format.toLowerCase()} pacing tight, and make the payoff obvious before people scroll.`, 200);
     const lineB = v1
         ? `Visually: ${v1.charAt(0).toUpperCase() + v1.slice(1)}${args.city.trim() ? ` — clean light, ${args.city.trim()}-friendly.` : "."}`
         : args.city.trim()
@@ -192,22 +168,19 @@ export function buildPostIdeaCreative(args: {
             : `Tone: modern Sri Lankan SME English — warm, clear, no jargon.`;
     return `${lineA}\n${squash(lineB, 200)}`;
 }
-
 export function buildWhyThisWorks(businessGrowthAction: string, goal: MarketingGoalKey, product: string): string {
     const task = squash(stripPlanningPrefixes(businessGrowthAction), 180) || "today's growth task";
-    const outcome =
-        goal === "Footfall"
-            ? "walk-ins"
-            : goal === "Bookings"
-                ? "bookings"
-                : goal === "Orders"
-                    ? "orders"
-                    : goal === "Leads" || goal === "DMs"
-                        ? "real conversations"
-                        : "momentum";
+    const outcome = goal === "Footfall"
+        ? "walk-ins"
+        : goal === "Bookings"
+            ? "bookings"
+            : goal === "Orders"
+                ? "orders"
+                : goal === "Leads" || goal === "DMs"
+                    ? "real conversations"
+                    : "momentum";
     return squash(`Supports your growth task (${task}) by turning scrolls into ${outcome} for ${product || "your offer"}.`, 260);
 }
-
 function pickCtaLabel(goal: MarketingGoalKey, intent: ReturnType<typeof intentFromInstruction>): string {
     if (intent.preOrder)
         return "DM to Pre-Order";
@@ -228,7 +201,6 @@ function pickCtaLabel(goal: MarketingGoalKey, intent: ReturnType<typeof intentFr
             return "Message Us Now";
     }
 }
-
 function pickOfferBadge(args: {
     intent: ReturnType<typeof intentFromInstruction>;
     weekend: boolean;
@@ -249,7 +221,6 @@ function pickOfferBadge(args: {
         return "Fresh Today";
     return "";
 }
-
 export function buildPosterCopyFromActivation(args: {
     instruction: string;
     product: string;
@@ -267,7 +238,6 @@ export function buildPosterCopyFromActivation(args: {
     const loc = city.trim();
     let headline = "";
     let sub = "";
-
     if (intent.preOrder) {
         headline = weekend ? `${prod} Weekend Pre-Orders` : `${prod} Pre-Orders Open`;
         sub = `Order before the cutoff and we'll hold yours — message us for the next step${loc ? ` (${loc}).` : "."}`;
@@ -312,15 +282,12 @@ export function buildPosterCopyFromActivation(args: {
         headline = `${prod} — Today's Highlight`;
         sub = `Straight talk, real value — tap in for details${loc ? ` — ${loc}.` : "."}`;
     }
-
     if (format === "Reel")
         sub = squash(`${sub} Short, punchy cuts work best.`, 100);
     if (format === "Carousel")
         sub = squash(`${sub} Use 3–5 slides: hook → proof → CTA.`, 100);
-
     const offerBadge = pickOfferBadge({ intent, weekend, offerDeadlineHint });
     const ctaLabel = pickCtaLabel(goal, intent);
-
     return {
         headline: squash(headline, 52),
         subheadline: squash(sub, 100),
@@ -328,7 +295,6 @@ export function buildPosterCopyFromActivation(args: {
         ctaLabel: squash(ctaLabel, 24),
     };
 }
-
 export function buildMarketingActivationCopyPack(args: {
     rawActivation: string;
     product: string;

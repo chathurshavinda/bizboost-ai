@@ -122,7 +122,6 @@ const PREVIEW_PLAN_SAMPLE = {
     ],
     progressPct: 42,
 };
-/** Sample growth-plan rows: daily business / ops actions */
 const PREVIEW_GROWTH_DAYS = [
     {
         day: "Day 10",
@@ -143,7 +142,6 @@ const PREVIEW_GROWTH_DAYS = [
         action: "Share a carousel of your top 3 dishes with a limited weekend combo price.",
     },
 ];
-/** Sample marketing-plan rows: social hooks + caption + hashtags */
 const PREVIEW_MARKETING_DAYS = [
     {
         day: "Day 10",
@@ -160,8 +158,7 @@ const PREVIEW_MARKETING_DAYS = [
     {
         day: "Day 12",
         hook: "Weekend combo drop",
-        caption:
-            "Weekend flavours just landed — tag someone you'd split our tasting platter with. Combo ends Sunday night!",
+        caption: "Weekend flavours just landed — tag someone you'd split our tasting platter with. Combo ends Sunday night!",
         tags: ["#WeekendSpecial", "#KandyEats", "#SriLankanFood", "#ShopLocalLK"],
     },
 ];
@@ -170,10 +167,6 @@ const WHY_BULLETS = [
     "Simple templates now, AI later",
     "Works even with minimal marketing knowledge",
 ];
-/**
- * Animated home gallery — swap `src` for your real screenshots (e.g. `/showcase/profile-1.png`).
- * Keep `id` unique. `row`: 0 = top strip, 1 = middle, 2 = bottom. `size` controls tile footprint (masonry feel).
- */
 type HomeShowcaseGalleryImage = {
     id: string;
     src: string;
@@ -285,7 +278,6 @@ export default function Home() {
     }>>([]);
     const [taskCompletedMap, setTaskCompletedMap] = useState<Record<number, boolean>>({});
     const [taskPlanDays, setTaskPlanDays] = useState<number>(0);
-    /** From DB via `/api/marketing-plan/latest` — user has at least one saved Plan Builder plan (not skeleton-only). */
     const [hasGeneratedPlan, setHasGeneratedPlan] = useState(false);
     const revealHow = useLandingReveal();
     const revealFeatures = useLandingReveal();
@@ -404,7 +396,7 @@ export default function Home() {
     return (<main className="landingRoot">
       <section className="heroShell">
         <div className="heroPathsLayer" aria-hidden>
-          <BackgroundPaths pathsOnly />
+          <BackgroundPaths pathsOnly/>
         </div>
         <div className="heroGradientBase" aria-hidden/>
         <div className="heroGradientMesh" aria-hidden/>
@@ -412,31 +404,13 @@ export default function Home() {
         <div className="heroContent">
           <h1 className="heroTitle">
             Premium marketing plans{" "}
-            <GradientText
-              className="heroTitleAccent heroTitleAccentGradient"
-              colors={["#180954", "#da19d4", "#684d80"]}
-              animationSpeed={3}
-              showBorder={false}
-            >
+            <GradientText className="heroTitleAccent heroTitleAccentGradient" colors={["#180954", "#da19d4", "#684d80"]} animationSpeed={3} showBorder={false}>
               for businesses
             </GradientText>
             {" "}that need momentum.
           </h1>
 
-          <SplitText
-            tag="p"
-            text="Daily action plans, campaign-ready content, and clear progress tracking - all in one calm, focused workspace built for modern SMEs."
-            className="heroSubtitle"
-            delay={16}
-            duration={0.6}
-            ease="power3.out"
-            splitType="chars"
-            from={{ opacity: 0, y: 24 }}
-            to={{ opacity: 1, y: 0 }}
-            threshold={0.12}
-            rootMargin="-80px"
-            textAlign="center"
-          />
+          <SplitText tag="p" text="Daily action plans, campaign-ready content, and clear progress tracking - all in one calm, focused workspace built for modern SMEs." className="heroSubtitle" delay={16} duration={0.6} ease="power3.out" splitType="chars" from={{ opacity: 0, y: 24 }} to={{ opacity: 1, y: 0 }} threshold={0.12} rootMargin="-80px" textAlign="center"/>
 
           <div className="heroActions">
             {!loading && !user && (<Link className="heroBtn heroBtnPrimary" href="/login">
@@ -460,13 +434,7 @@ export default function Home() {
       </section>
 
       {!loading && user && !taskLoading && hasGeneratedPlan && (<div className="todayTaskWrap">
-          {taskState.planFullyCompleted ? (<motion.section
-              className="todayTaskBanner todayTaskBanner--complete"
-              layout
-              initial={prefersReducedMotion ? undefined : { opacity: 0, y: 22, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.48, ease: [0.22, 1, 0.36, 1] }}
-            >
+          {taskState.planFullyCompleted ? (<motion.section className="todayTaskBanner todayTaskBanner--complete" layout initial={prefersReducedMotion ? undefined : { opacity: 0, y: 22, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.48, ease: [0.22, 1, 0.36, 1] }}>
               <div className="todayTaskBannerMesh todayTaskBannerMesh--gold" aria-hidden/>
               <div className="todayTaskBannerInner">
                 <div className="todayTaskBannerIcon todayTaskBannerIcon--gold" aria-hidden>
@@ -484,13 +452,7 @@ export default function Home() {
                   </button>
                 </div>
               </div>
-            </motion.section>) : (<motion.section
-              className={`todayTaskBanner ${taskState.isTodayTaskCompleted ? "todayTaskBanner--done" : taskState.isFallbackTask ? "todayTaskBanner--next" : "todayTaskBanner--active"}`}
-              layout
-              initial={prefersReducedMotion ? undefined : { opacity: 0, y: 22, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.48, ease: [0.22, 1, 0.36, 1] }}
-            >
+            </motion.section>) : (<motion.section className={`todayTaskBanner ${taskState.isTodayTaskCompleted ? "todayTaskBanner--done" : taskState.isFallbackTask ? "todayTaskBanner--next" : "todayTaskBanner--active"}`} layout initial={prefersReducedMotion ? undefined : { opacity: 0, y: 22, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.48, ease: [0.22, 1, 0.36, 1] }}>
               <div className={`todayTaskBannerMesh ${taskState.isTodayTaskCompleted ? "todayTaskBannerMesh--muted" : "todayTaskBannerMesh--accent"}`} aria-hidden/>
               <div className="todayTaskBannerInner">
                 <div className={`todayTaskBannerIcon ${taskState.isTodayTaskCompleted ? "todayTaskBannerIcon--success" : ""}`} aria-hidden>
@@ -612,14 +574,12 @@ export default function Home() {
             </p>
 
             <div className="featureGrid" role="list">
-              {WHAT_YOU_GET.map((f) => (
-                <div key={f.title} role="listitem">
+              {WHAT_YOU_GET.map((f) => (<div key={f.title} role="listitem">
                   <article className="featureCard">
                     <h3>{f.title}</h3>
                     <p>{f.desc}</p>
                   </article>
-                </div>
-              ))}
+                </div>))}
             </div>
           </div>
         </section>
@@ -658,7 +618,7 @@ export default function Home() {
                 <div className="planPreviewDevice" role="img" aria-label="Sample BizBoost growth plan and marketing plan interface">
                   <div className="planPreviewChrome">
                     <span className="planPreviewDots" aria-hidden>
-                      <span/><span/><span/>
+                      <span /><span /><span />
                     </span>
                     <span className="planPreviewChromeTitle">BizBoost · Growth &amp; marketing plans</span>
                   </div>

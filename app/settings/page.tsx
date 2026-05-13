@@ -22,13 +22,16 @@ function maskEmail(email: string): string {
     return `${prefix}***@${domain}`;
 }
 function formatDate(iso: string | null | undefined): string {
-    if (!iso) return "—";
+    if (!iso)
+        return "—";
     const date = new Date(iso);
-    if (Number.isNaN(date.getTime())) return "—";
+    if (Number.isNaN(date.getTime()))
+        return "—";
     return date.toLocaleString();
 }
 function formatPrice(amount: number | null | undefined, currency: string | null | undefined): string {
-    if (amount === null || amount === undefined) return "—";
+    if (amount === null || amount === undefined)
+        return "—";
     return `${currency ?? "LKR"} ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 export default function SettingsPage() {
@@ -58,7 +61,8 @@ export default function SettingsPage() {
         }
     }, [loading, user?.uid, router]);
     useEffect(() => {
-        if (!user?.uid) return;
+        if (!user?.uid)
+            return;
         let cancelled = false;
         const loadSubscription = async () => {
             setSubscriptionLoading(true);
@@ -66,22 +70,29 @@ export default function SettingsPage() {
                 const res = await fetch(`/api/subscription?firebase_uid=${encodeURIComponent(user.uid)}`, {
                     cache: "no-store",
                 });
-                if (cancelled) return;
+                if (cancelled)
+                    return;
                 if (res.status === 404) {
                     setSubscription(null);
                     return;
                 }
                 const data = await res.json();
-                if (cancelled) return;
+                if (cancelled)
+                    return;
                 if (res.ok && data?.ok && data.data) {
                     setSubscription(data.data as SubscriptionInfo);
-                } else {
+                }
+                else {
                     setSubscription(null);
                 }
-            } catch {
-                if (!cancelled) setSubscription(null);
-            } finally {
-                if (!cancelled) setSubscriptionLoading(false);
+            }
+            catch {
+                if (!cancelled)
+                    setSubscription(null);
+            }
+            finally {
+                if (!cancelled)
+                    setSubscriptionLoading(false);
             }
         };
         void loadSubscription();
@@ -124,10 +135,7 @@ export default function SettingsPage() {
           <div className="sectionHead">
             <h2>Subscription</h2>
           </div>
-          {subscriptionLoading ? (
-            <p className="hint">Loading subscription...</p>
-          ) : subscription && subscription.status === "active" ? (
-            <div className="subscriptionBlock">
+          {subscriptionLoading ? (<p className="hint">Loading subscription...</p>) : subscription && subscription.status === "active" ? (<div className="subscriptionBlock">
               <div className="subscriptionTopRow">
                 <div>
                   <span className="subBadge subBadgeActive">Active</span>
@@ -154,9 +162,7 @@ export default function SettingsPage() {
                   Change plan
                 </button>
               </div>
-            </div>
-          ) : subscription && subscription.status ? (
-            <div className="subscriptionBlock">
+            </div>) : subscription && subscription.status ? (<div className="subscriptionBlock">
               <span className={`subBadge subBadge--${subscription.status}`}>{subscription.status}</span>
               <p className="hint">
                 Your previous subscription is {subscription.status}. Start a new subscription to keep using BizBoost AI.
@@ -166,17 +172,14 @@ export default function SettingsPage() {
                   Subscribe again
                 </button>
               </div>
-            </div>
-          ) : (
-            <div className="subscriptionBlock">
+            </div>) : (<div className="subscriptionBlock">
               <p className="hint">You don&apos;t have an active subscription yet.</p>
               <div className="subActions">
                 <button type="button" className="subBtn subBtnPrimary" onClick={() => router.push("/select-plan")}>
                   Choose a plan
                 </button>
               </div>
-            </div>
-          )}
+            </div>)}
         </section>
 
         <section className="settingsCard">

@@ -56,18 +56,11 @@ export async function loginWithProvider(providerName: ProviderName): Promise<Aut
 function buildPasswordResetActionSettings(): ActionCodeSettings | undefined {
     if (typeof window === "undefined")
         return undefined;
-    /* Always use the current origin so local dev does not accidentally send a production URL from NEXT_PUBLIC_APP_URL. */
     return {
         url: `${window.location.origin}/login`,
         handleCodeInApp: false,
     };
 }
-
-/**
- * Sends Firebase password-reset email. Retries without continue URL if the
- * domain is not yet listed under Firebase → Authentication → Authorized domains.
- * Uses a neutral success message when the email is not registered (enumeration).
- */
 export async function resetPasswordEmail(email: string): Promise<AuthResult> {
     const guard = ensureAuth();
     if (guard)
@@ -132,8 +125,7 @@ export async function resetPasswordEmail(email: string): Promise<AuthResult> {
         if (code === "auth/unauthorized-continue-uri" || code === "auth/invalid-continue-uri") {
             return {
                 ok: false,
-                message:
-                    "Password reset could not use this site URL. In Firebase Console → Authentication → Settings, add this site's domain (e.g. localhost or your production host) under Authorized domains, then try again.",
+                message: "Password reset could not use this site URL. In Firebase Console → Authentication → Settings, add this site's domain (e.g. localhost or your production host) under Authorized domains, then try again.",
             };
         }
         return {
@@ -142,7 +134,6 @@ export async function resetPasswordEmail(email: string): Promise<AuthResult> {
         };
     }
 }
-
 export async function logout(): Promise<AuthResult> {
     const guard = ensureAuth();
     if (guard)

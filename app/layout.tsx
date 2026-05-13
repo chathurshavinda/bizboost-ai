@@ -35,10 +35,8 @@ export default function RootLayout({ children }: {
     children: React.ReactNode;
 }) {
     return (<html lang="en" suppressHydrationWarning><head>
-      <script
-        dangerouslySetInnerHTML={{
+      <script dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark'){document.documentElement.classList.add('dark')}else{document.documentElement.classList.remove('dark')}}catch(e){document.documentElement.classList.remove('dark')}})();`,
-        }}
-      />
+        }}/>
     </head><body className={`${dmSans.variable} ${playfair.variable} ${anton.variable} ${archivoBlack.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable}`} style={{ fontFamily: "var(--font-sans), system-ui, sans-serif" }}><Navbar /><div className="appShell">{children}</div></body></html>);
 }

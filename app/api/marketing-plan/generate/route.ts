@@ -6,14 +6,7 @@ import { requireActiveSubscription } from "@/lib/subscriptionAccess";
 import { buildDateRange, buildLifecyclePlanDays, computeProgress, startOfLocalDay } from "@/src/lib/marketingPlan";
 import { deriveDayThemeForPlan } from "@/src/lib/posterDayTheme";
 import { buildMarketingActivationCopyPack } from "@/src/lib/posterActivationCopy";
-import {
-    detectWeakProfileFields,
-    enrichPlanDaysWithAi,
-    generateAiBusinessPlan,
-    renderAiBusinessPlanMarkdown,
-    type AiBusinessPlan,
-    type AiPlanInput,
-} from "@/src/lib/aiBusinessPlan";
+import { detectWeakProfileFields, enrichPlanDaysWithAi, generateAiBusinessPlan, renderAiBusinessPlanMarkdown, type AiBusinessPlan, type AiPlanInput, } from "@/src/lib/aiBusinessPlan";
 type DayPlan = {
     dayNumber: number;
     dateLabel?: string;
@@ -995,7 +988,9 @@ const CATEGORY_ACTION_LIBRARIES: Record<CategoryKey, CategoryActionLibrary> = {
     education: buildCategoryActionLibrary("education"),
     generic: buildCategoryActionLibrary("generic"),
 };
-function pickLibraryItem<T extends { actionType: ActionType }>(items: T[], actionType: ActionType, variant: number): T | undefined {
+function pickLibraryItem<T extends {
+    actionType: ActionType;
+}>(items: T[], actionType: ActionType, variant: number): T | undefined {
     const scoped = items.filter((item) => item.actionType === actionType);
     return scoped.length ? scoped[variant % scoped.length] : items[variant % items.length];
 }
@@ -1015,9 +1010,9 @@ function normalizeExecutionChecklist(steps: string[], category: CategoryKey, pro
     const cleaned = steps
         .map((step) => conciseStep(step).replace(/^[\-•\s]+/, ""))
         .filter((step) => {
-            const count = wordCount(step);
-            return count >= 8 && count <= 14;
-        });
+        const count = wordCount(step);
+        return count >= 8 && count <= 14;
+    });
     const merged = dedupeKeepOrder([...cleaned, ...fallback]);
     return merged.slice(0, 5);
 }
@@ -1146,9 +1141,9 @@ function themeSpecificHashtagCandidates(category: CategoryKey, theme: ThemeKey, 
                 ? "BeautyLK"
                 : category === "services"
                     ? "ServicesLK"
-            : category === "education"
-                ? "TuitionLK"
-                : "LKBusiness");
+                    : category === "education"
+                        ? "TuitionLK"
+                        : "LKBusiness");
     const businessTypeTag = toHashTag(businessType || "LocalBiz");
     const cityTag = toHashTag(city || "");
     const productTag = toHashTag(product || "");
@@ -2688,10 +2683,7 @@ export async function POST(req: Request) {
         const db = await getDb();
         const subGate = await requireActiveSubscription(db, firebase_uid);
         if (subGate) {
-            return NextResponse.json(
-                { ok: false, error: subGate.error, code: subGate.code },
-                { status: 403 },
-            );
+            return NextResponse.json({ ok: false, error: subGate.error, code: subGate.code }, { status: 403 });
         }
         const profile = await db.collection("business_profiles").findOne({ firebase_uid });
         if (!profile) {
@@ -2803,10 +2795,10 @@ export async function POST(req: Request) {
             console.error("[marketing-plan/generate] AI plan generation failed (non-fatal):", aiError);
             aiBusinessPlan = null;
         }
-        // If the AI succeeded, override generic per-day text with business-specific AI text.
-        // Otherwise we keep the deterministic template output, which is still a valid plan.
         const mergedPlanData = aiBusinessPlan
-            ? enrichPlanDaysWithAi(templatePlanData as Array<Record<string, unknown>> as Array<{ dayNumber: number } & Record<string, unknown>>, aiBusinessPlan)
+            ? enrichPlanDaysWithAi(templatePlanData as Array<Record<string, unknown>> as Array<{
+                dayNumber: number;
+            } & Record<string, unknown>>, aiBusinessPlan)
             : templatePlanData;
         const narrativePlan = aiBusinessPlan
             ? renderAiBusinessPlanMarkdown(aiBusinessPlan, context.businessName)

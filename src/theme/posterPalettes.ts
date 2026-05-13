@@ -5,7 +5,6 @@ export type PosterTemplatePalette = {
     textColor: string;
     border: string;
 };
-
 export const POSTER_TEMPLATE_PALETTES: Record<string, PosterTemplatePalette> = {
     "promo-flash-impact": {
         bgGradient: "linear-gradient(145deg,#111827 0%,#1f2937 48%,#064e3b 100%)",
@@ -190,7 +189,6 @@ export const POSTER_TEMPLATE_PALETTES: Record<string, PosterTemplatePalette> = {
         border: "rgba(196,181,253,0.32)",
     },
 };
-
 export const DEFAULT_POSTER_TEMPLATE_PALETTE: PosterTemplatePalette = {
     bgGradient: "linear-gradient(156deg,#111827 0%,#263242 52%,#334155 100%)",
     accent: "#cbd5e1",
@@ -198,7 +196,6 @@ export const DEFAULT_POSTER_TEMPLATE_PALETTE: PosterTemplatePalette = {
     textColor: "#f8fafc",
     border: "rgba(203,213,225,0.3)",
 };
-
 export function getPosterTemplatePalette(templateId: string): PosterTemplatePalette {
     return POSTER_TEMPLATE_PALETTES[templateId] ?? DEFAULT_POSTER_TEMPLATE_PALETTE;
 }

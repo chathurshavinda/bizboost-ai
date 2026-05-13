@@ -1,11 +1,5 @@
 import type { PosterDesign, PosterStyle } from "@/src/components/poster/PosterTemplate";
-import {
-    buildPosterCopyFromActivation,
-    buildWhatToPostInstruction,
-    type ActivationFormat,
-    type InternalPlanTheme,
-    type MarketingGoalKey,
-} from "@/src/lib/posterActivationCopy";
+import { buildPosterCopyFromActivation, buildWhatToPostInstruction, type ActivationFormat, type InternalPlanTheme, type MarketingGoalKey, } from "@/src/lib/posterActivationCopy";
 import { pickPosterStyleForContext } from "@/src/lib/posterTemplateSelection";
 export const DAY_THEMES = [
     "Promo",
@@ -86,7 +80,6 @@ function captionFirstLine(caption: string): string {
     const line = caption.split(/\r?\n/).map((x) => x.trim()).find(Boolean);
     return line ? squash(line.replace(/^[#•\-\*]\s*/, ""), 72) : "";
 }
-
 function mapUiDayThemeToInternal(ui: string | undefined): InternalPlanTheme {
     const u = (ui || "").toLowerCase();
     if (u.includes("weekend") || u.includes("promo") || u.includes("festival"))
@@ -103,7 +96,6 @@ function mapUiDayThemeToInternal(ui: string | undefined): InternalPlanTheme {
         return "growth_push";
     return "promo_offer";
 }
-
 export type PosterSeedContext = {
     product: string;
     businessName: string;
@@ -114,7 +106,6 @@ export type PosterSeedContext = {
     goal: MarketingGoalKey;
     businessGrowthAction?: string;
 };
-
 export function buildPosterSeedFromPlan(args: {
     businessName: string;
     caption: string;
@@ -143,12 +134,10 @@ export function buildPosterSeedFromPlan(args: {
     const packSub = (ma?.posterSubheadline || "").trim();
     const packCta = (ma?.posterCtaLabel || "").trim();
     const packBadge = (ma?.posterOfferBadge || "").trim();
-
     let headline = packHeadline;
     let subheadline = packSub;
     let offerBadge = packBadge;
     let ctaLabel = packCta;
-
     const needsGeneratedPack = !headline || !subheadline || !ctaLabel;
     const pc = args.posterContext;
     if (needsGeneratedPack && pc) {
@@ -170,20 +159,19 @@ export function buildPosterSeedFromPlan(args: {
         offerBadge = offerBadge || gen.offerBadge;
         ctaLabel = ctaLabel || gen.ctaLabel;
     }
-
     const captionRest = args.caption.replace(/^[^\r\n]+\r?\n?/, "").trim();
     if (!headline) {
         headline =
             squash(ma?.hook || "", 56) ||
-            captionFirstLine(args.caption) ||
-            squash(args.mainActionTitle || "", 56) ||
-            "YOUR OFFER TODAY";
+                captionFirstLine(args.caption) ||
+                squash(args.mainActionTitle || "", 56) ||
+                "YOUR OFFER TODAY";
     }
     if (!subheadline) {
         subheadline =
             squash(ma?.postIdea || ma?.postBrief || ma?.contentBrief || ma?.whatToPost || "", 100) ||
-            squash(captionRest, 100) ||
-            squash(args.businessGrowthAction || "", 100);
+                squash(captionRest, 100) ||
+                squash(args.businessGrowthAction || "", 100);
     }
     if (!ctaLabel) {
         const rawCta = (ma?.cta || "DM US").trim();
@@ -194,7 +182,6 @@ export function buildPosterSeedFromPlan(args: {
         offerBadge = squash(ma?.offerDeadlineHint || "", 28) ||
             squash(ma?.posterHint || args.posterHintFallback || "", 28);
     }
-
     return {
         brandName: squash(args.businessName, 40) || "Your Brand",
         headline: headline.toUpperCase(),

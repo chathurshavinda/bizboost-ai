@@ -118,7 +118,7 @@ export default function MarketingPlanDayPage() {
                 }
                 const selectedRes = await fetch(`/api/select-plan?firebase_uid=${encodeURIComponent(user.uid)}`, { cache: "no-store" });
                 const selectedJson = await selectedRes.json();
-                if (selectedRes.status === 404 || selectedJson?.error === "No plan selected" || selectedJson?.error === "plan_not_selected") {
+                if (selectedRes.status === 404 || selectedJson?.active === false || selectedJson?.error === "No plan selected" || selectedJson?.error === "plan_not_selected") {
                     setModalType("missingPlan");
                     return;
                 }

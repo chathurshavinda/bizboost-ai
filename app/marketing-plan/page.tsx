@@ -272,9 +272,7 @@ export default function MarketingPlanPage() {
     const [narrativeOpen, setNarrativeOpen] = useState(false);
     const [aiPlan, setAiPlan] = useState<AiBusinessPlanDto | null>(null);
     const [planMissingFields, setPlanMissingFields] = useState<string[]>([]);
-    const [activeStrategyTab, setActiveStrategyTab] = useState<
-        "summary" | "growth" | "marketing" | "weekly" | "content" | "captions" | "hashtags" | "promotions" | "metrics" | "recommendations"
-    >("summary");
+    const [activeStrategyTab, setActiveStrategyTab] = useState<"summary" | "growth" | "marketing" | "weekly" | "content" | "captions" | "hashtags" | "promotions" | "metrics" | "recommendations">("summary");
     const [completedMap, setCompletedMap] = useState<Record<number, boolean>>({});
     const [savingDayNumber, setSavingDayNumber] = useState<number | null>(null);
     const [planId, setPlanId] = useState<string>("");
@@ -318,6 +316,7 @@ export default function MarketingPlanPage() {
             });
             const planJson = await planRes.json();
             if (planRes.status === 404 ||
+                planJson?.active === false ||
                 (planJson?.ok === false && (planJson?.error === "No plan selected" || planJson?.error === "plan_not_selected"))) {
                 setSelectedPlanDays(null);
                 setModalType("missingPlan");
@@ -337,17 +336,20 @@ export default function MarketingPlanPage() {
                 return;
             }
             setSelectedPlanDays(days);
-
             const subRes = await fetch(`/api/subscription?firebase_uid=${encodeURIComponent(uid)}`, {
                 cache: "no-store",
             });
             let pro = false;
             if (subRes.ok) {
-                const sj = (await subRes.json()) as { ok?: boolean; data?: { status?: string } };
+                const sj = (await subRes.json()) as {
+                    ok?: boolean;
+                    data?: {
+                        status?: string;
+                    };
+                };
                 pro = sj?.ok === true && sj?.data?.status === "active";
             }
             setHasProSubscription(pro);
-
             if (isNewMode) {
                 setGeneratedPlan([]);
                 setHasGenerated(false);
@@ -471,12 +473,11 @@ export default function MarketingPlanPage() {
                     : "";
             setNarrativePlan(nextNarrative);
             setNarrativeOpen(Boolean(nextNarrative));
-            const nextAiPlan: AiBusinessPlanDto | null =
-                result?.plan?.aiBusinessPlan && typeof result.plan.aiBusinessPlan === "object"
-                    ? (result.plan.aiBusinessPlan as AiBusinessPlanDto)
-                    : result?.data?.aiBusinessPlan && typeof result.data.aiBusinessPlan === "object"
-                        ? (result.data.aiBusinessPlan as AiBusinessPlanDto)
-                        : null;
+            const nextAiPlan: AiBusinessPlanDto | null = result?.plan?.aiBusinessPlan && typeof result.plan.aiBusinessPlan === "object"
+                ? (result.plan.aiBusinessPlan as AiBusinessPlanDto)
+                : result?.data?.aiBusinessPlan && typeof result.data.aiBusinessPlan === "object"
+                    ? (result.data.aiBusinessPlan as AiBusinessPlanDto)
+                    : null;
             setAiPlan(nextAiPlan);
             const nextMissing: string[] = Array.isArray(result?.data?.missingProfileFields)
                 ? (result.data.missingProfileFields as unknown[]).map((v) => String(v))
@@ -484,7 +485,8 @@ export default function MarketingPlanPage() {
                     ? (result.plan.missingProfileFields as unknown[]).map((v) => String(v))
                     : [];
             setPlanMissingFields(nextMissing);
-            if (nextAiPlan) setActiveStrategyTab("summary");
+            if (nextAiPlan)
+                setActiveStrategyTab("summary");
             setCompletedMap(nextPlan.reduce<Record<number, boolean>>((acc, day) => {
                 if (day.completed)
                     acc[day.dayNumber] = true;
@@ -835,7 +837,7 @@ export default function MarketingPlanPage() {
                 ["promotions", "Promotions"],
                 ["metrics", "Success Metrics"],
                 ["recommendations", "Recommendations"],
-              ] as const).map(([id, label]) => (<button key={id} type="button" role="tab" aria-selected={activeStrategyTab === id} className={`strategyTab ${activeStrategyTab === id ? "active" : ""}`} onClick={() => setActiveStrategyTab(id)}>
+            ] as const).map(([id, label]) => (<button key={id} type="button" role="tab" aria-selected={activeStrategyTab === id} className={`strategyTab ${activeStrategyTab === id ? "active" : ""}`} onClick={() => setActiveStrategyTab(id)}>
                   {label}
                 </button>))}
             </div>
@@ -921,23 +923,23 @@ export default function MarketingPlanPage() {
 
               {activeStrategyTab === "content" && (<div className="strategySection">
                   {[
-                {
-                    title: "Sales Improvement Ideas",
-                    items: aiPlan.salesImprovementIdeas,
-                },
-                {
-                    title: "Customer Attraction Ideas",
-                    items: aiPlan.customerAttractionIdeas,
-                },
-                {
-                    title: "Customer Retention Ideas",
-                    items: aiPlan.customerRetentionIdeas,
-                },
-                {
-                    title: "Content Ideas",
-                    items: aiPlan.contentIdeas,
-                },
-            ].map(({ title, items }) => Array.isArray(items) && items.length > 0 ? (<div key={title} className="strategyBlock">
+                    {
+                        title: "Sales Improvement Ideas",
+                        items: aiPlan.salesImprovementIdeas,
+                    },
+                    {
+                        title: "Customer Attraction Ideas",
+                        items: aiPlan.customerAttractionIdeas,
+                    },
+                    {
+                        title: "Customer Retention Ideas",
+                        items: aiPlan.customerRetentionIdeas,
+                    },
+                    {
+                        title: "Content Ideas",
+                        items: aiPlan.contentIdeas,
+                    },
+                ].map(({ title, items }) => Array.isArray(items) && items.length > 0 ? (<div key={title} className="strategyBlock">
                       <h3>{title}</h3>
                       <ul className="strategyList">
                         {items.map((item, idx) => (<li key={`${title}-${idx}`}>{item}</li>))}
@@ -949,8 +951,8 @@ export default function MarketingPlanPage() {
                   {Array.isArray(aiPlan.captionSuggestions) && aiPlan.captionSuggestions.length > 0 ? (aiPlan.captionSuggestions.map((c, idx) => (<div key={`cap-${idx}`} className="captionCard">
                         <pre className="captionPre">{c}</pre>
                         <button type="button" className="copyBtn" onClick={() => {
-                            void navigator.clipboard?.writeText(c).catch(() => undefined);
-                        }}>
+                        void navigator.clipboard?.writeText(c).catch(() => undefined);
+                    }}>
                           Copy
                         </button>
                       </div>))) : (<p className="strategyEmpty">No caption suggestions yet.</p>)}

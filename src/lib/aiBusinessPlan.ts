@@ -1,23 +1,4 @@
-/**
- * AI-generated, business-specific Growth + Marketing plan helpers.
- *
- * Goals (per project brief):
- *  - Use the user's actual saved business profile as the main input.
- *  - Avoid generic advice. Make every recommendation practical and SME-friendly.
- *  - Cover both a business growth strategy and a marketing strategy in one
- *    structured response (sections, daily tasks, captions, hashtags, metrics).
- *  - Be Sri Lanka SME-aware where suitable (LKR, WhatsApp, local festivals).
- *  - Never invent revenue/profit numbers unless clearly labelled as examples.
- *  - Surface "missing details" the user should still complete, instead of
- *    silently filling them with generic placeholders.
- *
- * The deterministic template-based plan in `route.ts` is preserved as a safe
- * fallback. The AI output here augments and personalises the per-day cards
- * and adds a structured strategy report consumed by the UI.
- */
-
 import { GoogleGenerativeAI } from "@google/generative-ai";
-
 export type AiPlanInput = {
     firebase_uid: string;
     businessName: string;
@@ -44,10 +25,8 @@ export type AiPlanInput = {
     language: string;
     planDuration: 7 | 14 | 30;
     startDate: string;
-    /** Plain bullet list of fields that look empty/weak on the profile (for the AI to acknowledge in `missingDetails`). */
     weakFields: string[];
 };
-
 export type AiDailyTask = {
     dayNumber: number;
     title: string;
@@ -62,21 +41,18 @@ export type AiDailyTask = {
     promotionIdea?: string;
     successMetric?: string;
 };
-
 export type AiGrowthPillar = {
     title: string;
     why: string;
     how: string[];
     kpis?: string[];
 };
-
 export type AiWeeklyMilestone = {
     week: number;
     focus: string;
     goals: string[];
     actions: string[];
 };
-
 export type AiMarketingStrategy = {
     overview: string;
     primaryChannels: string[];
@@ -84,7 +60,6 @@ export type AiMarketingStrategy = {
     audienceTips: string[];
     weeklyRhythm: string[];
 };
-
 export type AiBusinessPlan = {
     generatedAt: string;
     language: string;
@@ -107,35 +82,28 @@ export type AiBusinessPlan = {
     finalRecommendations: string[];
     missingDetails: string[];
 };
-
 const GEMINI_MODEL_CANDIDATES = [
     "gemini-2.5-flash",
     "gemini-2.0-flash",
     "gemini-flash-latest",
     "gemini-pro-latest",
 ];
-
 function resolveGeminiModels(): string[] {
     const fromEnv = process.env.GEMINI_MODEL?.trim();
-    if (fromEnv) return [fromEnv, ...GEMINI_MODEL_CANDIDATES.filter((m) => m !== fromEnv)];
+    if (fromEnv)
+        return [fromEnv, ...GEMINI_MODEL_CANDIDATES.filter((m) => m !== fromEnv)];
     return GEMINI_MODEL_CANDIDATES;
 }
-
 function listLine(label: string, value: string | string[]): string {
     if (Array.isArray(value)) {
         const cleaned = value.map((v) => String(v ?? "").trim()).filter(Boolean);
-        if (cleaned.length === 0) return "";
+        if (cleaned.length === 0)
+            return "";
         return `- ${label}: ${cleaned.join(" | ")}`;
     }
     const text = String(value ?? "").trim();
     return text ? `- ${label}: ${text}` : "";
 }
-
-/**
- * Build the consultant-style prompt. We embed every available profile field so
- * the model can ground every recommendation in real data, and we forbid the
- * common generic / vague phrasing patterns the previous prompt allowed.
- */
 export function buildAiBusinessPlanPrompt(input: AiPlanInput): string {
     const profileLines = [
         listLine("Business Name", input.businessName),
@@ -166,7 +134,6 @@ export function buildAiBusinessPlanPrompt(input: AiPlanInput): string {
     ]
         .filter(Boolean)
         .join("\n");
-
     const dailyTemplate = `
     {
       "dayNumber": number,                                  // 1..${input.planDuration}
@@ -183,7 +150,6 @@ export function buildAiBusinessPlanPrompt(input: AiPlanInput): string {
       "successMetric": "measurable result for today (e.g., 'WhatsApp inquiries from offer', '5 new pre-orders'). Realistic targets only."
     }
 `;
-
     return `SYSTEM ROLE
 You are BizBoost AI — an expert small business consultant and digital marketing strategist for Sri Lankan SMEs. You write practical, real-world growth and marketing plans that a busy small business owner can actually execute with limited budget and simple tools (Instagram, Facebook, WhatsApp, local flyers, partnerships).
 
@@ -258,19 +224,18 @@ QUALITY CHECKS BEFORE YOU RESPOND
 - Mention "${input.businessName}" naturally in summaries / pillars / captions, but never spam it.
 - Return JSON only. No prose outside JSON.`;
 }
-
-/** Strip Markdown code fences / leading prose so we can JSON.parse() raw model output. */
 function extractJson(text: string): string {
     const trimmed = text.trim();
-    if (!trimmed) return "";
+    if (!trimmed)
+        return "";
     const fenceMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
     const candidate = fenceMatch ? fenceMatch[1].trim() : trimmed;
     const first = candidate.indexOf("{");
     const last = candidate.lastIndexOf("}");
-    if (first === -1 || last === -1 || last < first) return candidate;
+    if (first === -1 || last === -1 || last < first)
+        return candidate;
     return candidate.slice(first, last + 1);
 }
-
 function toStringArray(value: unknown, max = 25): string[] {
     if (Array.isArray(value)) {
         return value
@@ -287,13 +252,13 @@ function toStringArray(value: unknown, max = 25): string[] {
     }
     return [];
 }
-
 function safeString(value: unknown, fallback = ""): string {
-    if (typeof value === "string") return value.trim();
-    if (value == null) return fallback;
+    if (typeof value === "string")
+        return value.trim();
+    if (value == null)
+        return fallback;
     return String(value).trim() || fallback;
 }
-
 function normaliseDailyTask(raw: unknown, dayNumber: number): AiDailyTask {
     const r = (raw ?? {}) as Record<string, unknown>;
     return {
@@ -311,7 +276,6 @@ function normaliseDailyTask(raw: unknown, dayNumber: number): AiDailyTask {
         successMetric: safeString(r.successMetric ?? r.metric) || undefined,
     };
 }
-
 function normaliseGrowthPillar(raw: unknown): AiGrowthPillar {
     const r = (raw ?? {}) as Record<string, unknown>;
     return {
@@ -321,7 +285,6 @@ function normaliseGrowthPillar(raw: unknown): AiGrowthPillar {
         kpis: toStringArray(r.kpis, 6),
     };
 }
-
 function normaliseWeek(raw: unknown, index: number): AiWeeklyMilestone {
     const r = (raw ?? {}) as Record<string, unknown>;
     const weekNumber = Number(r.week ?? r.weekNumber ?? index + 1) || index + 1;
@@ -332,7 +295,6 @@ function normaliseWeek(raw: unknown, index: number): AiWeeklyMilestone {
         actions: toStringArray(r.actions, 10),
     };
 }
-
 function normaliseMarketingStrategy(raw: unknown): AiMarketingStrategy {
     const r = (raw ?? {}) as Record<string, unknown>;
     return {
@@ -343,8 +305,6 @@ function normaliseMarketingStrategy(raw: unknown): AiMarketingStrategy {
         weeklyRhythm: toStringArray(r.weeklyRhythm, 8),
     };
 }
-
-/** Build a valid AiBusinessPlan object from arbitrary AI JSON, padding the daily tasks to planDuration. */
 export function normaliseAiBusinessPlan(raw: unknown, planDuration: 7 | 14 | 30, language: string): AiBusinessPlan {
     const r = (raw ?? {}) as Record<string, unknown>;
     const dailyRaw = Array.isArray(r.dailyTasks) ? r.dailyTasks : [];
@@ -379,8 +339,6 @@ export function normaliseAiBusinessPlan(raw: unknown, planDuration: 7 | 14 | 30,
         missingDetails: toStringArray(r.missingDetails, 12),
     };
 }
-
-/** Call Gemini with retries and model fallback, return parsed & normalised AiBusinessPlan or null. */
 export async function generateAiBusinessPlan(input: AiPlanInput): Promise<AiBusinessPlan | null> {
     const apiKey = process.env.GEMINI_API_KEY?.trim();
     if (!apiKey) {
@@ -407,43 +365,47 @@ export async function generateAiBusinessPlan(input: AiPlanInput): Promise<AiBusi
                 const result = await model.generateContent(prompt);
                 const raw = typeof result.response.text === "function" ? result.response.text() : "";
                 const text = typeof raw === "string" ? raw.trim() : "";
-                if (!text) continue;
+                if (!text)
+                    continue;
                 const json = extractJson(text);
                 try {
                     const parsed = JSON.parse(json) as unknown;
                     return normaliseAiBusinessPlan(parsed, input.planDuration, input.language);
-                } catch (parseError) {
+                }
+                catch (parseError) {
                     console.warn(`[aiBusinessPlan] JSON parse failed for ${modelName} attempt ${attempt + 1}:`, parseError instanceof Error ? parseError.message : parseError);
                     if (attempt < 2) {
                         await sleep([500, 1100][attempt] ?? 1100);
                         continue;
                     }
                 }
-            } catch (error) {
+            }
+            catch (error) {
                 const message = error instanceof Error ? error.message : String(error);
                 console.error(`[aiBusinessPlan] Gemini error on ${modelName} (attempt ${attempt + 1}):`, message);
                 if (isOverloaded(message) && attempt < 2) {
                     await sleep([700, 1500][attempt] ?? 1500);
                     continue;
                 }
-                if (isOverloaded(message) || isMissingModel(message)) break;
+                if (isOverloaded(message) || isMissingModel(message))
+                    break;
                 return null;
             }
         }
     }
     return null;
 }
-
-/** Render the structured plan as Markdown so the existing narrative card keeps working. */
 export function renderAiBusinessPlanMarkdown(plan: AiBusinessPlan, businessName: string): string {
     const lines: string[] = [];
     const heading = (level: 2 | 3, text: string) => lines.push(`${level === 2 ? "##" : "###"} ${text}`);
     const para = (text: string) => {
-        if (text && text.trim()) lines.push(text.trim());
+        if (text && text.trim())
+            lines.push(text.trim());
     };
     const bullets = (items: string[]) => {
         for (const item of items) {
-            if (item && item.trim()) lines.push(`- ${item.trim()}`);
+            if (item && item.trim())
+                lines.push(`- ${item.trim()}`);
         }
     };
     heading(2, `${businessName || "Your Business"} — Growth & Marketing Plan`);
@@ -472,8 +434,10 @@ export function renderAiBusinessPlanMarkdown(plan: AiBusinessPlan, businessName:
         heading(3, "Business Growth Strategy");
         for (const pillar of plan.growthStrategy) {
             para(`**${pillar.title}**`);
-            if (pillar.why) para(pillar.why);
-            if (pillar.how.length) bullets(pillar.how);
+            if (pillar.why)
+                para(pillar.why);
+            if (pillar.how.length)
+                bullets(pillar.how);
             if (pillar.kpis && pillar.kpis.length) {
                 para("_KPIs:_ " + pillar.kpis.join(" · "));
             }
@@ -482,7 +446,8 @@ export function renderAiBusinessPlanMarkdown(plan: AiBusinessPlan, businessName:
     }
     if (plan.marketingStrategy.overview || plan.marketingStrategy.primaryChannels.length) {
         heading(3, "Marketing Strategy");
-        if (plan.marketingStrategy.overview) para(plan.marketingStrategy.overview);
+        if (plan.marketingStrategy.overview)
+            para(plan.marketingStrategy.overview);
         if (plan.marketingStrategy.primaryChannels.length) {
             para("**Primary Channels**");
             bullets(plan.marketingStrategy.primaryChannels);
@@ -569,7 +534,6 @@ export function renderAiBusinessPlanMarkdown(plan: AiBusinessPlan, businessName:
     }
     return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
-
 type DayLike = Record<string, unknown> & {
     dayNumber: number;
     mainActionTitle?: string;
@@ -582,17 +546,13 @@ type DayLike = Record<string, unknown> & {
     successMetric?: string;
     marketingActivation?: Record<string, unknown>;
 };
-
-/**
- * Merge per-day AI content into the deterministic template plan.
- * - Only override when the AI value is meaningfully present.
- * - Never destroy nested marketingActivation structure (posters, hooks, etc.).
- */
 export function enrichPlanDaysWithAi<T extends DayLike>(planDays: T[], ai: AiBusinessPlan | null): T[] {
-    if (!ai || !Array.isArray(ai.dailyTasks) || ai.dailyTasks.length === 0) return planDays;
+    if (!ai || !Array.isArray(ai.dailyTasks) || ai.dailyTasks.length === 0)
+        return planDays;
     return planDays.map((day) => {
         const aiDay = ai.dailyTasks.find((d) => d.dayNumber === day.dayNumber);
-        if (!aiDay) return day;
+        if (!aiDay)
+            return day;
         const next = { ...day } as T;
         if (aiDay.title && aiDay.title.length > 4) {
             next.mainActionTitle = aiDay.title;
@@ -618,13 +578,17 @@ export function enrichPlanDaysWithAi<T extends DayLike>(planDays: T[], ai: AiBus
         }
         const existingActivation = (day.marketingActivation ?? {}) as Record<string, unknown>;
         const nextActivation: Record<string, unknown> = { ...existingActivation };
-        if (aiDay.postIdea) nextActivation.postIdea = aiDay.postIdea;
-        if (aiDay.caption) nextActivation.caption = aiDay.caption;
+        if (aiDay.postIdea)
+            nextActivation.postIdea = aiDay.postIdea;
+        if (aiDay.caption)
+            nextActivation.caption = aiDay.caption;
         if (Array.isArray(aiDay.hashtags) && aiDay.hashtags.length >= 4) {
             nextActivation.hashtags = aiDay.hashtags;
         }
-        if (aiDay.hook) nextActivation.hook = aiDay.hook;
-        if (aiDay.cta) nextActivation.cta = aiDay.cta;
+        if (aiDay.hook)
+            nextActivation.hook = aiDay.hook;
+        if (aiDay.cta)
+            nextActivation.cta = aiDay.cta;
         if (aiDay.marketingAction) {
             nextActivation.postBrief = aiDay.marketingAction;
             nextActivation.whatToPost = aiDay.marketingAction;
@@ -637,16 +601,18 @@ export function enrichPlanDaysWithAi<T extends DayLike>(planDays: T[], ai: AiBus
         return next;
     });
 }
-
-/** Light list of profile field names that, if missing, the plan still generates but should mention to user. */
 export function detectWeakProfileFields(profile: Record<string, unknown>): string[] {
     const weak: string[] = [];
     const check = (label: string, value: unknown) => {
         if (Array.isArray(value)) {
-            if (value.filter(Boolean).length === 0) weak.push(label);
-        } else if (typeof value === "string") {
-            if (!value.trim()) weak.push(label);
-        } else if (value == null) {
+            if (value.filter(Boolean).length === 0)
+                weak.push(label);
+        }
+        else if (typeof value === "string") {
+            if (!value.trim())
+                weak.push(label);
+        }
+        else if (value == null) {
             weak.push(label);
         }
     };

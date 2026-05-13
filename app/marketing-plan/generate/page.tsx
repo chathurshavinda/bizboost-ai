@@ -12,12 +12,7 @@ type DayItem = {
     bestTime: string;
     cta: string;
 };
-type ApiErrorCode =
-    | "business_profile_not_found"
-    | "plan_not_selected"
-    | "subscription_required"
-    | "generic"
-    | "";
+type ApiErrorCode = "business_profile_not_found" | "plan_not_selected" | "subscription_required" | "generic" | "";
 export default function GenerateMarketingPlanPage() {
     const router = useRouter();
     const { user, loading: authLoading } = useAuth();

@@ -356,11 +356,16 @@ export default function BusinessProfilePage() {
             const response = await fetch(`/api/select-plan?firebase_uid=${encodeURIComponent(uid)}`, {
                 cache: "no-store",
             });
-            if (response.ok) {
-                router.push("/select-plan");
-                return;
-            }
-            if (response.status === 404) {
+            const planJson = (await response.json()) as {
+                ok?: boolean;
+                active?: boolean;
+                planDays?: number;
+            };
+            const hasPlan = response.ok
+                && planJson?.ok === true
+                && planJson.active === true
+                && [7, 14, 30].includes(Number(planJson.planDays ?? 0));
+            if (!hasPlan) {
                 setPlanGateOpen(true);
                 return;
             }

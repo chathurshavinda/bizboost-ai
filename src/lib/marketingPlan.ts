@@ -62,28 +62,24 @@ export type MarketingPlanDocument = {
     endDate: string;
     createdAt: string;
     updatedAt: string;
-    /** Set when the plan is produced by Plan Builder (`/api/marketing-plan/generate`). Skeleton plans from `/create` omit this. */
     generatedAt?: string;
-    /** Present on AI-generated plans from Plan Builder; skeleton `/create` plans omit this. */
     templateVersion?: string;
     planDays: MarketingPlanDay[];
     progress: MarketingPlanProgress;
     narrativePlan?: string;
     businessSnapshot?: Record<string, unknown>;
-    /** Optional AI-generated structured Business + Marketing plan. Additive — older docs may not have it. */
     aiBusinessPlan?: AiBusinessPlan;
-    /** Optional list of profile fields that were weak/missing when the plan was generated. */
     missingProfileFields?: string[];
 };
-
-/** Raw DB document / JSON: true if this row was produced by Plan Builder (generate), not skeleton `/create`. */
 export function documentLooksGenerated(doc: Record<string, unknown> | null | undefined): boolean {
     if (!doc)
         return false;
     const ga = doc.generatedAt as unknown;
     if (ga != null && ga !== "")
         return true;
-    if (typeof ga === "object" && ga !== null && (ga as { getTime?: () => number }).getTime instanceof Function) {
+    if (typeof ga === "object" && ga !== null && (ga as {
+        getTime?: () => number;
+    }).getTime instanceof Function) {
         const t = (ga as Date).getTime();
         if (!Number.isNaN(t))
             return true;
@@ -98,8 +94,6 @@ export function documentLooksGenerated(doc: Record<string, unknown> | null | und
         return true;
     return false;
 }
-
-/** Normalized plan: true once the user has a saved generated plan (same signals as documentLooksGenerated). */
 export function planWasGeneratedInPlanBuilder(plan: MarketingPlanDocument | null): boolean {
     if (!plan)
         return false;
@@ -277,12 +271,11 @@ export function normalizePlanDocument(doc: Record<string, unknown> | null): Mark
         };
     }), durationDays, startDate);
     const progress = computeProgress(planDays);
-    const generatedAtIso =
-        generatedAtRaw instanceof Date
-            ? generatedAtRaw.toISOString()
-            : typeof generatedAtRaw === "string" && generatedAtRaw.trim()
-                ? new Date(generatedAtRaw).toISOString()
-                : undefined;
+    const generatedAtIso = generatedAtRaw instanceof Date
+        ? generatedAtRaw.toISOString()
+        : typeof generatedAtRaw === "string" && generatedAtRaw.trim()
+            ? new Date(generatedAtRaw).toISOString()
+            : undefined;
     const templateVersion = typeof doc.templateVersion === "string" ? doc.templateVersion.trim() : "";
     return {
         _id: doc._id,

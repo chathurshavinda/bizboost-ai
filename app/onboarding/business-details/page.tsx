@@ -2,13 +2,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import StepSidebar, { type StepId } from "../../../src/components/onboarding/StepSidebar";
 import BusinessForm from "../../../src/components/onboarding/BusinessForm";
-
 const STEP_ORDER: StepId[] = ["business", "products", "team", "financials"];
-
 export default function BusinessDetailsPage() {
     const [activeStep, setActiveStep] = useState<StepId>("business");
     const [detailsMode, setDetailsMode] = useState<"create" | "edit">("create");
-    /** Bumps only when which sections are mounted changes (not on every ref callback). */
     const [observeTick, setObserveTick] = useState(0);
     const sectionRefs = useRef<Partial<Record<StepId, HTMLElement | null>>>({});
     const sectionMountSig = useRef<string>("");
@@ -42,7 +39,6 @@ export default function BusinessDetailsPage() {
             if (bestStep)
                 setActiveStep((prev) => (prev === bestStep ? prev : bestStep));
         }, {
-            /* Prefer the section occupying the upper-middle of the viewport */
             root: null,
             rootMargin: "-12% 0px -35% 0px",
             threshold: [0, 0.08, 0.15, 0.25, 0.35, 0.5, 0.65, 0.8, 1],

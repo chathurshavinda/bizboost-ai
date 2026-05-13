@@ -74,10 +74,7 @@ export default function LoginPage() {
         <button type="button" className="authRefPrimaryButton" onClick={onLogin} disabled={loading}>
           {loading ? "Signing in..." : "Sign In to your account"}
         </button>
-        <Link
-          href={email.trim() ? `/forgot-password?email=${encodeURIComponent(email.trim())}` : "/forgot-password"}
-          className="authRefForgotLink"
-        >
+        <Link href={email.trim() ? `/forgot-password?email=${encodeURIComponent(email.trim())}` : "/forgot-password"} className="authRefForgotLink">
           Forgot password?
         </Link>
         <div className="authRefFooter">

@@ -1,11 +1,7 @@
 export const dynamic = "force-dynamic";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
-
-/** Allow retry/backoff for Gemini on serverless hosts (e.g. Vercel). */
 export const maxDuration = 60;
-
-/** Lite + stable IDs first; avoid deprecated gemini-1.5-* (404 on v1beta). *-latest maps to Gemini 3.x — heavy; kept as last resorts. */
 const DEFAULT_MODEL_CANDIDATES = [
     "gemini-2.5-flash-lite",
     "gemini-2.0-flash-lite",
@@ -23,42 +19,60 @@ function resolveModelCandidates(): string[] {
 }
 function formatGeminiError(error: unknown): string {
     if (error instanceof Error) {
-        const e = error as Error & { status?: number };
+        const e = error as Error & {
+            status?: number;
+        };
         const m = e.message || String(error);
         return typeof e.status === "number" && Number.isFinite(e.status) ? `${m} (HTTP ${e.status})` : m;
     }
     return String(error);
 }
-function collectTextFromCandidates(response: { candidates?: Array<{ content?: { parts?: unknown[] } }> }): string {
+function collectTextFromCandidates(response: {
+    candidates?: Array<{
+        content?: {
+            parts?: unknown[];
+        };
+    }>;
+}): string {
     const parts = response.candidates?.[0]?.content?.parts;
     if (!Array.isArray(parts))
         return "";
     let out = "";
     for (const p of parts) {
-        if (p && typeof p === "object" && "text" in p && typeof (p as { text: unknown }).text === "string") {
-            out += (p as { text: string }).text;
+        if (p && typeof p === "object" && "text" in p && typeof (p as {
+            text: unknown;
+        }).text === "string") {
+            out += (p as {
+                text: string;
+            }).text;
         }
     }
     return out.trim();
 }
-function extractGeneratedText(result: { response: { text: () => string; candidates?: Array<{ content?: { parts?: unknown[] } }> } }): string {
+function extractGeneratedText(result: {
+    response: {
+        text: () => string;
+        candidates?: Array<{
+            content?: {
+                parts?: unknown[];
+            };
+        }>;
+    };
+}): string {
     try {
         const raw = result.response.text();
         if (typeof raw === "string" && raw.trim())
             return raw.trim();
     }
     catch {
-        // e.g. text() throws when no candidate text — try parts
     }
     return collectTextFromCandidates(result.response);
 }
-/** When retry/backoff or another model may help (excludes retryable 429 — handled separately). */
 function isTransientGeminiFailure(message: string): boolean {
     if (/\(HTTP 429\)|\[429 Too Many Requests\]/i.test(message))
         return false;
     return /503|504|502|500|529|overload|service unavailable|high demand|rate limit|temporarily|UNAVAILABLE|RESOURCE_EXHAUSTED|try again|deadline exceeded|DEADLINE|timeout|ETIMEDOUT|ECONNRESET|EAI_AGAIN|fetch failed|network error|internal error/i.test(message);
 }
-/** Daily / disabled free-tier quota: retrying immediately will not help. */
 function isGemini429NonRetryable(message: string): boolean {
     if (!/\(HTTP 429\)|\[429 Too Many Requests\]/i.test(message))
         return false;
@@ -71,7 +85,6 @@ function isGemini429NonRetryable(message: string): boolean {
 function isRetryableHttp429(message: string): boolean {
     return /\(HTTP 429\)|\[429 Too Many Requests\]/i.test(message) && !isGemini429NonRetryable(message);
 }
-/** User-facing: show real quota message instead of “busy”. */
 function isGeminiQuotaExceededUserFacing(message: string): boolean {
     return /\(HTTP 429\)|\[429 Too Many Requests\]/i.test(message) &&
         /exceeded your current quota|Quota exceeded|RESOURCE_EXHAUSTED/i.test(message);
@@ -759,7 +772,11 @@ export async function POST(req: Request) {
                         : undefined,
                 });
                 const result = await model.generateContent(prompt);
-                const promptFeedback = (result.response as { promptFeedback?: { blockReason?: string } }).promptFeedback;
+                const promptFeedback = (result.response as {
+                    promptFeedback?: {
+                        blockReason?: string;
+                    };
+                }).promptFeedback;
                 const blockReason = promptFeedback?.blockReason;
                 if (blockReason && blockReason !== "BLOCKED_REASON_UNSPECIFIED") {
                     console.error(`[api/ai/generate] Prompt blocked (${blockReason}) on ${modelName}`);

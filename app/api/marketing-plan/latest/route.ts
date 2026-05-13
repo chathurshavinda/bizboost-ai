@@ -3,8 +3,6 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { documentLooksGenerated, normalizePlanDocument } from "@/src/lib/marketingPlan";
-
-/** Any saved row that came from Plan Builder (generate), not skeleton `/create`. */
 function generatedPlanFilter(firebase_uid: string) {
     return {
         firebase_uid,
@@ -16,7 +14,6 @@ function generatedPlanFilter(firebase_uid: string) {
         ],
     };
 }
-
 export async function GET(req: Request) {
     try {
         const { searchParams } = new URL(req.url);
@@ -27,13 +24,10 @@ export async function GET(req: Request) {
         }
         const db = await getDb();
         const collection = db.collection("marketing_plans");
-
         const hasGeneratedPlan = !!(await collection.findOne(generatedPlanFilter(firebase_uid), {
             projection: { _id: 1 },
         }));
-
         let latestAny: Record<string, unknown> | null = null;
-
         if (planId && ObjectId.isValid(planId)) {
             latestAny = (await collection.findOne({
                 _id: new ObjectId(planId),
@@ -41,11 +35,7 @@ export async function GET(req: Request) {
             })) as Record<string, unknown> | null;
         }
         else {
-            const active = (await collection.findOne(
-                { firebase_uid, status: "active" },
-                { sort: { updatedAt: -1, generatedAt: -1, createdAt: -1 } },
-            )) as Record<string, unknown> | null;
-
+            const active = (await collection.findOne({ firebase_uid, status: "active" }, { sort: { updatedAt: -1, generatedAt: -1, createdAt: -1 } })) as Record<string, unknown> | null;
             if (active && documentLooksGenerated(active)) {
                 latestAny = active;
             }
@@ -59,13 +49,9 @@ export async function GET(req: Request) {
                 latestAny = active;
             }
             else {
-                latestAny = (await collection.findOne(
-                    { firebase_uid },
-                    { sort: { createdAt: -1, generatedAt: -1, updatedAt: -1 } },
-                )) as Record<string, unknown> | null;
+                latestAny = (await collection.findOne({ firebase_uid }, { sort: { createdAt: -1, generatedAt: -1, updatedAt: -1 } })) as Record<string, unknown> | null;
             }
         }
-
         if (!latestAny) {
             return NextResponse.json({ ok: true, plan: null, data: null, hasGeneratedPlan }, { status: 200 });
         }

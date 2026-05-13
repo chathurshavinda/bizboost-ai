@@ -47,11 +47,9 @@ type BusinessProfileApiResponse = {
 type BusinessFormProps = {
     registerSectionRef?: (step: StepId, el: HTMLElement | null) => void;
     onModeChange?: (mode: "create" | "edit") => void;
-    /** Hide duplicate page title when the parent route supplies the hero (e.g. Business Details). */
     embedded?: boolean;
 };
 export default function BusinessForm({ registerSectionRef, onModeChange, embedded = false }: BusinessFormProps) {
-    /** Stable callbacks so React does not detach/reattach refs every render (avoids parent setState loops). */
     const setBusinessSectionRef = useCallback((el: HTMLElement | null) => {
         registerSectionRef?.("business", el);
     }, [registerSectionRef]);

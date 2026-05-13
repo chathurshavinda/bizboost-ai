@@ -151,16 +151,7 @@ export async function DELETE(request: NextRequest) {
         const filter = { firebase_uid };
         console.log("business-profile firebase_uid", firebase_uid);
         console.log("[business-profile][DELETE] query filter:", filter);
-        const [
-            businessProfiles,
-            selectedPlans,
-            marketingPlans,
-            posters,
-            dayStatus,
-            subscriptions,
-            payhereOrders,
-            subscriptionPayments,
-        ] = await Promise.all([
+        const [businessProfiles, selectedPlans, marketingPlans, posters, dayStatus, subscriptions, payhereOrders, subscriptionPayments,] = await Promise.all([
             db.collection("business_profiles").deleteMany(filter),
             db.collection("selected_plans").deleteMany(filter),
             db.collection("marketing_plans").deleteMany(filter),
