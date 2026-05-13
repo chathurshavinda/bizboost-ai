@@ -54,31 +54,36 @@ export default function LoginPage() {
         }
     };
     if (checkingProfile) {
-        return (<AuthLayout>
-        <AuthCard title="Almost there" subtitle="Checking your business profile...">
-          <AuthFeedback>Please wait while we prepare your workspace.</AuthFeedback>
-        </AuthCard>
+        return (<AuthLayout>
+        <AuthCard title="Almost there" subtitle="Checking your business profile...">
+          <AuthFeedback>Please wait while we prepare your workspace.</AuthFeedback>
+        </AuthCard>
       </AuthLayout>);
     }
-    return (<AuthLayout>
-      <AuthCard title="Welcome back" subtitle="Sign in to your account to continue">
-        {msg ? <AuthFeedback>{msg}</AuthFeedback> : null}
-        <SocialButtons onClick={onProvider} disabled={loading} mode="continue"/>
-        <div className="authRefOr">OR</div>
-        <label className="authRefField">
-          <input type="email" className="authRefInput" placeholder="Email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)}/>
-        </label>
-        <label className="authRefField">
-          <input type="password" className="authRefInput" placeholder="Password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)}/>
-        </label>
-        <button type="button" className="authRefPrimaryButton" onClick={onLogin} disabled={loading}>
-          {loading ? "Signing in..." : "Sign In to your account"}
-        </button>
-        <button type="button" className="authRefForgotLink">Forgot Password?</button>
-        <div className="authRefFooter">
-          Don&apos;t have an account? {" "}
-          <Link href="/signup" className="authRefFooterLink">Create an account</Link>
-        </div>
-      </AuthCard>
+    return (<AuthLayout>
+      <AuthCard title="Welcome back" subtitle="Sign in to your account to continue">
+        {msg ? <AuthFeedback>{msg}</AuthFeedback> : null}
+        <SocialButtons onClick={onProvider} disabled={loading} mode="continue"/>
+        <div className="authRefOr">OR</div>
+        <label className="authRefField">
+          <input type="email" className="authRefInput" placeholder="Email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)}/>
+        </label>
+        <label className="authRefField">
+          <input type="password" className="authRefInput" placeholder="Password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)}/>
+        </label>
+        <button type="button" className="authRefPrimaryButton" onClick={onLogin} disabled={loading}>
+          {loading ? "Signing in..." : "Sign In to your account"}
+        </button>
+        <Link
+          href={email.trim() ? `/forgot-password?email=${encodeURIComponent(email.trim())}` : "/forgot-password"}
+          className="authRefForgotLink"
+        >
+          Forgot password?
+        </Link>
+        <div className="authRefFooter">
+          Don&apos;t have an account? {" "}
+          <Link href="/signup" className="authRefFooterLink">Create an account</Link>
+        </div>
+      </AuthCard>
     </AuthLayout>);
 }

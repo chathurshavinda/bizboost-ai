@@ -107,18 +107,20 @@ export default function Navbar() {
         </div>
 
         <div className="navbarRight" ref={mobileRef}>
-          <div className="navLinks" aria-label="Primary">
-            {NAV_LINKS.map((link) => {
-            const isActive = link.match(pathname ?? "");
-            if (link.external) {
-                return (<a key={link.href} href={link.href} target="_blank" rel="noopener noreferrer" className={`navLink${isActive ? " navLink--active" : ""}`}>
+          <div className="navLinksCluster">
+            <div className="navLinks" aria-label="Primary">
+              {NAV_LINKS.map((link) => {
+              const isActive = link.match(pathname ?? "");
+              if (link.external) {
+                  return (<a key={link.href} href={link.href} target="_blank" rel="noopener noreferrer" className={`navLink${isActive ? " navLink--active" : ""}`}>
+                      {link.label}
+                    </a>);
+              }
+              return (<Link key={link.href} href={link.href} className={`navLink${isActive ? " navLink--active" : ""}`}>
                     {link.label}
-                  </a>);
-            }
-            return (<Link key={link.href} href={link.href} className={`navLink${isActive ? " navLink--active" : ""}`}>
-                  {link.label}
-                </Link>);
-        })}
+                  </Link>);
+          })}
+            </div>
           </div>
 
           <span className="navDivider" aria-hidden/>

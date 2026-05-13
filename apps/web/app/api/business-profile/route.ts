@@ -150,12 +150,24 @@ export async function DELETE(request: NextRequest) {
         const filter = { firebase_uid };
         console.log("business-profile firebase_uid", firebase_uid);
         console.log("[business-profile][DELETE] query filter:", filter);
-        const [businessProfiles, selectedPlans, marketingPlans, posters, dayStatus,] = await Promise.all([
+        const [
+            businessProfiles,
+            selectedPlans,
+            marketingPlans,
+            posters,
+            dayStatus,
+            subscriptions,
+            payhereOrders,
+            subscriptionPayments,
+        ] = await Promise.all([
             db.collection("business_profiles").deleteMany(filter),
             db.collection("selected_plans").deleteMany(filter),
             db.collection("marketing_plans").deleteMany(filter),
             db.collection("posters").deleteMany(filter),
             db.collection("day_status").deleteMany(filter),
+            db.collection("subscriptions").deleteMany(filter),
+            db.collection("payhere_orders").deleteMany(filter),
+            db.collection("subscription_payments").deleteMany(filter),
         ]);
         return NextResponse.json({
             ok: true,
@@ -165,6 +177,9 @@ export async function DELETE(request: NextRequest) {
                 marketing_plans: marketingPlans.deletedCount,
                 posters: posters.deletedCount,
                 day_status: dayStatus.deletedCount,
+                subscriptions: subscriptions.deletedCount,
+                payhere_orders: payhereOrders.deletedCount,
+                subscription_payments: subscriptionPayments.deletedCount,
             },
         }, { status: 200 });
     }

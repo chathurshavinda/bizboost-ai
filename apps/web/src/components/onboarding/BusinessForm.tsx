@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../lib/useAuth";
 import { auth } from "../../lib/firebase";
@@ -47,8 +47,23 @@ type BusinessProfileApiResponse = {
 type BusinessFormProps = {
     registerSectionRef?: (step: StepId, el: HTMLElement | null) => void;
     onModeChange?: (mode: "create" | "edit") => void;
+    /** Hide duplicate page title when the parent route supplies the hero (e.g. Business Details). */
+    embedded?: boolean;
 };
-export default function BusinessForm({ registerSectionRef, onModeChange }: BusinessFormProps) {
+export default function BusinessForm({ registerSectionRef, onModeChange, embedded = false }: BusinessFormProps) {
+    /** Stable callbacks so React does not detach/reattach refs every render (avoids parent setState loops). */
+    const setBusinessSectionRef = useCallback((el: HTMLElement | null) => {
+        registerSectionRef?.("business", el);
+    }, [registerSectionRef]);
+    const setProductsSectionRef = useCallback((el: HTMLElement | null) => {
+        registerSectionRef?.("products", el);
+    }, [registerSectionRef]);
+    const setTeamSectionRef = useCallback((el: HTMLElement | null) => {
+        registerSectionRef?.("team", el);
+    }, [registerSectionRef]);
+    const setFinancialsSectionRef = useCallback((el: HTMLElement | null) => {
+        registerSectionRef?.("financials", el);
+    }, [registerSectionRef]);
     const { user, loading: authLoading } = useAuth();
     const [status, setStatus] = useState<string | null>(null);
     const [submitError, setSubmitError] = useState<string | null>(null);
@@ -239,185 +254,232 @@ export default function BusinessForm({ registerSectionRef, onModeChange }: Busin
         }
     };
     if (authLoading || profileLoading) {
-        return (<section className="onboardingMain">
-        <header className="onboardingMainHeader">
-          <h1 className="onboardingTitle">{formMode === "edit" ? "Edit Business Details" : "Create Business Details"}</h1>
-          <p className="onboardingSubtitle">Loading your saved profile…</p>
-        </header>
+        if (embedded) {
+            return (<section className="onboardingMain">
+          <div className="bb-form-loading">
+            <div className="bb-skeleton-line" aria-hidden/>
+            <div className="bb-skeleton-line" style={{ width: "72%" }} aria-hidden/>
+            <p className="onboardingSubtitle">Loading your saved profile…</p>
+          </div>
+        </section>);
+        }
+        return (<section className="onboardingMain">
+        <header className="onboardingMainHeader">
+          <h1 className="onboardingTitle">{formMode === "edit" ? "Edit Business Details" : "Create Business Details"}</h1>
+          <p className="onboardingSubtitle">Loading your saved profile…</p>
+        </header>
       </section>);
     }
-    return (<section className="onboardingMain">
-      {showSuccessToast ? (<div className="profileSaveToast" role="status" aria-live="polite">
-          {successToastMessage}
-        </div>) : null}
-
-      <header className="onboardingMainHeader">
-        <h1 className="onboardingTitle">{formMode === "edit" ? "Edit Business Details" : "Create Business Details"}</h1>
-        <p className="onboardingSubtitle">Tell BizBoost AI about your business so we can tailor campaigns and content.</p>
-      </header>
-
-      <form className="onboardingForm" onSubmit={handleSubmit} noValidate>
-        <section id="business" ref={(el) => registerSectionRef && registerSectionRef("business", el)} style={{ display: "flex", flexDirection: "column", gap: 16, paddingTop: 4 }}>
-          <div className="onboardingFieldGroup">
-            <label className="onboardingLabel">
-              <span>What is your business name?</span>
-              <input type="text" className={"onboardingInput" + (errors.businessName ? " onboardingInput--error" : "")} placeholder="Eg. Stellar Studio" value={businessName} onChange={(e) => setBusinessName(e.target.value)}/>
-              {errors.businessName && <span className="onboardingError">{errors.businessName}</span>}
-            </label>
-          </div>
-
-          <div className="onboardingFieldGroup">
-            <label className="onboardingLabel">
-              <span>What kind of business are you?</span>
-              <input type="text" className={"onboardingInput" + (errors.businessType ? " onboardingInput--error" : "")} placeholder="Eg. Local restaurant, online store" value={businessType} onChange={(e) => setBusinessType(e.target.value)}/>
-              {errors.businessType && <span className="onboardingError">{errors.businessType}</span>}
-            </label>
-          </div>
-
-          <div className="onboardingFieldRow">
-            <label className="onboardingLabel">
-              <span>Country</span>
-              <select className={"onboardingInput onboardingSelect" + (errors.country ? " onboardingInput--error" : "")} value={country} onChange={(e) => setCountry(e.target.value)}>
-                <option value="Sri Lanka">Sri Lanka</option>
-              </select>
-              {errors.country && <span className="onboardingError">{errors.country}</span>}
-            </label>
-
-            <label className="onboardingLabel">
-              <span>City / Location</span>
-              <input type="text" className={"onboardingInput" + (errors.city ? " onboardingInput--error" : "")} placeholder="Eg: Colombo" value={city} onChange={(e) => setCity(e.target.value)}/>
-              {errors.city && <span className="onboardingError">{errors.city}</span>}
-            </label>
-          </div>
-
-          <div className="onboardingFieldGroup">
-            <label className="onboardingLabel">
-              <span>Language</span>
-              <select className={"onboardingInput onboardingSelect" + (errors.language ? " onboardingInput--error" : "")} value={language} onChange={(e) => setLanguage(e.target.value)}>
-                <option value="English">English</option>
-              </select>
-              {errors.language && <span className="onboardingError">{errors.language}</span>}
-            </label>
-          </div>
-        </section>
-
-        <section id="products" ref={(el) => registerSectionRef && registerSectionRef("products", el)} style={{ display: "flex", flexDirection: "column", gap: 16, paddingTop: 18 }}>
-          <h2 className="onboardingTitle" style={{ fontSize: 18 }}>Products or services</h2>
-
-          <div className="onboardingFieldGroup">
-            <label className="onboardingLabel">
-              <span>Main products or services</span>
-              <textarea className={"onboardingInput" + (errors.productsOrServices ? " onboardingInput--error" : "")} rows={3} placeholder="Eg. Social media management, logo design, Facebook ad campaigns" style={{ borderRadius: 18, resize: "vertical" }} value={productsOrServices} onChange={(e) => setProductsOrServices(e.target.value)}/>
-              {errors.productsOrServices && <span className="onboardingError">{errors.productsOrServices}</span>}
-            </label>
-          </div>
-
-          <div className="onboardingFieldGroup">
-            <label className="onboardingLabel">
-              <span>Target customers</span>
-              <input type="text" className="onboardingInput" placeholder="Eg. Small business owners in Colombo" value={targetCustomers} onChange={(e) => setTargetCustomers(e.target.value)}/>
-            </label>
-          </div>
-
-          <div className="onboardingFieldGroup">
-            <label className="onboardingLabel">
-              <span>Business goals</span>
-              <input type="text" className="onboardingInput" placeholder="Eg. Increase monthly inquiries and conversions" value={businessGoals} onChange={(e) => setBusinessGoals(e.target.value)}/>
-            </label>
-          </div>
-
-          <div className="onboardingFieldGroup">
-            <label className="onboardingLabel">
-              <span>Social links (comma separated)</span>
-              <input type="text" className="onboardingInput" placeholder="Eg. instagram.com/yourbrand, facebook.com/yourbrand" value={socialLinks} onChange={(e) => setSocialLinks(e.target.value)}/>
-            </label>
-          </div>
-
-          <div className="onboardingFieldGroup">
-            <label className="onboardingLabel">
-              <span>Typical price range</span>
-              <input type="text" className="onboardingInput" placeholder="Eg. LKR 5,000 - 50,000 per package"/>
-            </label>
-          </div>
-        </section>
-
-        <section id="team" ref={(el) => registerSectionRef && registerSectionRef("team", el)} style={{ display: "flex", flexDirection: "column", gap: 16, paddingTop: 18 }}>
-          <h2 className="onboardingTitle" style={{ fontSize: 18 }}>Management team</h2>
-
-          <div className="onboardingFieldGroup">
-            <label className="onboardingLabel">
-              <span>Owner / Manager name</span>
-              <input type="text" className="onboardingInput" placeholder="Eg. Jane Perera" value={ownerOrManagerName} onChange={(e) => setOwnerOrManagerName(e.target.value)}/>
-            </label>
-          </div>
-
-          <div className="onboardingFieldGroup">
-            <label className="onboardingLabel">
-              <span>Team size</span>
-              <input type="text" className="onboardingInput" placeholder="Eg. Solo founder, 3 full-time, 2 part-time" value={teamSize} onChange={(e) => setTeamSize(e.target.value)}/>
-            </label>
-          </div>
-
-          <div className="onboardingFieldGroup">
-            <label className="onboardingLabel">
-              <span>Contact email</span>
-              <input type="email" className="onboardingInput" placeholder="Eg. hello@yourbusiness.lk" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)}/>
-            </label>
-          </div>
-        </section>
-
-        <section id="financials" ref={(el) => registerSectionRef && registerSectionRef("financials", el)} style={{ display: "flex", flexDirection: "column", gap: 16, paddingTop: 18 }}>
-          <h2 className="onboardingTitle" style={{ fontSize: 18 }}>Financials</h2>
-
-          <div className="onboardingFieldGroup">
-            <label className="onboardingLabel">
-              <span>Monthly business budget</span>
-              <input type="text" className="onboardingInput" placeholder="Eg. LKR 100,000 per month" value={monthlyBusinessBudget} onChange={(e) => setMonthlyBusinessBudget(e.target.value)}/>
-            </label>
-          </div>
-
-          <div className="onboardingFieldGroup">
-            <label className="onboardingLabel">
-              <span>Monthly marketing budget</span>
-              <input type="text" className="onboardingInput" placeholder="Eg. LKR 25,000 per month" value={monthlyMarketingBudget} onChange={(e) => setMonthlyMarketingBudget(e.target.value)}/>
-            </label>
-          </div>
-
-          <div className="onboardingFieldGroup">
-            <label className="onboardingLabel">
-              <span>Expected revenue range</span>
-              <input type="text" className="onboardingInput" placeholder="Eg. LKR 200,000 - 500,000 per month" value={expectedRevenueRange} onChange={(e) => setExpectedRevenueRange(e.target.value)}/>
-            </label>
-          </div>
-
-          {status && <p className="onboardingStatus">{status}</p>}
-          {submitError && <p className="onboardingError">{submitError}</p>}
-
-          <div className="onboardingActions" style={{ display: "flex", justifyContent: "flex-end", gap: 10, flexWrap: "wrap" }}>
-            <button type="submit" className="onboardingSubmitButton" disabled={submitting}>
-              {submitting ? "Saving..." : "Save & Continue"}
-            </button>
-          </div>
-        </section>
-      </form>
-
-      <style jsx>{`
-        .profileSaveToast {
-          position: fixed;
-          bottom: 28px;
-          left: 50%;
-          transform: translateX(-50%);
-          z-index: 9999;
-          padding: 12px 20px;
-          border-radius: 14px;
-          font-size: 14px;
-          font-weight: 600;
-          color: #0f172a;
-          background: rgba(255, 255, 255, 0.95);
-          border: 1px solid rgba(148, 163, 184, 0.35);
-          box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
-          backdrop-filter: blur(12px);
-        }
-      `}</style>
+    return (<section className="onboardingMain">
+      {showSuccessToast ? (<div className="profileSaveToast" role="status" aria-live="polite">
+          {successToastMessage}
+        </div>) : null}
+
+      {!embedded ? (<header className="onboardingMainHeader">
+          <h1 className="onboardingTitle">{formMode === "edit" ? "Edit Business Details" : "Create Business Details"}</h1>
+          <p className="onboardingSubtitle">Tell BizBoost AI about your business so we can tailor campaigns and content.</p>
+        </header>) : null}
+
+      <form className="onboardingForm" onSubmit={handleSubmit} noValidate>
+        <section id="business" ref={setBusinessSectionRef} className="bb-form-section">
+          <div className="bb-form-section-head">
+            <p className="bb-form-section-kicker">Step 1</p>
+            <h2 className="bb-form-section-title">Business overview</h2>
+            <p className="bb-form-section-desc">
+              Your public identity and location—used to personalize plans, posts, and recommendations.
+            </p>
+          </div>
+
+          <div className="bb-form-field-grid">
+            <div className="onboardingFieldGroup">
+              <label className="onboardingLabel">
+                <span>Business name</span>
+                <input type="text" className={"onboardingInput" + (errors.businessName ? " onboardingInput--error" : "")} placeholder="e.g. Stellar Studio" value={businessName} onChange={(e) => setBusinessName(e.target.value)}/>
+                {errors.businessName ? <span className="onboardingError">{errors.businessName}</span> : null}
+              </label>
+            </div>
+
+            <div className="onboardingFieldGroup">
+              <label className="onboardingLabel">
+                <span>Business type</span>
+                <input type="text" className={"onboardingInput" + (errors.businessType ? " onboardingInput--error" : "")} placeholder="e.g. Local restaurant, retail, consulting" value={businessType} onChange={(e) => setBusinessType(e.target.value)}/>
+                {errors.businessType ? <span className="onboardingError">{errors.businessType}</span> : null}
+              </label>
+            </div>
+          </div>
+
+          <div className="bb-form-field-grid bb-form-field-grid--2">
+            <div className="onboardingFieldGroup">
+              <label className="onboardingLabel">
+                <span>Country</span>
+                <select className={"onboardingInput onboardingSelect" + (errors.country ? " onboardingInput--error" : "")} value={country} onChange={(e) => setCountry(e.target.value)}>
+                  <option value="Sri Lanka">Sri Lanka</option>
+                </select>
+                {errors.country ? <span className="onboardingError">{errors.country}</span> : null}
+              </label>
+            </div>
+
+            <div className="onboardingFieldGroup">
+              <label className="onboardingLabel">
+                <span>City / location</span>
+                <input type="text" className={"onboardingInput" + (errors.city ? " onboardingInput--error" : "")} placeholder="e.g. Colombo" value={city} onChange={(e) => setCity(e.target.value)}/>
+                {errors.city ? <span className="onboardingError">{errors.city}</span> : null}
+              </label>
+            </div>
+          </div>
+
+          <div className="onboardingFieldGroup">
+            <label className="onboardingLabel">
+              <span>Primary language</span>
+              <select className={"onboardingInput onboardingSelect" + (errors.language ? " onboardingInput--error" : "")} value={language} onChange={(e) => setLanguage(e.target.value)}>
+                <option value="English">English</option>
+              </select>
+              {errors.language ? <span className="onboardingError">{errors.language}</span> : null}
+            </label>
+          </div>
+        </section>
+
+        <section id="products" ref={setProductsSectionRef} className="bb-form-section">
+          <div className="bb-form-section-head">
+            <p className="bb-form-section-kicker">Step 2</p>
+            <h2 className="bb-form-section-title">Offerings &amp; audience</h2>
+            <p className="bb-form-section-desc">
+              What you sell, who you serve, and where you show up online.
+            </p>
+          </div>
+
+          <div className="onboardingFieldGroup">
+            <label className="onboardingLabel">
+              <span>Main products or services</span>
+              <textarea className={"onboardingInput onboardingInput--multiline" + (errors.productsOrServices ? " onboardingInput--error" : "")} rows={3} placeholder="e.g. Catering packages, lunch combos, weekend tasting menus" value={productsOrServices} onChange={(e) => setProductsOrServices(e.target.value)}/>
+              {errors.productsOrServices ? <span className="onboardingError">{errors.productsOrServices}</span> : null}
+            </label>
+          </div>
+
+          <div className="bb-form-field-grid bb-form-field-grid--2">
+            <div className="onboardingFieldGroup">
+              <label className="onboardingLabel">
+                <span>Target customers</span>
+                <input type="text" className="onboardingInput" placeholder="e.g. Office workers within 2 km, families on weekends" value={targetCustomers} onChange={(e) => setTargetCustomers(e.target.value)}/>
+              </label>
+            </div>
+
+            <div className="onboardingFieldGroup">
+              <label className="onboardingLabel">
+                <span>Business goals</span>
+                <input type="text" className="onboardingInput" placeholder="e.g. More weekday orders and repeat visits" value={businessGoals} onChange={(e) => setBusinessGoals(e.target.value)}/>
+              </label>
+            </div>
+          </div>
+
+          <div className="onboardingFieldGroup">
+            <label className="onboardingLabel">
+              <span>Social links (comma separated)</span>
+              <input type="text" className="onboardingInput" placeholder="instagram.com/yourbrand, facebook.com/yourbrand" value={socialLinks} onChange={(e) => setSocialLinks(e.target.value)}/>
+            </label>
+          </div>
+
+          <div className="onboardingFieldGroup">
+            <label className="onboardingLabel">
+              <span>Typical price range</span>
+              <input type="text" className="onboardingInput" placeholder="e.g. LKR 5,000 – 50,000 per package"/>
+            </label>
+          </div>
+        </section>
+
+        <section id="team" ref={setTeamSectionRef} className="bb-form-section">
+          <div className="bb-form-section-head">
+            <p className="bb-form-section-kicker">Step 3</p>
+            <h2 className="bb-form-section-title">Team &amp; contact</h2>
+            <p className="bb-form-section-desc">
+              Who we should reference in your plan and how to reach you.
+            </p>
+          </div>
+
+          <div className="bb-form-field-grid bb-form-field-grid--2">
+            <div className="onboardingFieldGroup">
+              <label className="onboardingLabel">
+                <span>Owner / manager name</span>
+                <input type="text" className="onboardingInput" placeholder="e.g. Jane Perera" value={ownerOrManagerName} onChange={(e) => setOwnerOrManagerName(e.target.value)}/>
+              </label>
+            </div>
+
+            <div className="onboardingFieldGroup">
+              <label className="onboardingLabel">
+                <span>Team size</span>
+                <input type="text" className="onboardingInput" placeholder="e.g. Solo founder, 3 full-time" value={teamSize} onChange={(e) => setTeamSize(e.target.value)}/>
+              </label>
+            </div>
+          </div>
+
+          <div className="onboardingFieldGroup">
+            <label className="onboardingLabel">
+              <span>Contact email</span>
+              <input type="email" className="onboardingInput" placeholder="hello@yourbusiness.lk" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)}/>
+            </label>
+          </div>
+        </section>
+
+        <section id="financials" ref={setFinancialsSectionRef} className="bb-form-section">
+          <div className="bb-form-section-head">
+            <p className="bb-form-section-kicker">Step 4</p>
+            <h2 className="bb-form-section-title">Budget &amp; revenue</h2>
+            <p className="bb-form-section-desc">
+              Helps BizBoost scale tactics to the resources you actually have.
+            </p>
+          </div>
+
+          <div className="bb-form-field-grid bb-form-field-grid--2">
+            <div className="onboardingFieldGroup">
+              <label className="onboardingLabel">
+                <span>Monthly business budget</span>
+                <input type="text" className="onboardingInput" placeholder="e.g. LKR 100,000 / month" value={monthlyBusinessBudget} onChange={(e) => setMonthlyBusinessBudget(e.target.value)}/>
+              </label>
+            </div>
+
+            <div className="onboardingFieldGroup">
+              <label className="onboardingLabel">
+                <span>Monthly marketing budget</span>
+                <input type="text" className="onboardingInput" placeholder="e.g. LKR 25,000 / month" value={monthlyMarketingBudget} onChange={(e) => setMonthlyMarketingBudget(e.target.value)}/>
+              </label>
+            </div>
+          </div>
+
+          <div className="onboardingFieldGroup">
+            <label className="onboardingLabel">
+              <span>Expected revenue range</span>
+              <input type="text" className="onboardingInput" placeholder="e.g. LKR 200,000 – 500,000 / month" value={expectedRevenueRange} onChange={(e) => setExpectedRevenueRange(e.target.value)}/>
+            </label>
+          </div>
+
+          {status ? <p className="onboardingStatus">{status}</p> : null}
+          {submitError ? <p className="onboardingError">{submitError}</p> : null}
+
+          <div className="onboardingActions flex justify-end gap-3 pt-2">
+            <button type="submit" className="onboardingSubmitButton" disabled={submitting}>
+              {submitting ? "Saving…" : "Save & continue"}
+            </button>
+          </div>
+        </section>
+      </form>
+
+      <style jsx>{`
+        .profileSaveToast {
+          position: fixed;
+          bottom: 28px;
+          left: 50%;
+          transform: translateX(-50%);
+          z-index: 9999;
+          padding: 12px 20px;
+          border-radius: 14px;
+          font-size: 14px;
+          font-weight: 600;
+          color: #0f172a;
+          background: rgba(255, 255, 255, 0.95);
+          border: 1px solid rgba(148, 163, 184, 0.35);
+          box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
+          backdrop-filter: blur(12px);
+        }
+      `}</style>
     </section>);
 }

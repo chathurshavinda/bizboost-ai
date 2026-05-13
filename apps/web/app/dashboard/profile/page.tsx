@@ -517,10 +517,12 @@ export default function BusinessProfilePage() {
     return (<div className="profilePage">
       <div className="profileShell">
         <section className="businessProfileHero">
+          <div className="businessProfileHeroInner">
+          <p className="businessProfileWelcome">Welcome back</p>
           <div className="businessProfileBadge">Business profile</div>
           <h1 className="businessProfileTitle">{businessName}</h1>
           <p className="businessProfileSubtitle">
-            {businessType} • {city}, {country}
+            {businessType} · {city}, {country}
           </p>
 
           <div className="businessProfileHeroMeta">
@@ -545,6 +547,7 @@ export default function BusinessProfilePage() {
             <button type="button" className="btn businessProfileGhostButton" onClick={() => router.push("/onboarding/business-details")}>
               Edit business details
             </button>
+          </div>
           </div>
         </section>
 

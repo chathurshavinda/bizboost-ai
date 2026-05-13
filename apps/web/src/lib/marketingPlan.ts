@@ -1,3 +1,4 @@
+import type { AiBusinessPlan } from "./aiBusinessPlan";
 export type MarketingPlanStatus = "active" | "completed" | "archived";
 export type MarketingPlanDay = {
     dayNumber: number;
@@ -61,11 +62,57 @@ export type MarketingPlanDocument = {
     endDate: string;
     createdAt: string;
     updatedAt: string;
+    /** Set when the plan is produced by Plan Builder (`/api/marketing-plan/generate`). Skeleton plans from `/create` omit this. */
+    generatedAt?: string;
+    /** Present on AI-generated plans from Plan Builder; skeleton `/create` plans omit this. */
+    templateVersion?: string;
     planDays: MarketingPlanDay[];
     progress: MarketingPlanProgress;
     narrativePlan?: string;
     businessSnapshot?: Record<string, unknown>;
+    /** Optional AI-generated structured Business + Marketing plan. Additive — older docs may not have it. */
+    aiBusinessPlan?: AiBusinessPlan;
+    /** Optional list of profile fields that were weak/missing when the plan was generated. */
+    missingProfileFields?: string[];
 };
+
+/** Raw DB document / JSON: true if this row was produced by Plan Builder (generate), not skeleton `/create`. */
+export function documentLooksGenerated(doc: Record<string, unknown> | null | undefined): boolean {
+    if (!doc)
+        return false;
+    const ga = doc.generatedAt as unknown;
+    if (ga != null && ga !== "")
+        return true;
+    if (typeof ga === "object" && ga !== null && (ga as { getTime?: () => number }).getTime instanceof Function) {
+        const t = (ga as Date).getTime();
+        if (!Number.isNaN(t))
+            return true;
+    }
+    const tv = doc.templateVersion;
+    if (typeof tv === "string" && tv.trim().length > 0)
+        return true;
+    const np = doc.narrativePlan;
+    if (typeof np === "string" && np.trim().length > 0)
+        return true;
+    if (doc.aiBusinessPlan && typeof doc.aiBusinessPlan === "object")
+        return true;
+    return false;
+}
+
+/** Normalized plan: true once the user has a saved generated plan (same signals as documentLooksGenerated). */
+export function planWasGeneratedInPlanBuilder(plan: MarketingPlanDocument | null): boolean {
+    if (!plan)
+        return false;
+    if (plan.generatedAt && plan.generatedAt.trim())
+        return true;
+    if (typeof plan.templateVersion === "string" && plan.templateVersion.trim().length > 0)
+        return true;
+    if (typeof plan.narrativePlan === "string" && plan.narrativePlan.trim().length > 0)
+        return true;
+    if (plan.aiBusinessPlan && typeof plan.aiBusinessPlan === "object")
+        return true;
+    return false;
+}
 function toISODateString(date: Date): string {
     return date.toISOString().slice(0, 10);
 }
@@ -230,6 +277,13 @@ export function normalizePlanDocument(doc: Record<string, unknown> | null): Mark
         };
     }), durationDays, startDate);
     const progress = computeProgress(planDays);
+    const generatedAtIso =
+        generatedAtRaw instanceof Date
+            ? generatedAtRaw.toISOString()
+            : typeof generatedAtRaw === "string" && generatedAtRaw.trim()
+                ? new Date(generatedAtRaw).toISOString()
+                : undefined;
+    const templateVersion = typeof doc.templateVersion === "string" ? doc.templateVersion.trim() : "";
     return {
         _id: doc._id,
         firebase_uid: String(doc.firebase_uid ?? ""),
@@ -239,9 +293,15 @@ export function normalizePlanDocument(doc: Record<string, unknown> | null): Mark
         endDate,
         createdAt: new Date(createdAtRaw as string | number | Date).toISOString(),
         updatedAt: new Date(updatedAtRaw as string | number | Date).toISOString(),
+        ...(generatedAtIso ? { generatedAt: generatedAtIso } : {}),
+        ...(templateVersion ? { templateVersion } : {}),
         planDays,
         progress,
         narrativePlan: typeof doc.narrativePlan === "string" ? doc.narrativePlan : "",
         businessSnapshot: typeof doc.businessSnapshot === "object" && doc.businessSnapshot ? (doc.businessSnapshot as Record<string, unknown>) : undefined,
+        aiBusinessPlan: typeof doc.aiBusinessPlan === "object" && doc.aiBusinessPlan ? (doc.aiBusinessPlan as AiBusinessPlan) : undefined,
+        missingProfileFields: Array.isArray(doc.missingProfileFields)
+            ? (doc.missingProfileFields as unknown[]).map((v) => String(v ?? "").trim()).filter(Boolean)
+            : undefined,
     };
 }

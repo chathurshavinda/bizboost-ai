@@ -108,7 +108,7 @@ html.dark {
 
 #features,
 #about,
-#contact,
+#showcase,
 #how-it-works,
 #pricing {
   scroll-margin-top: 5.5rem;
@@ -460,6 +460,14 @@ body {
   margin-top: 10px;
 }
 
+.onboardingActions--trailing {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-top: 8px;
+}
+
 .onboardingSubmitButton {
   display: inline-flex;
   align-items: center;
@@ -504,6 +512,321 @@ body {
 
   .onboardingFieldRow {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ----- BizBoost page chrome (aligned with Home landing) ----- */
+.bb-page {
+  min-height: 100vh;
+  background: var(--page-bg);
+}
+
+.bb-hero-dark {
+  background: #000000;
+  color: #f4f4f5;
+  padding: clamp(48px, 9vw, 96px) max(22px, 5vw) clamp(28px, 5vw, 56px);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Flush first dark hero under sticky navbar (navbar uses top: 14px); keep hero padding rhythm */
+.appShell > .bb-page > .bb-hero-dark:first-child {
+  margin-top: -14px;
+  padding-top: calc(clamp(48px, 9vw, 96px) + 14px);
+}
+
+/* Marketing Plan + Day Detail: modest gap under navbar (overrides flush above) */
+.appShell > .bb-page > .bb-hero-dark.bb-hero-dark--planHeroBreath:first-child {
+  margin-top: clamp(10px, 1.75vw, 18px);
+  padding-top: clamp(48px, 9vw, 96px);
+}
+
+.bb-hero-dark::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(520px 280px at 12% 20%, rgba(99, 102, 241, 0.2), transparent 65%),
+    radial-gradient(480px 260px at 88% 10%, rgba(236, 72, 153, 0.12), transparent 62%),
+    radial-gradient(700px 320px at 50% 120%, rgba(16, 185, 129, 0.08), transparent 58%);
+  opacity: 0.72;
+}
+
+.bb-hero-dark-inner {
+  position: relative;
+  z-index: 1;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.bb-eyebrow-dark {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-weight: 700;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  color: rgba(226, 232, 240, 0.72);
+}
+
+.bb-title-dark {
+  margin: 12px 0 0;
+  font-family: var(--font-playfair), Georgia, serif;
+  font-size: clamp(28px, 4vw, 42px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
+  color: #ffffff;
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.45);
+}
+
+.bb-lead-dark {
+  margin: 16px 0 0;
+  max-width: 40rem;
+  font-size: clamp(15px, 1.2vw, 16px);
+  line-height: 1.65;
+  font-weight: 400;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  color: rgba(226, 232, 240, 0.88);
+}
+
+.bb-band-light {
+  position: relative;
+  z-index: 1;
+  background: #fafafa;
+  /* Tighter top spacing + overlap so the form sits closer to the hero */
+  padding: clamp(12px, 2.5vw, 28px) max(22px, 5vw) clamp(48px, 9vw, 104px);
+}
+
+.bb-shell {
+  width: 100%;
+  max-width: 1220px;
+  margin: 0 auto;
+}
+
+.bb-band-light .bb-shell {
+  position: relative;
+  z-index: 2;
+  margin-top: -clamp(18px, 3.5vw, 40px);
+}
+
+/* Light onboarding card — matches Home light sections */
+.onboardingCard.onboardingCard--light {
+  grid-template-columns: minmax(0, 0.28fr) minmax(0, 1fr);
+  gap: clamp(20px, 3vw, 36px);
+  padding: clamp(22px, 3vw, 34px);
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(250, 250, 250, 0.96) 100%);
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.95) inset,
+    0 28px 70px rgba(15, 23, 42, 0.09);
+  color: #0f172a;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.onboardingCard.onboardingCard--light .onboardingSidebar {
+  border-right: 1px solid rgba(226, 232, 240, 0.95);
+  padding-right: clamp(14px, 2vw, 22px);
+}
+
+.onboardingCard.onboardingCard--light .onboardingStepIcon {
+  background: #ffffff;
+  border-color: rgba(148, 163, 184, 0.42);
+}
+
+.onboardingCard.onboardingCard--light .onboardingStepIcon--active .onboardingStepIconDot {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  box-shadow: 0 0 16px rgba(99, 102, 241, 0.55);
+}
+
+.onboardingCard.onboardingCard--light .onboardingStepIcon--done .onboardingStepIconDot {
+  background: #22c55e;
+}
+
+.onboardingCard.onboardingCard--light .onboardingStepLine {
+  background: linear-gradient(to bottom, rgba(226, 232, 240, 0.5), rgba(148, 163, 184, 0.55));
+}
+
+.onboardingCard.onboardingCard--light .onboardingStepLabel {
+  color: #64748b;
+}
+
+.onboardingCard.onboardingCard--light .onboardingStepLabel--active {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.onboardingCard.onboardingCard--light .onboardingStepLabel--done {
+  color: #475569;
+}
+
+.onboardingCard.onboardingCard--light .onboardingLabel {
+  color: #475569;
+}
+
+.onboardingCard.onboardingCard--light .onboardingLabel > span:first-child {
+  font-weight: 600;
+  color: #334155;
+}
+
+.onboardingCard.onboardingCard--light .onboardingInput {
+  border-radius: 14px;
+  background: #ffffff;
+  border: 1px solid rgba(148, 163, 184, 0.42);
+  color: #0f172a;
+}
+
+.onboardingCard.onboardingCard--light .onboardingInput:focus {
+  border-color: #0f172a;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.35), 0 0 0 6px rgba(15, 23, 42, 0.06);
+  background: #ffffff;
+}
+
+.onboardingCard.onboardingCard--light .onboardingInput::placeholder {
+  color: #94a3b8;
+}
+
+.onboardingCard.onboardingCard--light .onboardingError {
+  color: #dc2626;
+}
+
+.onboardingCard.onboardingCard--light .onboardingStatus {
+  color: #15803d;
+}
+
+.onboardingCard.onboardingCard--light .onboardingSubmitButton {
+  border-radius: 999px;
+  padding: 14px 28px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  color: #ffffff;
+  background: #0f172a;
+  border: 1px solid #0f172a;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.22);
+}
+
+.onboardingCard.onboardingCard--light .onboardingSubmitButton:hover:not(:disabled) {
+  background: #111827;
+  border-color: #111827;
+  filter: none;
+  transform: translateY(-1px);
+}
+
+.onboardingCard.onboardingCard--light .onboardingSubmitButton:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.onboardingInput--multiline {
+  border-radius: 16px !important;
+  min-height: 96px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.bb-form-section {
+  border-radius: 20px;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.92));
+  padding: clamp(18px, 2.4vw, 24px);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.05);
+  scroll-margin-top: 5.5rem;
+}
+
+.bb-form-section + .bb-form-section {
+  margin-top: 14px;
+}
+
+.bb-form-section-head {
+  margin-bottom: 16px;
+}
+
+.bb-form-section-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.bb-form-section-title {
+  margin: 8px 0 0;
+  font-size: clamp(17px, 2vw, 20px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+
+.bb-form-section-desc {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #64748b;
+  max-width: 52ch;
+}
+
+.bb-form-field-grid {
+  display: grid;
+  gap: 16px;
+}
+
+@media (min-width: 640px) {
+  .bb-form-field-grid--2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.bb-form-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 8px 4px 16px;
+}
+
+.bb-skeleton-line {
+  height: 14px;
+  width: min(100%, 260px);
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    rgba(226, 232, 240, 0.65) 0%,
+    rgba(241, 245, 249, 0.95) 48%,
+    rgba(226, 232, 240, 0.65) 100%
+  );
+  background-size: 200% 100%;
+  animation: bbShimmer 1.35s ease-in-out infinite;
+}
+
+@keyframes bbShimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@media (max-width: 900px) {
+  .onboardingCard.onboardingCard--light {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 22px 18px;
+  }
+
+  .onboardingCard.onboardingCard--light .onboardingSidebar {
+    border-right: none;
+    border-bottom: 1px solid rgba(226, 232, 240, 0.95);
+    padding-right: 0;
+    padding-bottom: 18px;
+    margin-bottom: 8px;
   }
 }
 
@@ -765,7 +1088,7 @@ body {
 
 .navbar {
   position: sticky;
-  top: 10px;
+  top: 14px;
   z-index: 50;
   width: 100%;
   padding-inline: clamp(8px, 1.8vw, 16px);
@@ -780,13 +1103,9 @@ body {
 
 .navbar--home {
   position: fixed;
-  top: 10px;
+  top: 14px;
   left: 0;
   right: 0;
-}
-
-.navbar--scrolled {
-  
 }
 
 .navbarInner {
@@ -795,17 +1114,32 @@ body {
   justify-content: space-between;
   gap: 16px;
   width: 100%;
-  max-width: 1080px;
+  max-width: min(1180px, calc(100% - 24px));
   margin: 0 auto;
-  padding: 8px clamp(12px, 2.2vw, 20px);
-  min-height: 52px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
-  backdrop-filter: blur(20px) saturate(1.25);
-  -webkit-backdrop-filter: blur(20px) saturate(1.25);
+  padding: 10px clamp(14px, 2.2vw, 22px);
+  min-height: 54px;
+  border-radius: 20px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.94) 0%,
+    rgba(248, 250, 252, 0.91) 100%
+  );
+  border: 1px solid rgba(15, 23, 42, 0.07);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 1px 0 rgba(15, 23, 42, 0.04),
+    0 18px 42px rgba(15, 23, 42, 0.07);
+  backdrop-filter: blur(22px) saturate(1.2);
+  -webkit-backdrop-filter: blur(22px) saturate(1.2);
   transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.navbar--scrolled .navbarInner {
+  border-color: rgba(15, 23, 42, 0.1);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 1px 0 rgba(15, 23, 42, 0.06),
+    0 22px 48px rgba(15, 23, 42, 0.1);
 }
 
 .navbarLeft {
@@ -836,11 +1170,11 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  background: rgba(255, 255, 255, 0.85);
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(248, 250, 252, 0.95);
   cursor: pointer;
   padding: 0;
   transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
@@ -848,12 +1182,14 @@ body {
 
 .navMenuTrigger:hover {
   background: #ffffff;
-  border-color: rgba(15, 23, 42, 0.18);
+  border-color: rgba(15, 23, 42, 0.14);
 }
 
 .navMenuTrigger--open {
-  border-color: rgba(15, 23, 42, 0.28);
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+  border-color: rgba(15, 23, 42, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 10px 22px rgba(15, 23, 42, 0.09);
 }
 
 .navbarRight {
@@ -861,6 +1197,16 @@ body {
   align-items: center;
   gap: 6px;
   position: relative;
+}
+
+.navLinksCluster {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.045);
+  border: 1px solid rgba(15, 23, 42, 0.06);
 }
 
 .navLinks {
@@ -871,41 +1217,43 @@ body {
 
 .navLink {
   position: relative;
-  padding: 8px 14px;
-  border-radius: 10px;
-  color: #475569;
-  font-size: 14px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  color: #64748b;
+  font-size: 13px;
   font-weight: 500;
+  letter-spacing: -0.01em;
   text-decoration: none;
-  transition: color 0.16s ease, background 0.16s ease;
+  transition:
+    color 0.16s ease,
+    background 0.16s ease,
+    box-shadow 0.16s ease;
 }
 
 .navLink:hover {
   color: #0f172a;
-  background: rgba(15, 23, 42, 0.04);
+  background: rgba(255, 255, 255, 0.72);
 }
 
 .navLink--active {
   color: #0f172a;
   font-weight: 600;
+  background: #ffffff;
+  box-shadow:
+    0 1px 0 rgba(15, 23, 42, 0.06),
+    0 4px 14px rgba(15, 23, 42, 0.07);
 }
 
 .navLink--active::after {
-  content: "";
-  position: absolute;
-  left: 14px;
-  right: 14px;
-  bottom: 2px;
-  height: 2px;
-  border-radius: 2px;
-  background: #10b981;
+  display: none;
 }
 
 .navDivider {
   width: 1px;
-  height: 22px;
-  margin: 0 10px;
-  background: rgba(15, 23, 42, 0.1);
+  height: 26px;
+  margin: 0 12px;
+  align-self: center;
+  background: rgba(15, 23, 42, 0.09);
 }
 
 .navAuthGroup {
@@ -918,17 +1266,18 @@ body {
   display: inline-flex;
   align-items: center;
   padding: 8px 14px;
-  border-radius: 10px;
-  color: #475569;
-  font-size: 14px;
+  border-radius: 999px;
+  color: #64748b;
+  font-size: 13px;
   font-weight: 500;
+  letter-spacing: -0.01em;
   text-decoration: none;
   transition: color 0.16s ease, background 0.16s ease;
 }
 
 .navLoginLink:hover {
   color: #0f172a;
-  background: rgba(15, 23, 42, 0.04);
+  background: rgba(15, 23, 42, 0.05);
   text-decoration: none;
 }
 
@@ -936,22 +1285,24 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 9px 18px;
+  padding: 11px 20px;
   border-radius: 999px;
-  background: #0a0f1c;
+  background: #0f172a;
   color: #ffffff;
   text-decoration: none;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
-  border: 1px solid #0a0f1c;
-  box-shadow: 0 6px 16px rgba(10, 15, 28, 0.16);
-  transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+  letter-spacing: -0.005em;
+  border: 1px solid #0f172a;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.14);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease, border-color 0.16s ease;
 }
 
 .navGetStarted:hover {
   background: #111827;
+  border-color: #111827;
   transform: translateY(-1px);
-  box-shadow: 0 12px 24px rgba(10, 15, 28, 0.22);
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.18);
 }
 
 .navProfileWrap {
@@ -962,31 +1313,33 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   padding: 0;
   border-radius: 999px;
   border: 1px solid rgba(15, 23, 42, 0.1);
-  background: rgba(255, 255, 255, 0.85);
-  color: #0a0f1c;
+  background: rgba(255, 255, 255, 0.92);
+  color: #0f172a;
   cursor: pointer;
   transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
 }
 
 .userChip:hover {
-  border-color: rgba(15, 23, 42, 0.2);
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+  border-color: rgba(15, 23, 42, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 8px 18px rgba(15, 23, 42, 0.09);
   transform: translateY(-1px);
 }
 
 .userChipInitial {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #0a0f1c;
+  background: #0f172a;
   color: #fff;
   font-size: 12px;
   font-weight: 600;
@@ -1049,11 +1402,11 @@ body {
   display: none;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  background: rgba(255, 255, 255, 0.85);
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(248, 250, 252, 0.95);
   cursor: pointer;
   padding: 0;
   transition: background 0.16s ease, border-color 0.16s ease;
@@ -1061,7 +1414,7 @@ body {
 
 .navbarToggle:hover {
   background: #ffffff;
-  border-color: rgba(15, 23, 42, 0.18);
+  border-color: rgba(15, 23, 42, 0.14);
 }
 
 .navbarToggleBar {
@@ -1482,43 +1835,76 @@ body {
 }
 
 .businessProfileHero {
-  border: 1px solid rgba(148, 163, 184, 0.28);
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 24px;
-  padding: 26px 24px;
+  padding: clamp(24px, 4vw, 34px) clamp(22px, 3vw, 32px);
   background:
-    radial-gradient(520px 200px at 0% 0%, rgba(22, 163, 74, 0.08), transparent 70%),
-    radial-gradient(480px 200px at 100% 0%, rgba(16, 185, 129, 0.08), transparent 68%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.92));
-  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+    radial-gradient(520px 220px at 12% 0%, rgba(99, 102, 241, 0.35), transparent 62%),
+    radial-gradient(420px 200px at 92% 12%, rgba(236, 72, 153, 0.18), transparent 58%),
+    linear-gradient(155deg, #020617 0%, #0f172a 42%, #020617 100%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 28px 80px rgba(0, 0, 0, 0.45);
+}
+
+.businessProfileHero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.35;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.businessProfileHeroInner {
+  position: relative;
+  z-index: 1;
+}
+
+.businessProfileWelcome {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.48);
 }
 
 .businessProfileBadge {
   display: inline-flex;
   align-items: center;
+  margin-top: 12px;
   padding: 7px 13px;
   border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #475569;
-  background: rgba(255, 255, 255, 0.9);
+  color: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(10px);
 }
 
 .businessProfileTitle {
-  margin: 10px 0 4px;
-  font-size: clamp(28px, 4vw, 36px);
-  font-weight: 800;
+  margin: 12px 0 6px;
+  font-family: var(--font-playfair), Georgia, serif;
+  font-size: clamp(28px, 4.2vw, 38px);
+  font-weight: 500;
   line-height: 1.12;
   letter-spacing: -0.02em;
-  color: #0f172a;
+  color: #ffffff;
 }
 
 .businessProfileSubtitle {
   margin: 0;
-  color: #64748b;
+  color: rgba(255, 255, 255, 0.72);
   font-size: 15px;
+  line-height: 1.5;
 }
 
 .businessProfileHeroMeta {
@@ -1535,14 +1921,15 @@ body {
   gap: 6px;
   padding: 7px 12px;
   border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.32);
-  background: rgba(255, 255, 255, 0.88);
-  color: #334155;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(248, 250, 252, 0.92);
   font-size: 13px;
+  backdrop-filter: blur(10px);
 }
 
 .businessProfileMetaChip svg {
-  color: #0f766e;
+  color: rgba(165, 180, 252, 0.95);
 }
 
 .businessProfileActionsRow {
@@ -1554,30 +1941,35 @@ body {
 }
 
 .businessProfileActionsRow .btn {
-  border-color: rgba(148, 163, 184, 0.45);
-  background: rgba(255, 255, 255, 0.95);
-  color: #334155;
+  border-radius: 999px;
+  padding: 13px 22px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  border-color: rgba(255, 255, 255, 0.35);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .businessProfileActionsRow .btn:hover {
-  background: #ffffff;
-  border-color: rgba(148, 163, 184, 0.6);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.5);
 }
 
 .businessProfileActionsRow .btn.primary {
-  background: linear-gradient(145deg, #10b981, #059669);
-  border-color: rgba(16, 185, 129, 0.35);
-  color: #ffffff;
-  box-shadow: 0 12px 28px rgba(16, 185, 129, 0.32);
+  background: #ffffff;
+  border: 1px solid #ffffff;
+  color: #0f172a;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
 }
 
 .businessProfileActionsRow .btn.primary:hover {
-  background: linear-gradient(145deg, #059669, #047857);
-  border-color: transparent;
+  background: #f1f5f9;
+  border-color: #f1f5f9;
 }
 
 .businessProfileGhostButton {
-  color: #334155;
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .businessProfileMainGrid {
@@ -1636,7 +2028,7 @@ body {
 .businessProfileInfoItem:hover,
 .businessProfileStatusItem:hover {
   transform: translateY(-1px);
-  border-color: rgba(16, 185, 129, 0.22);
+  border-color: rgba(99, 102, 241, 0.25);
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
 }
 
@@ -1654,7 +2046,7 @@ body {
 }
 
 .businessProfileInfoLabel svg {
-  color: #0d9488;
+  color: #6366f1;
 }
 
 .businessProfileInfoValue {
@@ -1688,7 +2080,7 @@ body {
 .businessProfileMeterFill {
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, #34d399, #10b981);
+  background: linear-gradient(90deg, #6366f1, #22c55e);
 }
 
 .businessProfileStatusList {
@@ -1735,7 +2127,7 @@ body {
 
 .businessProfileCapabilityCard:hover {
   transform: translateY(-2px);
-  border-color: rgba(16, 185, 129, 0.28);
+  border-color: rgba(99, 102, 241, 0.28);
   box-shadow: 0 16px 36px rgba(15, 23, 42, 0.1);
 }
 
@@ -1748,15 +2140,15 @@ body {
 .businessProfileCapabilityIcon {
   width: 36px;
   height: 36px;
-  border-radius: 999px;
+  border-radius: 12px;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(16, 185, 129, 0.28);
-  background: rgba(236, 253, 245, 0.95);
+  border: 1px solid rgba(99, 102, 241, 0.28);
+  background: rgba(238, 242, 255, 0.95);
 }
 
 .businessProfileCapabilityIcon svg {
-  color: #047857;
+  color: #4338ca;
 }
 
 .businessProfileCapabilityTitle {
@@ -1776,15 +2168,19 @@ body {
 .businessProfileActionButton {
   margin-top: auto;
   align-self: flex-start;
-  border-color: transparent;
-  background: linear-gradient(145deg, #10b981, #059669);
+  border-radius: 999px;
+  padding: 11px 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  border: 1px solid #0f172a;
+  background: #0f172a;
   color: #ffffff;
-  box-shadow: 0 10px 24px rgba(16, 185, 129, 0.28);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
 }
 
 .businessProfileActionButton:hover {
-  background: linear-gradient(145deg, #059669, #047857);
-  border-color: transparent;
+  background: #111827;
+  border-color: #111827;
 }
 
 .heroPanel { margin: 40px auto; max-width: 980px; }
@@ -1814,6 +2210,7 @@ body {
   .businessProfileInfoItemWide { grid-column: span 1; }
   .businessProfileCapabilityGrid { grid-template-columns: 1fr; }
   .nav { display: none; }
+  .navLinksCluster,
   .navLinks,
   .navDivider,
   .navAuthGroup { display: none; }
@@ -2280,23 +2677,21 @@ body {
   box-shadow: 0 8px 28px rgba(15, 23, 42, 0.12);
 }
 
-.authRefVisualImg {
-  object-fit: cover;
-  object-position: center;
+.authRefVisualIllustration {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
 }
 
 .authRefVisualOverlay {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: linear-gradient(
-    105deg,
-    rgba(15, 23, 42, 0.55) 0%,
-    rgba(15, 23, 42, 0.22) 45%,
-    rgba(15, 23, 42, 0.35) 100%
-  );
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
+  /* Solid tint so the hero stays readable under GLOBAL MONOCHROME (background-image stripped) */
+  background-color: rgba(15, 23, 42, 0.03);
 }
 
 .authRefVisualFrame,
@@ -2368,6 +2763,12 @@ body {
   color: #1e3a5f;
   border-color: rgba(96, 165, 250, 0.45);
   background: rgba(239, 246, 255, 0.82);
+}
+
+.authRefFeedback--error {
+  color: #7f1d1d;
+  border-color: rgba(248, 113, 113, 0.55);
+  background: rgba(254, 242, 242, 0.95);
 }
 
 .authRefField {
@@ -2485,11 +2886,14 @@ body {
 }
 
 .authRefForgotLink {
+  display: block;
+  width: 100%;
   border: none;
   background: transparent;
   color: #64748b;
   font-size: 14px;
   text-align: center;
+  text-decoration: none;
   cursor: pointer;
   margin-top: 6px;
 }
@@ -2668,7 +3072,6 @@ body {
 .rightPanel,
 .onboardingCard,
 .businessProfileShell,
-.businessProfileHero,
 .businessProfilePanel,
 .businessProfileCapabilityCard,
 .authPanel,
@@ -2697,8 +3100,7 @@ body {
 .authPanelSubtitle,
 .authRefSubtitle,
 .businessProfileSubtitle,
-.businessProfilePanelHint,
-.homeFooterCopy {
+.businessProfilePanelHint {
   color: var(--ui-muted) !important;
 }
 
@@ -2764,6 +3166,12 @@ body {
   background: rgba(255, 255, 255, 0.5) !important;
 }
 
+.authRefFeedback--error {
+  color: #7f1d1d !important;
+  border-color: rgba(248, 113, 113, 0.55) !important;
+  background: rgba(254, 242, 242, 0.95) !important;
+}
+
 .authAside,
 .authVisual,
 .ctaStrip {
@@ -2820,8 +3228,7 @@ html.dark .sectionTitle {
 }
 
 html.dark .heroSubtitle,
-html.dark .sectionLead,
-html.dark .homeFooterCopy {
+html.dark .sectionLead {
   color: #94a3b8 !important;
 }
 
@@ -2861,9 +3268,22 @@ html.dark .navbar--scrolled {
 }
 
 html.dark .navbarInner {
-  background: rgba(0, 0, 0, 0.82);
-  border-color: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
+  background: linear-gradient(
+    180deg,
+    rgba(22, 28, 42, 0.94) 0%,
+    rgba(12, 16, 26, 0.92) 100%
+  );
+  border-color: rgba(255, 255, 255, 0.09);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 18px 44px rgba(0, 0, 0, 0.55);
+}
+
+html.dark .navbar--scrolled .navbarInner {
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 22px 52px rgba(0, 0, 0, 0.62);
 }
 
 html.dark .navbarBrandText {
@@ -2881,8 +3301,15 @@ html.dark .navLoginLink:hover {
   background: rgba(255, 255, 255, 0.06);
 }
 
+html.dark .navLinksCluster {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
 html.dark .navLink--active {
   color: #f8fafc;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 html.dark .navDivider {
@@ -2981,7 +3408,6 @@ html.dark .authCard,
 html.dark .rightPanel,
 html.dark .onboardingCard,
 html.dark .businessProfileShell,
-html.dark .businessProfileHero,
 html.dark .businessProfilePanel,
 html.dark .businessProfileCapabilityCard,
 html.dark .authPanel,
@@ -3020,7 +3446,6 @@ html.dark .authPanelSubtitle,
 html.dark .authRefSubtitle,
 html.dark .businessProfileSubtitle,
 html.dark .businessProfilePanelHint,
-html.dark .homeFooterCopy,
 html.dark .onboardingSubtitle,
 html.dark .status,
 html.dark .link {
@@ -3105,6 +3530,10 @@ html.dark .authScene {
 
 html.dark .authRefBg {
   background: #000000 !important;
+}
+
+html.dark .authRefVisualOverlay {
+  background-color: rgba(0, 0, 0, 0.14);
 }
 
 html.dark .authRefShell {
@@ -3194,6 +3623,12 @@ html.dark .authRefFeedback--progress {
   background: rgba(30, 58, 138, 0.15) !important;
 }
 
+html.dark .authRefFeedback--error {
+  color: #fecaca !important;
+  border-color: rgba(248, 113, 113, 0.35) !important;
+  background: rgba(127, 29, 29, 0.35) !important;
+}
+
 
 html.dark .authPanel {
   background: rgba(10, 10, 10, 0.82) !important;
@@ -3278,13 +3713,17 @@ html.dark .businessProfileShell {
 }
 
 html.dark .businessProfileHero {
-  background: rgba(10, 10, 10, 0.82) !important;
+  background:
+    radial-gradient(520px 220px at 12% 0%, rgba(99, 102, 241, 0.35), transparent 62%),
+    radial-gradient(420px 200px at 92% 12%, rgba(236, 72, 153, 0.18), transparent 58%),
+    linear-gradient(155deg, #020617 0%, #0f172a 42%, #020617 100%) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
 }
 
 html.dark .businessProfileBadge {
-  border-color: rgba(255, 255, 255, 0.08) !important;
-  color: #71717a !important;
-  background: rgba(0, 0, 0, 0.6) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  color: rgba(255, 255, 255, 0.82) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
 }
 
 html.dark .businessProfileTitle {
@@ -3292,17 +3731,17 @@ html.dark .businessProfileTitle {
 }
 
 html.dark .businessProfileSubtitle {
-  color: #71717a !important;
+  color: rgba(255, 255, 255, 0.72) !important;
 }
 
 html.dark .businessProfileMetaChip {
-  border-color: rgba(255, 255, 255, 0.08) !important;
-  background: rgba(0, 0, 0, 0.6) !important;
-  color: #a1a1aa !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: rgba(248, 250, 252, 0.92) !important;
 }
 
 html.dark .businessProfileMetaChip svg {
-  color: #5eead4 !important;
+  color: rgba(165, 180, 252, 0.95) !important;
 }
 
 html.dark .businessProfileActionsRow .btn {
@@ -3316,8 +3755,15 @@ html.dark .businessProfileActionsRow .btn:hover {
 }
 
 html.dark .businessProfileActionsRow .btn.primary {
-  background: linear-gradient(145deg, #10b981, #059669) !important;
-  color: #ffffff !important;
+  background: #ffffff !important;
+  border-color: #ffffff !important;
+  color: #0f172a !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45) !important;
+}
+
+html.dark .businessProfileActionsRow .btn.primary:hover {
+  background: #f1f5f9 !important;
+  border-color: #f1f5f9 !important;
 }
 
 html.dark .businessProfileInfoItem {
@@ -3330,7 +3776,7 @@ html.dark .businessProfileInfoLabel {
 }
 
 html.dark .businessProfileInfoLabel svg {
-  color: #5eead4 !important;
+  color: rgba(165, 180, 252, 0.95) !important;
 }
 
 html.dark .businessProfileInfoValue {
@@ -3572,8 +4018,15 @@ html.dark .homeFooterName {
 
 
 html.dark body.home-page .navbarInner {
-  background: rgba(0, 0, 0, 0.82);
-  border-color: rgba(255, 255, 255, 0.08);
+  background: linear-gradient(
+    180deg,
+    rgba(22, 28, 42, 0.94) 0%,
+    rgba(12, 16, 26, 0.92) 100%
+  );
+  border-color: rgba(255, 255, 255, 0.09);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 18px 44px rgba(0, 0, 0, 0.55);
 }
 
 html.dark .navbarBrandText {
@@ -3621,6 +4074,12 @@ html.dark body.home-page {
   color: #111111 !important;
 }
 
+/* Monochrome override paints the shell white; bb-page routes use a black hero — match canvas so no white seam under the navbar */
+html:has(.appShell > .bb-page),
+body:has(.appShell > .bb-page) {
+  background: #000000 !important;
+}
+
 /* Remove tinted glows/gradients from page shells and decorative layers */
 .landingRoot,
 .heroShell,
@@ -3652,7 +4111,6 @@ html.dark body.home-page {
 .rightPanel,
 .onboardingCard,
 .businessProfileShell,
-.businessProfileHero,
 .businessProfilePanel,
 .businessProfileCapabilityCard,
 .authPanel,
@@ -3664,7 +4122,6 @@ html.dark body.home-page {
 .actionsCard,
 .scrollSection,
 .ctaStrip,
-.homeFooter,
 .todayTaskWrap .homeTaskCard,
 .todayTaskWrap .homePlanCompleteCard {
   background: #ffffff !important;
@@ -3695,7 +4152,6 @@ h1, h2, h3, h4, h5, h6 {
 .authRefSubtitle,
 .businessProfileSubtitle,
 .businessProfilePanelHint,
-.homeFooterCopy,
 .onboardingSubtitle,
 .status,
 .link,
@@ -3834,5 +4290,270 @@ button:disabled,
   color: #111111 !important;
   border-color: #e5e5e5 !important;
   background-color: #ffffff !important;
+}
+
+/* Home: black canvas behind main so no white shows past footer / overscroll */
+html:has(main.landingRoot),
+html.dark:has(main.landingRoot) {
+  background-color: #000000 !important;
+  overflow-x: clip;
+}
+
+body:has(main.landingRoot),
+html.dark body:has(main.landingRoot) {
+  background-color: #000000 !important;
+}
+
+body:has(main.landingRoot) .appShell {
+  background: transparent !important;
+  min-height: 0 !important;
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+main.landingRoot {
+  background-color: #f8fafc !important;
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* Home page: dark footer (override global monochrome) */
+.landingRoot .homeFooter {
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+  padding: clamp(52px, 7vw, 80px) max(20px, calc((100% - 1180px) / 2 + 20px)) clamp(24px, 4vw, 36px);
+  background: #000000 !important;
+  color: #f4f4f5 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.landingRoot .homeFooter .homeFooterBrandName {
+  color: #ffffff !important;
+}
+
+.landingRoot .homeFooter .homeFooterColumnTitle {
+  color: #ffffff !important;
+}
+
+.landingRoot .homeFooter .homeFooterTagline,
+.landingRoot .homeFooter .homeFooterMeta {
+  color: rgba(255, 255, 255, 0.66) !important;
+}
+
+.landingRoot .homeFooter .homeFooterCopy {
+  color: rgba(255, 255, 255, 0.48) !important;
+}
+
+.landingRoot .homeFooter a.homeFooterLink {
+  color: rgba(255, 255, 255, 0.72) !important;
+  text-decoration: none !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  transition: color 0.18s ease, transform 0.18s ease;
+}
+
+.landingRoot .homeFooter a.homeFooterLink:hover {
+  color: #ffffff !important;
+  transform: translateX(2px);
+}
+
+.landingRoot .homeFooter a.homeFooterLink:focus {
+  outline: none !important;
+}
+
+.landingRoot .homeFooter a.homeFooterLink:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.45) !important;
+  outline-offset: 3px !important;
+}
+
+.landingRoot .homeFooter .homeFooterBottom {
+  border-top-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landingRoot .homeFooter a.homeFooterLink:hover {
+    transform: none !important;
+  }
+}
+
+/* Home landing strips: override global monochrome heading/body !important */
+.landingRoot .landingSection--dark .sectionEyebrow {
+  color: rgba(255, 255, 255, 0.48) !important;
+}
+
+.landingRoot .landingSection--dark .sectionTitle,
+.landingRoot .landingSection--dark h2.sectionTitle {
+  color: #ffffff !important;
+}
+
+.landingRoot .landingSection--dark .sectionLead {
+  color: rgba(255, 255, 255, 0.68) !important;
+}
+
+.landingRoot .landingSection--dark .workflowIntroTitle,
+.landingRoot .landingSection--dark .timelineCard h3 {
+  color: #ffffff !important;
+}
+
+.landingRoot .landingSection--dark .workflowIntro p,
+.landingRoot .landingSection--dark .timelineCard p {
+  color: rgba(255, 255, 255, 0.68) !important;
+}
+
+.landingRoot .landingCtaTitle {
+  color: #ffffff !important;
+}
+
+.landingRoot .landingSection--light .sectionTitle,
+.landingRoot .landingSection--light h2.sectionTitle {
+  color: #0f172a !important;
+}
+
+.landingRoot .landingSection--light .sectionLead {
+  color: #64748b !important;
+}
+
+/* Business profile hero: override monochrome normalize for dark strip (Home-aligned) */
+.profilePage .businessProfileHero .businessProfileWelcome {
+  color: rgba(255, 255, 255, 0.48) !important;
+}
+
+.profilePage .businessProfileHero .businessProfileTitle {
+  color: #ffffff !important;
+}
+
+.profilePage .businessProfileHero .businessProfileSubtitle {
+  color: rgba(255, 255, 255, 0.72) !important;
+}
+
+.profilePage .businessProfileActionsRow .btn.primary {
+  background: #ffffff !important;
+  border: 1px solid #ffffff !important;
+  color: #0f172a !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35) !important;
+}
+
+.profilePage .businessProfileActionsRow .btn.primary:hover {
+  background: #f1f5f9 !important;
+  border-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+.profilePage .businessProfileActionsRow .btn:not(.primary) {
+  background: transparent !important;
+  color: rgba(255, 255, 255, 0.92) !important;
+  border: 1px solid rgba(255, 255, 255, 0.35) !important;
+}
+
+.profilePage .businessProfileActionsRow .btn:not(.primary):hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.5) !important;
+}
+
+/*
+ * App dark hero (Business Details): global normalize forces h1 → #111 and p → #444 with !important,
+ * which makes hero copy muddy on black. Restore WCAG-friendly contrast here.
+ */
+.bb-page .bb-hero-dark .bb-eyebrow-dark {
+  color: rgba(226, 232, 240, 0.72) !important;
+}
+
+.bb-page .bb-hero-dark h1.bb-title-dark,
+.bb-page .bb-hero-dark .bb-title-dark {
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.45) !important;
+}
+
+.bb-page .bb-hero-dark p.bb-lead-dark,
+.bb-page .bb-hero-dark .bb-lead-dark {
+  color: rgba(226, 232, 240, 0.9) !important;
+}
+
+/*
+ * Centered marketing heroes (Plan Builder, Select Plan, Poster Preview).
+ * Appended last so global monochrome / Tailwind layers cannot leave title + body left-aligned.
+ */
+.bb-page .bb-hero-dark .bb-hero-centered {
+  text-align: center !important;
+}
+
+.bb-page .bb-hero-dark .bb-hero-centered h1,
+.bb-page .bb-hero-dark .bb-hero-centered h1.bb-title-dark,
+.bb-page .bb-hero-dark .bb-hero-centered > p,
+.bb-page .bb-hero-dark .bb-hero-centered p.bb-lead-dark,
+.bb-page .bb-hero-dark .bb-hero-centered p.bb-eyebrow-dark,
+.bb-page .bb-hero-dark .bb-hero-centered .bb-title-dark,
+.bb-page .bb-hero-dark .bb-hero-centered .bb-lead-dark,
+.bb-page .bb-hero-dark .bb-hero-centered .bb-eyebrow-dark {
+  text-align: center !important;
+}
+
+/*
+ * Plan Builder (Marketing Plan) hero — heading + subtitle share one centered column
+ */
+.bb-page .bb-hero-dark .bb-hero-planBuilder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+.bb-page .bb-hero-dark .bb-hero-planBuilder .bb-eyebrow-dark {
+  width: 100%;
+  max-width: 36rem;
+  text-align: center !important;
+}
+
+.bb-page .bb-hero-dark .bb-hero-planBuilder .bb-title-dark {
+  width: 100%;
+  max-width: 36rem;
+  margin-top: clamp(10px, 2vw, 14px) !important;
+  text-align: center !important;
+}
+
+.bb-page .bb-hero-dark .bb-hero-planBuilder .bb-lead-dark.bb-lead-dark--planBuilder,
+.bb-page .bb-hero-dark .bb-hero-planBuilder p.bb-lead-dark--planBuilder {
+  width: 100%;
+  max-width: min(34rem, 100%) !important;
+  margin-top: clamp(16px, 2.8vw, 26px) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  margin-bottom: 0 !important;
+  text-align: center !important;
+  text-wrap: balance;
+}
+
+/* Select Plan hero — subtitle centered in the hero column (same flex pattern as Plan Builder) */
+.bb-page .bb-hero-dark .bb-hero-selectPlan {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-sizing: border-box;
+  text-align: center !important;
+}
+
+.bb-page .bb-hero-dark .bb-hero-selectPlan .bb-eyebrow-dark,
+.bb-page .bb-hero-dark .bb-hero-selectPlan .bb-title-dark {
+  width: 100%;
+  max-width: 36rem;
+  text-align: center !important;
+}
+
+.bb-page .bb-hero-dark .bb-hero-selectPlan .bb-lead-dark,
+.bb-page .bb-hero-dark .bb-hero-selectPlan p.bb-lead-dark {
+  width: 100%;
+  max-width: min(40rem, 100%) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  text-align: center !important;
+  text-wrap: balance;
 }
 

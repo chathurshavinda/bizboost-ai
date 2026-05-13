@@ -80,20 +80,20 @@ async function posterWrapToPngDataUrl(posterWrap: HTMLElement): Promise<string> 
     posterWrap.style.filter = "none";
 
     const toPngOpts = {
-        cacheBust: true,
-        pixelRatio: 1,
+                cacheBust: true,
+                pixelRatio: 1,
         width: POSTER_EXPORT_PX,
         height: POSTER_EXPORT_PX,
         /** No matte — art is edge-to-edge on the square. */
         backgroundColor: "rgba(0,0,0,0)",
-        skipFonts: true,
+                skipFonts: true,
     };
 
     try {
         return await toPng(posterWrap, toPngOpts);
-    }
-    catch {
-        const { default: html2canvas } = await import("html2canvas");
+        }
+        catch {
+            const { default: html2canvas } = await import("html2canvas");
         const side = Math.min(w, h);
         const scale = POSTER_EXPORT_PX / side;
         const canvas = await html2canvas(posterWrap, {
@@ -105,8 +105,8 @@ async function posterWrapToPngDataUrl(posterWrap: HTMLElement): Promise<string> 
             windowHeight: h,
             x: 0,
             y: 0,
-            useCORS: true,
-            allowTaint: false,
+                useCORS: true,
+                allowTaint: false,
             logging: false,
         });
         const out = document.createElement("canvas");
@@ -174,8 +174,11 @@ export default function PosterPreviewPage() {
     const [shareImageUrl, setShareImageUrl] = useState("");
     const [exportMessage, setExportMessage] = useState("");
     const [captionCopied, setCaptionCopied] = useState(false);
+    const [imageCopied, setImageCopied] = useState(false);
     const [posterDataUrl, setPosterDataUrl] = useState<string | null>(null);
     const posterRef = useRef<HTMLDivElement>(null);
+    /** Blob for “Copy image” in the share fallback sheet (native share must stay synchronous; see handleShare). */
+    const shareFallbackBlobRef = useRef<Blob | null>(null);
     const hasPoster = Boolean(draft?.imageDataUrl);
     const actionsLocked = loading;
     const exportBusy = confirmBusy || downloadBusy || shareBusy;
@@ -328,65 +331,123 @@ export default function PosterPreviewPage() {
             setDownloadBusy(false);
         }
     }, [buildPosterDataUrl, draftIdForFilename, exportBusy, hasPoster, isConfirmed]);
-    const handleShare = useCallback(async () => {
-        console.log("share clicked");
+
+    const openShareFallbackSheet = useCallback((blob: Blob) => {
+        shareFallbackBlobRef.current = blob;
+        const nextUrl = URL.createObjectURL(blob);
+        setShareImageUrl((prev) => {
+            if (prev)
+                URL.revokeObjectURL(prev);
+            return nextUrl;
+        });
+        setShareUnsupportedOpen(true);
+        setExportMessage("");
+    }, []);
+
+    /**
+     * Web Share with files must be triggered with no prior `await` in the same event turn (Chrome / Safari user activation).
+     * So we only call `navigator.share({ files })` when `posterDataUrl` is already in memory (after Confirm or background export).
+     * If it is missing, we async-export then open the fallback sheet only (clipboard + download + links).
+     */
+    const handleShare = useCallback(() => {
         if (exportBusy || !hasPoster || !isConfirmed)
             return;
-        setShareBusy(true);
-        try {
-            const dataUrl = await buildPosterDataUrl();
-            if (!dataUrl) {
-                setExportMessage("Could not prepare the poster image to share.");
-                setShareUnsupportedOpen(true);
+        setExportMessage("");
+
+        const captionText = (draft?.caption || "").trim().slice(0, 2000);
+        const filename = `bizboost-poster-${draftIdForFilename}.png`;
+
+        /** No `setState` before `navigator.share` — React updates can drop user activation (Chrome). */
+        const runNativeShareSync = (dataUrl: string) => {
+            const blob = dataUrlToBlob(dataUrl);
+
+            const finishOrFallback = () => {
+                setShareBusy(false);
+                openShareFallbackSheet(blob);
+            };
+
+            if (typeof navigator === "undefined" || typeof navigator.share !== "function") {
+                finishOrFallback();
                 return;
             }
-            setPosterDataUrl(dataUrl);
-            const blob = dataUrlToBlob(dataUrl);
-            const filename = `bizboost-poster-${draftIdForFilename}.png`;
+
             const file = new File([blob], filename, { type: "image/png", lastModified: Date.now() });
 
-            if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
-                try {
-                    if (!navigator.canShare || navigator.canShare({ files: [file] })) {
-                        await navigator.share({
-                            files: [file],
-                            title: "BizBoost Poster",
-                            text: (draft?.caption || "").slice(0, 2000),
-                        });
-                        return;
-                    }
-                }
-                catch (err) {
-                    const e = err as Error;
-                    if (e?.name === "AbortError")
-                        return;
-                    console.warn("[Poster Preview] navigator.share with file failed:", e);
-                }
+            if (typeof navigator.canShare === "function" && !navigator.canShare({ files: [file] })) {
+                finishOrFallback();
+                return;
             }
 
+            const payload: ShareData = {
+                files: [file],
+                title: "BizBoost Poster",
+                text: captionText,
+            };
+
+            navigator.share(payload)
+                .catch((err: unknown) => {
+                    const e = err as DOMException;
+                    if (e?.name === "AbortError")
+                        return;
+                    console.warn("[Poster Preview] navigator.share:", err);
+                    openShareFallbackSheet(blob);
+                })
+                .finally(() => {
+                    setShareBusy(false);
+                });
+        };
+
+        const cached = posterDataUrl;
+        if (cached) {
+            runNativeShareSync(cached);
+            return;
+        }
+
+        setShareBusy(true);
+        void buildPosterDataUrl()
+            .then((built) => {
+                setShareBusy(false);
+                if (!built) {
+                    setExportMessage("Could not prepare the poster image. Confirm the poster again, then tap Share.");
+                    setShareUnsupportedOpen(true);
+                    return;
+                }
+                setPosterDataUrl(built);
+                const blob = dataUrlToBlob(built);
+                shareFallbackBlobRef.current = blob;
             const nextUrl = URL.createObjectURL(blob);
             setShareImageUrl((prev) => {
                 if (prev)
                     URL.revokeObjectURL(prev);
                 return nextUrl;
             });
-            const opened = typeof window !== "undefined" ? window.open(nextUrl, "_blank", "noopener,noreferrer") : null;
-            if (!opened)
-                triggerAnchorDownload(blob, filename);
             setShareUnsupportedOpen(true);
-            setExportMessage("");
-        }
-        catch (error) {
-            const err = error as Error;
-            if (err?.name !== "AbortError") {
+                setExportMessage("Your browser needs a saved image to share here — use Copy image or Download, then paste or attach in your app.");
+            })
+            .catch(() => {
+                setShareBusy(false);
+                setExportMessage("Could not export the poster. Try Download.");
                 setShareUnsupportedOpen(true);
-                setExportMessage("Share failed. Try again.");
-            }
+            });
+    }, [buildPosterDataUrl, draft?.caption, draftIdForFilename, exportBusy, hasPoster, isConfirmed, openShareFallbackSheet, posterDataUrl]);
+
+    const copyPosterImageToClipboard = useCallback(async () => {
+        const blob = shareFallbackBlobRef.current;
+        if (!blob || typeof navigator === "undefined" || !navigator.clipboard?.write) {
+            setExportMessage("Copy image is not supported in this browser—use Download.");
+            return;
         }
-        finally {
-            setShareBusy(false);
+        try {
+            await navigator.clipboard.write([
+                new ClipboardItem({ [blob.type || "image/png"]: blob }),
+            ]);
+            setImageCopied(true);
+            window.setTimeout(() => setImageCopied(false), 1600);
         }
-    }, [buildPosterDataUrl, draft?.caption, draftIdForFilename, exportBusy, hasPoster, isConfirmed]);
+        catch {
+            setExportMessage("Could not copy image. Use Download poster PNG.");
+        }
+    }, []);
     const copyCaption = useCallback(async () => {
         try {
             await navigator.clipboard.writeText(draft?.caption || "");
@@ -411,10 +472,22 @@ export default function PosterPreviewPage() {
             base.style = draft.posterStyle;
         return base;
     }, [draft?.posterDesign, draft?.posterStyle]);
-    return (<div className="posterPage">
-      <div id="poster-export-mount" className="posterExportMount" aria-hidden="true">
-        {!loading && draft?.imageDataUrl ? (<PosterTemplate key={`${draft?._id ?? "draft"}-${draft.imageDataUrl.length}`} imageUrl={draft.imageDataUrl} design={effectivePosterDesign}/>) : null}
-      </div>
+    return (<div className="bb-page">
+      <section className="bb-hero-dark">
+        <div className="bb-hero-dark-inner bb-hero-centered mx-auto max-w-3xl text-center">
+          <p className="bb-eyebrow-dark">Export</p>
+          <h1 className="bb-title-dark">Poster Preview</h1>
+          <p className="bb-lead-dark mx-auto">
+            Review your poster, confirm when it looks right, then download or share to your channels.
+          </p>
+        </div>
+      </section>
+
+      <section className="bb-band-light">
+        <div className="bb-shell">
+          <div id="poster-export-mount" className="posterExportMount" aria-hidden="true">
+            {!loading && draft?.imageDataUrl ? (<PosterTemplate key={`${draft?._id ?? "draft"}-${draft.imageDataUrl.length}`} imageUrl={draft.imageDataUrl} design={effectivePosterDesign}/>) : null}
+          </div>
       <div className="posterShell">
         <section className="posterCanvas">
           <div className="posterViewport">
@@ -425,8 +498,28 @@ export default function PosterPreviewPage() {
         </section>
 
         <aside className="actionsCard">
-          <h1>Poster Preview</h1>
-          <p>Review your poster output before sharing or downloading.</p>
+          <p className="actionsEyebrow">Share kit</p>
+          <h2 className="actionsTitle">Caption &amp; actions</h2>
+          <p className="actionsLead">
+            Copy your caption, confirm the poster, then export when you are ready.
+          </p>
+
+          {draft?.caption ? (<div className="metaBlock">
+              <span className="metaLabel">Caption</span>
+              <p className="metaCaption">{draft.caption}</p>
+              <button type="button" className="miniGhostBtn" disabled={!draft.caption} onClick={() => void copyCaption()}>
+                {captionCopied ? "Copied" : "Copy caption"}
+              </button>
+            </div>) : null}
+
+          {(draft?.hashtags?.length ?? 0) > 0 ? (<div className="metaBlock">
+              <span className="metaLabel">Hashtags</span>
+              <div className="hashChipRow">
+                {(draft?.hashtags ?? []).map((tag) => (<span key={tag} className="hashChip">
+                    {tag}
+                  </span>))}
+              </div>
+            </div>) : null}
 
           {isConfirmed && (<div className="confirmedPill" role="status">
               Poster confirmed
@@ -453,6 +546,8 @@ export default function PosterPreviewPage() {
           </div>
         </aside>
       </div>
+        </div>
+      </section>
 
       {shareUnsupportedOpen && (<div className="shareBackdrop" role="dialog" aria-modal="true" aria-labelledby="shareUnsupportedTitle" onClick={(e) => {
                 if (e.target === e.currentTarget)
@@ -472,6 +567,9 @@ export default function PosterPreviewPage() {
             <div className="unsupportedActions">
               <button type="button" className="primaryBtn fullWidth" disabled={exportBusy} onClick={() => void handleDownload()}>
                 Download poster PNG
+              </button>
+              <button type="button" className="secondaryBtn fullWidth" onClick={() => void copyPosterImageToClipboard()}>
+                {imageCopied ? "Image copied — paste into Instagram, etc." : "Copy image to clipboard"}
               </button>
               {shareImageUrl ? (<a className="secondaryBtn fullWidth shareLinkBtn" href={shareImageUrl} download={`bizboost-poster-${draftIdForFilename}.png`}>
                   Save image link
@@ -500,40 +598,48 @@ export default function PosterPreviewPage() {
         </div>)}
 
       <style jsx>{`
-        .posterPage {
-          min-height: 100vh;
-          padding: 28px 16px 12px;
-          background: var(--page-bg);
-        }
         .posterShell {
           max-width: 1120px;
           margin: 0 auto;
           display: grid;
           grid-template-columns: 1.35fr 0.65fr;
-          gap: 14px;
+          gap: clamp(14px, 2.5vw, 22px);
+          align-items: start;
         }
         .posterCanvas,
         .actionsCard {
-          border-radius: 22px;
-          border: 1px solid rgba(148, 163, 184, 0.28);
-          background: rgba(255, 255, 255, 0.78);
-          box-shadow: 0 16px 42px rgba(15, 23, 42, 0.1);
+          border-radius: 24px;
+          border: 1px solid rgba(226, 232, 240, 0.95);
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(250, 250, 250, 0.94) 100%);
+          box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.9) inset,
+            0 22px 56px rgba(15, 23, 42, 0.09);
           backdrop-filter: blur(12px);
-          padding: 18px;
+          padding: clamp(18px, 2.5vw, 22px);
+        }
+        .posterCanvas {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
         }
         .posterViewport {
           position: relative;
           width: 100%;
+          display: flex;
+          justify-content: center;
         }
         .posterFrame {
           position: relative;
           width: 100%;
-          max-width: min(100%, 560px);
+          max-width: min(100%, 520px);
           margin: 0 auto;
           aspect-ratio: 1 / 1;
           overflow: hidden;
-          border-radius: 14px;
-          background: transparent;
+          border-radius: 18px;
+          background: rgba(15, 23, 42, 0.04);
+          border: 1px solid rgba(226, 232, 240, 0.85);
+          box-shadow: 0 28px 64px rgba(15, 23, 42, 0.14);
           display: flex;
           flex-direction: column;
           align-items: stretch;
@@ -596,15 +702,86 @@ export default function PosterPreviewPage() {
           padding: 8px 12px;
           word-break: break-word;
         }
-        .actionsCard h1 {
+        .actionsEyebrow {
           margin: 0;
-          color: #0f172a;
-          font-size: 30px;
+          font-size: 11px;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+          font-weight: 700;
+          color: #64748b;
         }
-        .actionsCard p {
+        .actionsTitle {
+          margin: 8px 0 0;
+          color: #0f172a;
+          font-size: clamp(22px, 3vw, 26px);
+          font-family: var(--font-playfair), Georgia, serif;
+          font-weight: 600;
+          letter-spacing: -0.02em;
+          line-height: 1.15;
+        }
+        .actionsLead {
           margin: 8px 0 0;
           color: #64748b;
           font-size: 14px;
+          line-height: 1.55;
+        }
+        .metaBlock {
+          margin-top: 16px;
+          padding: 14px;
+          border-radius: 16px;
+          border: 1px solid rgba(226, 232, 240, 0.95);
+          background: rgba(248, 250, 252, 0.85);
+          display: grid;
+          gap: 10px;
+        }
+        .metaLabel {
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: #64748b;
+        }
+        .metaCaption {
+          margin: 0;
+          font-size: 14px;
+          line-height: 1.55;
+          color: #334155;
+          white-space: pre-wrap;
+          word-break: break-word;
+        }
+        .miniGhostBtn {
+          justify-self: start;
+          border: 1px solid rgba(148, 163, 184, 0.45);
+          background: #ffffff;
+          color: #334155;
+          border-radius: 999px;
+          padding: 8px 14px;
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+        .miniGhostBtn:hover:not(:disabled) {
+          transform: translateY(-1px);
+          box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+        }
+        .miniGhostBtn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+        .hashChipRow {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+        .hashChip {
+          border-radius: 999px;
+          border: 1px solid rgba(99, 102, 241, 0.28);
+          background: rgba(238, 242, 255, 0.65);
+          color: #4338ca;
+          font-size: 12px;
+          font-weight: 600;
+          padding: 6px 11px;
         }
         .confirmedPill {
           margin-top: 14px;
@@ -639,25 +816,36 @@ export default function PosterPreviewPage() {
           border: 1px solid #111111;
           background: #111111;
           color: #fff;
-          border-radius: 10px;
-          padding: 11px 14px;
+          border-radius: 999px;
+          padding: 12px 18px;
           font-size: 13px;
           font-weight: 700;
           cursor: pointer;
+          box-shadow: 0 14px 30px rgba(15, 23, 42, 0.2);
+          transition: transform 0.18s ease, filter 0.18s ease;
+        }
+        .primaryBtn:hover:not(:disabled) {
+          transform: translateY(-1px);
+          filter: brightness(1.03);
         }
         .primaryBtn:disabled {
           opacity: 0.55;
           cursor: not-allowed;
         }
         .secondaryBtn {
-          border: 1px solid rgba(148, 163, 184, 0.5);
+          border: 1px solid rgba(148, 163, 184, 0.45);
           background: #fff;
           color: #334155;
-          border-radius: 10px;
-          padding: 11px 14px;
+          border-radius: 999px;
+          padding: 12px 18px;
           font-size: 13px;
           font-weight: 700;
           cursor: pointer;
+          transition: transform 0.18s ease, box-shadow 0.18s ease;
+          box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+        }
+        .secondaryBtn:hover:not(:disabled) {
+          transform: translateY(-1px);
         }
         .secondaryBtn:disabled {
           opacity: 0.55;
@@ -748,6 +936,9 @@ export default function PosterPreviewPage() {
         @media (max-width: 980px) {
           .posterShell {
             grid-template-columns: 1fr;
+          }
+          .posterCanvas {
+            order: -1;
           }
         }
       `}</style>

@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { FaChevronRight, FaEdit } from "react-icons/fa";
 import { useAuth } from "@/src/lib/useAuth";
 type DayPlan = {
     dayNumber: number;
@@ -39,6 +40,7 @@ type DayPlan = {
         };
         posterHint?: string;
         offerDeadlineHint?: string;
+        promotionIdea?: string;
     };
     hashtags?: string[];
     successMetric?: string;
@@ -442,28 +444,33 @@ export default function MarketingPlanDayPage() {
     const growthTitle = currentDay?.mainActionTitle
         ? cleanDayTitle(currentDay.mainActionTitle) || currentDay.mainActionTitle
         : `Day ${dayNumber}`;
-    return (<div className="dayPage">
-      <div className="dayShell">
-        <section className="dayHero">
-          <div>
-            <p className="eyebrow">Growth plan · Day detail</p>
-            <h1>{isLoading ? "Loading..." : growthTitle}</h1>
-            {!isLoading && currentDay && <p className="dateMeta">{dayDateLabel}</p>}
-            <p className="sub">
-              {businessName} {planDays > 0 ? `· ${planDays} Day Plan` : ""}
+    return (<div className="bb-page">
+      <section className="bb-hero-dark bb-hero-dark--planHeroBreath">
+        <div className="bb-hero-dark-inner dayHeroInner">
+          <div className="dayHeroCopy">
+            <p className="bb-eyebrow-dark">Growth plan · Day detail</p>
+            <h1 className="bb-title-dark">{isLoading ? "Loading..." : growthTitle}</h1>
+            {!isLoading && currentDay ? <p className="dayDateMeta">{dayDateLabel}</p> : null}
+            <p className="bb-lead-dark dayMetaLead">
+              {businessName}
+              {planDays > 0 ? ` · ${planDays}-day plan` : ""}
             </p>
           </div>
-          <div className="heroActions">
-            {isCompleted && <span className="completedBadge">✓ Completed</span>}
-            <button type="button" onClick={() => void toggleDayCompleted()} className="completeBtn" disabled={isLoading || !currentDay || isCompleting || isCompleted}>
-              {isCompleting ? "Saving..." : "Mark Day Completed"}
+          <div className="dayHeroActions">
+            {isCompleted ? <span className="completedBadge">✓ Completed</span> : null}
+            <button type="button" onClick={() => void toggleDayCompleted()} className="dayCompletePill" disabled={isLoading || !currentDay || isCompleting || isCompleted}>
+              {isCompleting ? "Saving..." : "Mark day completed"}
             </button>
-            <button type="button" onClick={() => router.push("/marketing-plan")} className="backBtn">
-              Back to Plan
+            <button type="button" onClick={() => router.push("/marketing-plan")} className="dayBackPill">
+              Back to plan
             </button>
           </div>
-        </section>
+        </div>
+      </section>
 
+      <section className="bb-band-light">
+        <div className="bb-shell">
+          <div className="dayShell">
         {!isLoading && currentDay && (<>
             <section className="card sectionGrowth">
               <div className="sectionTitleRow">
@@ -484,6 +491,10 @@ export default function MarketingPlanDayPage() {
                 <span className="pill pillKpi">KPI</span>
                 <p className="kpiText">{currentDay.successMetric || ""}</p>
               </div>
+              {currentDay.marketingActivation?.promotionIdea ? (<div className="promoCallout">
+                  <span className="pill pillPromo">Promotion idea</span>
+                  <p>{currentDay.marketingActivation.promotionIdea}</p>
+                </div>) : null}
             </section>
 
             <section className="card sectionActivation">
@@ -494,9 +505,18 @@ export default function MarketingPlanDayPage() {
                       <h2 className="sectionH activationMainTitle">{"Today's social post"}</h2>
                       <p className="activationSub">One post on Instagram or Facebook that matches your task above.</p>
                     </div>
-                    <button type="button" onClick={() => openBizEditor()} className="editorBtn editorBtnHeader" aria-label="Open Biz Editor" title="Open Biz Editor with today’s context">
-                      <span className="editorBtnIcon">↗</span>
-                      <span className="editorBtnText">Go to Biz Editor</span>
+                    <button type="button" onClick={() => openBizEditor()} className="editorBtn editorBtnHeader" aria-label="Open Biz Editor with today’s post context" title="Opens Biz Editor with caption, post idea, and poster hints from this day">
+                      <span className="editorBtnShine" aria-hidden/>
+                      <span className="editorBtnInner">
+                        <span className="editorBtnIcon" aria-hidden>
+                          <FaEdit size={15}/>
+                        </span>
+                        <span className="editorBtnCopy">
+                          <span className="editorBtnText">Go to Biz Editor</span>
+                          <span className="editorBtnSub">Poster · caption · export</span>
+                        </span>
+                        <FaChevronRight className="editorBtnChevron" size={12} aria-hidden/>
+                      </span>
                     </button>
                   </div>
 
@@ -624,7 +644,9 @@ export default function MarketingPlanDayPage() {
                 </>) : scoreLoading ? (<p className="kpiText">Calculating success probability...</p>) : (<p className="kpiText">No estimate yet. Click Recalculate.</p>)}
             </section>
           </>)}
-      </div>
+          </div>
+        </div>
+      </section>
 
       {modalContent && (<div className="modalOverlay">
           <div className="modalCard">
@@ -637,131 +659,205 @@ export default function MarketingPlanDayPage() {
         </div>)}
 
       <style jsx>{`
-        .dayPage {
-          min-height: 100vh;
-          padding: 24px 16px 14px;
-          background: var(--page-bg);
-        }
         .dayShell {
           max-width: 1120px;
           margin: 0 auto;
           display: grid;
-          gap: 24px;
+          gap: clamp(18px, 3vw, 24px);
         }
-        .dayHero,
-        .card {
-          border-radius: 24px;
-          border: 1px solid rgba(148, 163, 184, 0.28);
-          background: rgba(255, 255, 255, 0.78);
-          box-shadow: 0 16px 42px rgba(15, 23, 42, 0.1);
-          backdrop-filter: blur(12px);
-          padding: 30px;
-        }
-        .dayHero {
+        .dayHeroInner {
           display: flex;
           justify-content: space-between;
-          gap: 18px;
           align-items: flex-start;
-          flex-wrap: nowrap;
+          gap: 20px;
+          flex-wrap: wrap;
         }
-        .eyebrow {
-          margin: 0;
-          font-size: 11px;
-          letter-spacing: 0.2em;
-          text-transform: uppercase;
-          color: #64748b;
-          font-weight: 700;
+        .dayHeroCopy {
+          flex: 1;
+          min-width: min(100%, 280px);
         }
-        h1 {
-          margin: 8px 0 0;
-          color: #0f172a;
-          font-size: clamp(28px, 4vw, 42px);
-          line-height: 1.1;
-        }
-        .sub {
-          margin: 8px 0 0;
-          color: #64748b;
-          font-size: 14px;
-        }
-        .dateMeta {
-          margin: 10px 0 0;
-          color: #111111;
+        .dayDateMeta {
+          margin: 12px 0 0;
           font-size: 15px;
-          font-weight: 800;
+          font-weight: 700;
+          color: rgba(248, 250, 252, 0.95);
+          letter-spacing: -0.01em;
         }
-        .backBtn,
-        .completeBtn,
+        .dayMetaLead {
+          margin-top: 12px !important;
+          max-width: 42rem !important;
+        }
+        .dayHeroActions {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 10px;
+          flex-wrap: wrap;
+          flex-shrink: 0;
+        }
+        .dayCompletePill {
+          border: 1px solid #ffffff;
+          background: #ffffff;
+          color: #0f172a;
+          border-radius: 999px;
+          padding: 11px 20px;
+          font-size: 13px;
+          font-weight: 700;
+          cursor: pointer;
+          box-shadow: 0 14px 36px rgba(0, 0, 0, 0.25);
+          transition: transform 0.18s ease, filter 0.18s ease;
+        }
+        .dayCompletePill:hover:not(:disabled) {
+          transform: translateY(-1px);
+          filter: brightness(1.02);
+        }
+        .dayCompletePill:disabled {
+          cursor: not-allowed;
+          opacity: 0.55;
+        }
+        .dayBackPill {
+          border: 1px solid rgba(255, 255, 255, 0.38);
+          background: rgba(255, 255, 255, 0.08);
+          color: #f8fafc;
+          border-radius: 999px;
+          padding: 11px 20px;
+          font-size: 13px;
+          font-weight: 700;
+          cursor: pointer;
+          backdrop-filter: blur(8px);
+          transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+        }
+        .dayBackPill:hover {
+          background: rgba(255, 255, 255, 0.16);
+          border-color: rgba(255, 255, 255, 0.55);
+          transform: translateY(-1px);
+        }
+        .card {
+          border-radius: 28px;
+          border: 1px solid rgba(226, 232, 240, 0.95);
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(250, 250, 250, 0.94) 100%);
+          box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.9) inset,
+            0 24px 64px rgba(15, 23, 42, 0.09);
+          backdrop-filter: blur(12px);
+          padding: clamp(22px, 3vw, 30px);
+        }
         .copyBtn,
         .modalPrimary {
           border: 1px solid #111111;
           background: #111111;
           color: #fff;
-          border-radius: 10px;
-          padding: 9px 12px;
+          border-radius: 999px;
+          padding: 9px 16px;
           font-size: 13px;
           font-weight: 700;
           cursor: pointer;
+          transition: transform 0.18s ease;
         }
-        .completeBtn:disabled {
-          cursor: not-allowed;
-          opacity: 0.68;
-        }
-        .heroActions {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          flex-wrap: wrap;
-          justify-content: flex-end;
-          flex-shrink: 0;
+        .copyBtn:hover,
+        .modalPrimary:hover {
+          transform: translateY(-1px);
         }
         .completedBadge {
           border-radius: 999px;
-          border: 1px solid #e5e5e5;
-          background: #f5f5f5;
-          color: #111111;
+          border: 1px solid rgba(52, 211, 153, 0.45);
+          background: rgba(16, 185, 129, 0.18);
+          color: #ecfdf5;
           font-size: 13px;
           font-weight: 800;
-          padding: 8px 11px;
+          padding: 8px 12px;
         }
         .editorBtn {
-          min-height: 42px;
-          padding: 8px 14px;
-          border-radius: 12px;
-          border: 1px solid rgba(148, 163, 184, 0.36);
-          background: rgba(255, 255, 255, 0.82);
-          color: #0f172a;
-          font-size: 14px;
-          font-weight: 700;
+          position: relative;
+          min-height: 48px;
+          padding: 0;
+          border: none;
+          border-radius: 999px;
+          cursor: pointer;
+          color: #f8fafc;
+          background: linear-gradient(135deg, #1e1b4b 0%, #4f46e5 42%, #7c3aed 100%);
+          box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.18) inset,
+            0 14px 32px rgba(79, 70, 229, 0.35),
+            0 4px 12px rgba(15, 23, 42, 0.18);
+          transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s ease, filter 0.22s ease;
+        }
+        .editorBtnShine {
+          pointer-events: none;
+          position: absolute;
+          inset: 0;
+          border-radius: inherit;
+          background: linear-gradient(120deg, transparent 40%, rgba(255, 255, 255, 0.18) 50%, transparent 62%);
+          opacity: 0.55;
+        }
+        .editorBtnInner {
+          position: relative;
+          z-index: 1;
           display: inline-flex;
           align-items: center;
-          gap: 8px;
-          cursor: pointer;
-          box-shadow: 0 10px 20px rgba(15, 23, 42, 0.12);
-          backdrop-filter: blur(8px);
-          transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+          gap: 12px;
+          padding: 11px 18px 11px 14px;
+          min-height: 48px;
+          box-sizing: border-box;
         }
         .editorBtn:hover {
-          transform: translateY(-1px);
-          background: #ffffff;
-          border-color: #111111;
-          box-shadow: 0 14px 26px rgba(0, 0, 0, 0.12);
+          transform: translateY(-2px);
+          filter: brightness(1.05);
+          box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.22) inset,
+            0 18px 40px rgba(79, 70, 229, 0.42),
+            0 8px 16px rgba(15, 23, 42, 0.22);
+        }
+        .editorBtn:active {
+          transform: translateY(0);
+          filter: brightness(0.98);
         }
         .editorBtn:focus-visible {
-          outline: 2px solid rgba(17, 17, 17, 0.45);
-          outline-offset: 2px;
+          outline: 2px solid rgba(129, 140, 248, 0.95);
+          outline-offset: 3px;
         }
         .editorBtnIcon {
-          width: 24px;
-          height: 24px;
-          border-radius: 999px;
+          width: 34px;
+          height: 34px;
+          border-radius: 12px;
           display: grid;
           place-items: center;
-          background: rgba(15, 23, 42, 0.06);
-          font-size: 14px;
-          line-height: 1;
+          flex-shrink: 0;
+          background: rgba(255, 255, 255, 0.14);
+          border: 1px solid rgba(255, 255, 255, 0.22);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+        }
+        .editorBtnCopy {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 2px;
+          text-align: left;
+          min-width: 0;
         }
         .editorBtnText {
+          font-size: 14px;
+          font-weight: 800;
+          letter-spacing: -0.02em;
+          line-height: 1.15;
           white-space: nowrap;
+        }
+        .editorBtnSub {
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.02em;
+          color: rgba(248, 250, 252, 0.72);
+          line-height: 1.2;
+          white-space: nowrap;
+        }
+        .editorBtnChevron {
+          flex-shrink: 0;
+          opacity: 0.85;
+          margin-left: 2px;
+          transition: transform 0.2s ease;
+        }
+        .editorBtn:hover .editorBtnChevron {
+          transform: translateX(3px);
         }
         .sectionTitleRow {
           display: flex;
@@ -1010,6 +1106,33 @@ export default function MarketingPlanDayPage() {
           line-height: 1.55;
           font-size: 14px;
         }
+        .promoCallout {
+          margin-top: 14px;
+          padding: 12px 14px;
+          border-radius: 14px;
+          border: 1px dashed rgba(244, 114, 182, 0.55);
+          background: rgba(253, 242, 248, 0.7);
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+        }
+        .promoCallout p {
+          margin: 0;
+          flex: 1;
+          color: #831843;
+          font-size: 14px;
+          line-height: 1.5;
+        }
+        .pillPromo {
+          background: #f9a8d4;
+          color: #831843;
+          border-radius: 999px;
+          padding: 4px 10px;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+        }
         .sectionGrowth {
           border-color: #e5e5e5;
         }
@@ -1032,11 +1155,17 @@ export default function MarketingPlanDayPage() {
           border: 1px solid rgba(14, 165, 233, 0.35);
           background: linear-gradient(145deg, #0ea5e9, #0284c7);
           color: #fff;
-          border-radius: 10px;
-          padding: 9px 12px;
+          border-radius: 999px;
+          padding: 10px 18px;
           font-size: 13px;
           font-weight: 700;
           cursor: pointer;
+          box-shadow: 0 10px 28px rgba(14, 165, 233, 0.28);
+          transition: transform 0.18s ease, filter 0.18s ease;
+        }
+        .recalculateBtn:hover:not(:disabled) {
+          transform: translateY(-1px);
+          filter: brightness(1.03);
         }
         .recalculateBtn:disabled {
           opacity: 0.7;
@@ -1214,15 +1343,15 @@ export default function MarketingPlanDayPage() {
           color: #64748b;
         }
         @media (max-width: 900px) {
-          .dayPage {
-            padding-top: 20px;
-          }
-          .dayHero,
           .card {
-            padding: 24px;
+            padding: clamp(18px, 4vw, 24px);
           }
-          .dayHero {
-            flex-wrap: wrap;
+          .dayHeroInner {
+            flex-direction: column;
+            align-items: stretch;
+          }
+          .dayHeroActions {
+            justify-content: flex-start;
           }
           .grid2 {
             grid-template-columns: 1fr;
@@ -1230,11 +1359,8 @@ export default function MarketingPlanDayPage() {
           .scoreColumns {
             grid-template-columns: 1fr;
           }
-          .heroActions {
-            justify-content: flex-start;
-          }
-          .heroActions > :global(button),
-          .heroActions > :global(span) {
+          .dayHeroActions > :global(button),
+          .dayHeroActions > :global(span) {
             min-height: 42px;
           }
           .activationSummaryStrip {
@@ -1245,7 +1371,10 @@ export default function MarketingPlanDayPage() {
           }
           .editorBtnHeader {
             width: 100%;
+          }
+          .editorBtnHeader .editorBtnInner {
             justify-content: center;
+            width: 100%;
           }
         }
         @media (max-width: 560px) {

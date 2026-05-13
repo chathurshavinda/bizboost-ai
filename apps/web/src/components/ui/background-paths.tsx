@@ -39,8 +39,26 @@ function FloatingPaths({ position }: { position: number }) {
   );
 }
 
-export function BackgroundPaths({ title = "Background Paths" }: { title?: string }) {
-  const words = title.split(" ");
+export function BackgroundPaths({
+  title = "Background Paths",
+  /** When true, only animated SVG paths (for hero underlays). Omit embedded headline/button text. */
+  pathsOnly = false,
+}: {
+  title?: string;
+  pathsOnly?: boolean;
+}) {
+  const words = title.trim() ? title.trim().split(/\s+/) : [];
+
+  if (pathsOnly) {
+    return (
+      <div className="relative h-full min-h-0 w-full overflow-hidden bg-transparent">
+        <div className="absolute inset-0">
+          <FloatingPaths position={1} />
+          <FloatingPaths position={-1} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-white dark:bg-neutral-950">
@@ -59,7 +77,7 @@ export function BackgroundPaths({ title = "Background Paths" }: { title?: string
           <h1 className="mb-8 text-5xl font-bold tracking-tighter sm:text-7xl md:text-8xl">
             {words.map((word, wordIndex) => (
               <span key={wordIndex} className="mr-4 inline-block last:mr-0">
-                {word.split("").map((letter, letterIndex) => (
+                {(word === "" ? [] : word.split("")).map((letter, letterIndex) => (
                   <motion.span
                     key={`${wordIndex}-${letterIndex}`}
                     initial={{ y: 100, opacity: 0 }}

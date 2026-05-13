@@ -893,19 +893,25 @@ export default function BizEditorPage() {
         }
     }
     const previewCaption = useMemo(() => caption || "Caption preview will appear here after generation.", [caption]);
-    return (<div className="editorPage">
-      <div className="editorShell">
-        <section className="editorHeader">
-          <div>
-            <p className="eyebrow">Biz Editor</p>
-            <h1>Creative Editor</h1>
-            <p className="sub">Upload an image, generate a business-ready caption, and prepare your post output.</p>
+    return (<div className="bb-page">
+      <section className="bb-hero-dark">
+        <div className="bb-hero-dark-inner editorHeroRow">
+          <div className="editorHeroCopy">
+            <p className="bb-eyebrow-dark">Biz Editor</p>
+            <h1 className="bb-title-dark">Creative Editor</h1>
+            <p className="bb-lead-dark">
+              Upload an image, generate a business-ready caption, and prepare your post output.
+            </p>
           </div>
-          <button type="button" className="backBtn" onClick={() => router.push(backToHref)}>
+          <button type="button" className="editorBackPill" onClick={() => router.push(backToHref)}>
             Back
           </button>
-        </section>
+        </div>
+      </section>
 
+      <section className="bb-band-light">
+        <div className="bb-shell">
+          <div className="editorShell">
         <section className="editorGrid">
           <div className="glassCard">
             <h2>Image Upload</h2>
@@ -960,7 +966,7 @@ export default function BizEditorPage() {
             <div>
               <h2>Poster Preview</h2>
               <p className="previewHint">
-                Browse templates by category below typography uses the shared BizBoost layout system so branding stays cohesive.
+                Browse templates by category below. Typography uses the shared BizBoost layout system so branding stays cohesive.
               </p>
               {campaignDayTheme ? (<p className="themeBadge">Poster theme from plan · {campaignDayTheme}</p>) : null}
             </div>
@@ -1042,7 +1048,9 @@ export default function BizEditorPage() {
 
           {generated ? <p className="previewCaptionHint">Caption: {previewCaption}</p> : null}
         </section>
-      </div>
+          </div>
+        </div>
+      </section>
 
       {showMissingBusinessModal && (<div className="modalOverlay">
           <div className="modalCard">
@@ -1055,73 +1063,83 @@ export default function BizEditorPage() {
         </div>)}
 
       <style jsx>{`
-        .editorPage {
-          min-height: 100vh;
-          padding: 28px 16px 12px;
-          background: var(--page-bg);
+        .editorHeroRow {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 16px;
+          flex-wrap: wrap;
+        }
+        .editorHeroCopy {
+          flex: 1;
+          min-width: min(100%, 280px);
+        }
+        .editorBackPill {
+          flex-shrink: 0;
+          border: 1px solid rgba(255, 255, 255, 0.35);
+          background: rgba(255, 255, 255, 0.08);
+          color: #f8fafc;
+          border-radius: 999px;
+          padding: 11px 20px;
+          font-size: 13px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+          backdrop-filter: blur(8px);
+        }
+        .editorBackPill:hover {
+          background: rgba(255, 255, 255, 0.18);
+          border-color: rgba(255, 255, 255, 0.55);
+          transform: translateY(-1px);
         }
         .editorShell {
           max-width: 1120px;
           margin: 0 auto;
           display: grid;
-          gap: 14px;
+          gap: clamp(14px, 2vw, 18px);
         }
-        .editorHeader,
         .glassCard {
           border-radius: 22px;
-          border: 1px solid rgba(148, 163, 184, 0.28);
-          background: rgba(255, 255, 255, 0.78);
-          box-shadow: 0 16px 42px rgba(15, 23, 42, 0.1);
+          border: 1px solid rgba(226, 232, 240, 0.95);
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(250, 250, 250, 0.94) 100%);
+          box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.9) inset,
+            0 20px 52px rgba(15, 23, 42, 0.09);
           backdrop-filter: blur(12px);
-          padding: 18px;
+          padding: clamp(18px, 2.5vw, 22px);
         }
-        .editorHeader {
-          display: flex;
-          justify-content: space-between;
-          gap: 12px;
-          align-items: flex-start;
-          flex-wrap: wrap;
-        }
-        .eyebrow {
-          margin: 0;
-          font-size: 11px;
-          letter-spacing: 0.2em;
-          text-transform: uppercase;
-          color: #64748b;
-          font-weight: 700;
-        }
-        h1 {
-          margin: 8px 0 0;
-          color: #0f172a;
-          font-size: clamp(28px, 4vw, 42px);
-          line-height: 1.1;
-        }
-        .sub {
-          margin: 8px 0 0;
-          color: #64748b;
-          font-size: 14px;
-        }
-        .backBtn,
         .primaryBtn,
         .modalPrimary {
           border: 1px solid #111111;
           background: #111111;
           color: #fff;
-          border-radius: 10px;
-          padding: 9px 12px;
+          border-radius: 999px;
+          padding: 11px 18px;
           font-size: 13px;
           font-weight: 700;
           cursor: pointer;
+          box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+          transition: transform 0.18s ease, filter 0.18s ease;
+        }
+        .primaryBtn:hover:not(:disabled),
+        .modalPrimary:hover {
+          transform: translateY(-1px);
+          filter: brightness(1.03);
         }
         .secondaryBtn {
-          border: 1px solid rgba(148, 163, 184, 0.5);
+          border: 1px solid rgba(148, 163, 184, 0.45);
           background: #fff;
           color: #334155;
-          border-radius: 10px;
-          padding: 9px 12px;
+          border-radius: 999px;
+          padding: 11px 18px;
           font-size: 13px;
           font-weight: 700;
           cursor: pointer;
+          transition: transform 0.18s ease, box-shadow 0.18s ease;
+          box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+        }
+        .secondaryBtn:hover:not(:disabled) {
+          transform: translateY(-1px);
         }
         .secondaryBtn:disabled,
         .primaryBtn:disabled {
@@ -1229,7 +1247,7 @@ export default function BizEditorPage() {
           flex-wrap: wrap;
         }
         .previewCard {
-          padding-top: 14px;
+          padding-top: clamp(16px, 2vw, 20px);
         }
         .previewHeader {
           display: flex;
@@ -1332,8 +1350,11 @@ export default function BizEditorPage() {
           color: #64748b;
         }
         .posterStage {
-          border-radius: 16px;
+          border-radius: 18px;
           overflow: hidden;
+          border: 1px solid rgba(226, 232, 240, 0.85);
+          box-shadow: 0 24px 56px rgba(15, 23, 42, 0.12);
+          background: rgba(248, 250, 252, 0.5);
         }
         .designTuning {
           margin-top: 14px;

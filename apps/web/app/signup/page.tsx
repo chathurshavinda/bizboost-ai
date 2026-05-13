@@ -59,36 +59,36 @@ export default function SignupPage() {
         }
     };
     if (checkingProfile) {
-        return (<AuthLayout>
-        <AuthCard title="Almost there" subtitle="Checking your business profile...">
-          <AuthFeedback>Please wait while we prepare your workspace.</AuthFeedback>
-        </AuthCard>
+        return (<AuthLayout>
+        <AuthCard title="Almost there" subtitle="Checking your business profile...">
+          <AuthFeedback>Please wait while we prepare your workspace.</AuthFeedback>
+        </AuthCard>
       </AuthLayout>);
     }
-    return (<AuthLayout>
-      <AuthCard title="Welcome to BizBoost" subtitle="Create an account to continue">
-        {msg ? <AuthFeedback>{msg}</AuthFeedback> : null}
-        <SocialButtons onClick={onProvider} disabled={loading} mode="signup"/>
-        <div className="authRefOr">OR</div>
-        <label className="authRefField">
-          <input type="text" className="authRefInput" placeholder="Name" autoComplete="name" value={fullName} onChange={(e) => setFullName(e.target.value)}/>
-        </label>
-        <label className="authRefField">
-          <input type="email" className="authRefInput" placeholder="Email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)}/>
-        </label>
-        <label className="authRefField">
-          <input type="password" className="authRefInput" placeholder="Password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)}/>
-        </label>
-        <button type="button" className="authRefPrimaryButton" onClick={onSignup} disabled={loading}>
-          {loading ? "Creating account..." : "Create an account"}
-        </button>
-        <div className="authRefFooter">
-          Already have an account? {" "}
-          <Link href="/login" className="authRefFooterLink">Sign In</Link>
-        </div>
-        <div className="authRefTerms">
-          By continuing, you confirm that you&apos;ve read and agreed to the <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.
-        </div>
-      </AuthCard>
+    return (<AuthLayout>
+      <AuthCard title="Welcome to BizBoost" subtitle="Create an account to continue">
+        {msg ? <AuthFeedback>{msg}</AuthFeedback> : null}
+        <SocialButtons onClick={onProvider} disabled={loading} mode="signup"/>
+        <div className="authRefOr">OR</div>
+        <label className="authRefField">
+          <input type="text" className="authRefInput" placeholder="Name" autoComplete="name" value={fullName} onChange={(e) => setFullName(e.target.value)}/>
+        </label>
+        <label className="authRefField">
+          <input type="email" className="authRefInput" placeholder="Email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)}/>
+        </label>
+        <label className="authRefField">
+          <input type="password" className="authRefInput" placeholder="Password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)}/>
+        </label>
+        <button type="button" className="authRefPrimaryButton" onClick={onSignup} disabled={loading}>
+          {loading ? "Creating account..." : "Create an account"}
+        </button>
+        <div className="authRefFooter">
+          Already have an account? {" "}
+          <Link href="/login" className="authRefFooterLink">Sign In</Link>
+        </div>
+        <div className="authRefTerms">
+          By continuing, you confirm that you&apos;ve read and agreed to the <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.
+        </div>
+      </AuthCard>
     </AuthLayout>);
 }

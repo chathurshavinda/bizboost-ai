@@ -4,6 +4,14 @@ import { getDb } from "@/lib/mongodb";
 import { buildDateRange, buildLifecyclePlanDays, computeProgress, startOfLocalDay } from "@/src/lib/marketingPlan";
 import { deriveDayThemeForPlan } from "@/src/lib/posterDayTheme";
 import { buildMarketingActivationCopyPack } from "@/src/lib/posterActivationCopy";
+import {
+    detectWeakProfileFields,
+    enrichPlanDaysWithAi,
+    generateAiBusinessPlan,
+    renderAiBusinessPlanMarkdown,
+    type AiBusinessPlan,
+    type AiPlanInput,
+} from "@/src/lib/aiBusinessPlan";
 type DayPlan = {
     dayNumber: number;
     dateLabel?: string;
@@ -71,7 +79,7 @@ type TemplateContext = {
     priceRange: string;
     preferredChannels: string[];
 };
-const PLAN_TEMPLATE_VERSION = "growth-action-cycle-v11-library-matched";
+const PLAN_TEMPLATE_VERSION = "growth-action-cycle-v12-ai-business-plan";
 const SPAM_HASHTAG = /like4like|follow4follow|followforfollow|f4f|l4l|followers|growthhack/i;
 const baseHashtags = ["#BizBoostAI"];
 function resolveBusinessCategory(...parts: string[]): BusinessCategoryKey {
@@ -2706,12 +2714,20 @@ export async function POST(req: Request) {
             if (existingPlanDays === planDays && existingTemplateVersion === PLAN_TEMPLATE_VERSION) {
                 const reusedPlanData = Array.isArray(existingPlan.planData) ? existingPlan.planData : [];
                 const reusedNarrative = typeof existingPlan.narrativePlan === "string" ? existingPlan.narrativePlan : "";
+                const reusedAi = typeof existingPlan.aiBusinessPlan === "object" && existingPlan.aiBusinessPlan
+                    ? (existingPlan.aiBusinessPlan as AiBusinessPlan)
+                    : null;
+                const reusedMissing = Array.isArray(existingPlan.missingProfileFields)
+                    ? (existingPlan.missingProfileFields as unknown[]).map((v) => String(v ?? "").trim()).filter(Boolean)
+                    : [];
                 return NextResponse.json({
                     ok: true,
                     data: {
                         planDays: existingPlanDays,
                         planData: reusedPlanData,
                         narrativePlan: reusedNarrative,
+                        aiBusinessPlan: reusedAi,
+                        missingProfileFields: reusedMissing,
                     },
                     reused: true,
                 }, { status: 200 });
@@ -2739,32 +2755,77 @@ export async function POST(req: Request) {
         const generatedAt = new Date();
         const { endDate } = buildDateRange(planDays, planStartDate);
         const startDate = planStartDate.toISOString().slice(0, 10);
-        const planData = ensurePlanDataLength(buildPlan(planDays, context, planStartDate), planDays, context, planStartDate);
-        const narrativeInput: NarrativeInput = {
+        const templatePlanData = ensurePlanDataLength(buildPlan(planDays, context, planStartDate), planDays, context, planStartDate);
+        const profileLanguage = toCleanString(profile.language, "English") || "English";
+        const weakProfileFields = detectWeakProfileFields(profile as Record<string, unknown>);
+        const aiPlanInput: AiPlanInput = {
+            firebase_uid,
             businessName: context.businessName,
             businessType: context.businessType,
-            category: resolvedCategory,
+            inferredCategory: resolvedCategory,
+            city: context.city,
+            country: context.country,
             location: [context.city, context.country].filter(Boolean).join(", ") || "Sri Lanka",
-            productsOrServices: context.productsOrServices.join(", ") || context.businessType,
+            productsOrServices: context.productsOrServices,
             targetCustomers: context.targetCustomers || "Local Sri Lankan customers",
-            businessGoal: context.businessGoals || "Grow customer base and revenue",
-            budget: toCleanString(profile.monthlyMarketingBudget ?? profile.monthlyBusinessBudget, "Medium"),
-            language: toCleanString(profile.language, "English"),
-            monthlyMarketingBudget: toCleanString(profile.monthlyMarketingBudget),
-            teamSize: toCleanString(profile.teamSize),
-            expectedRevenueRange: toCleanString(profile.expectedRevenueRange),
-            socialLinks: Array.isArray(profile.socialLinks)
-                ? (profile.socialLinks as unknown[]).filter(Boolean).join(", ")
-                : String(profile.socialLinks ?? ""),
+            businessGoals: context.businessGoals || "Grow customer base and revenue",
+            currentChallenges: toCleanString((profile as Record<string, unknown>).currentChallenges ?? (profile as Record<string, unknown>).challenges),
+            ownerOrManagerName: toCleanString((profile as Record<string, unknown>).ownerOrManagerName),
+            teamSize: context.teamSize,
+            operatingModel: context.operatingModel,
+            priceRange: context.priceRange,
+            preferredChannels: context.preferredChannels,
+            socialLinks: context.socialLinks,
             currentMarketingMethods: toCleanString(profile.currentMarketingMethods),
             competitors: toCleanString(profile.competitors),
-            preferredPlatforms: toCleanString(profile.preferredPlatforms),
+            monthlyMarketingBudget: toCleanString(profile.monthlyMarketingBudget),
+            monthlyBusinessBudget: toCleanString(profile.monthlyBusinessBudget),
+            expectedRevenueRange: toCleanString(profile.expectedRevenueRange),
+            language: profileLanguage,
             planDuration: planDays,
             startDate,
+            weakFields: weakProfileFields,
         };
-        const narrativePlan = await generateNarrativePlan(narrativeInput);
-        const lifecyclePlanDays = buildLifecyclePlanDays((Array.isArray(planData) ? planData : []) as Array<Record<string, unknown>>, planDays, startDate);
+        let aiBusinessPlan: AiBusinessPlan | null = null;
+        try {
+            aiBusinessPlan = await generateAiBusinessPlan(aiPlanInput);
+        }
+        catch (aiError) {
+            console.error("[marketing-plan/generate] AI plan generation failed (non-fatal):", aiError);
+            aiBusinessPlan = null;
+        }
+        // If the AI succeeded, override generic per-day text with business-specific AI text.
+        // Otherwise we keep the deterministic template output, which is still a valid plan.
+        const mergedPlanData = aiBusinessPlan
+            ? enrichPlanDaysWithAi(templatePlanData as Array<Record<string, unknown>> as Array<{ dayNumber: number } & Record<string, unknown>>, aiBusinessPlan)
+            : templatePlanData;
+        const narrativePlan = aiBusinessPlan
+            ? renderAiBusinessPlanMarkdown(aiBusinessPlan, context.businessName)
+            : await generateNarrativePlan({
+                businessName: context.businessName,
+                businessType: context.businessType,
+                category: resolvedCategory,
+                location: aiPlanInput.location,
+                productsOrServices: context.productsOrServices.join(", ") || context.businessType,
+                targetCustomers: aiPlanInput.targetCustomers,
+                businessGoal: aiPlanInput.businessGoals,
+                budget: toCleanString(profile.monthlyMarketingBudget ?? profile.monthlyBusinessBudget, "Medium"),
+                language: profileLanguage,
+                monthlyMarketingBudget: aiPlanInput.monthlyMarketingBudget,
+                teamSize: aiPlanInput.teamSize,
+                expectedRevenueRange: aiPlanInput.expectedRevenueRange,
+                socialLinks: aiPlanInput.socialLinks.filter(Boolean).join(", "),
+                currentMarketingMethods: aiPlanInput.currentMarketingMethods,
+                competitors: aiPlanInput.competitors,
+                preferredPlatforms: aiPlanInput.preferredChannels.filter(Boolean).join(", "),
+                planDuration: planDays,
+                startDate,
+            });
+        const lifecyclePlanDays = buildLifecyclePlanDays((Array.isArray(mergedPlanData) ? mergedPlanData : []) as Array<Record<string, unknown>>, planDays, startDate);
         const progress = computeProgress(lifecyclePlanDays);
+        const missingProfileFields = aiBusinessPlan && aiBusinessPlan.missingDetails.length > 0
+            ? aiBusinessPlan.missingDetails
+            : weakProfileFields;
         const document = {
             firebase_uid,
             userId: firebase_uid,
@@ -2800,6 +2861,8 @@ export async function POST(req: Request) {
             completedDays: lifecyclePlanDays.filter((day) => day.completed).map((day) => day.dayNumber),
             progress,
             narrativePlan: narrativePlan || "",
+            aiBusinessPlan: aiBusinessPlan ?? null,
+            missingProfileFields,
         };
         if (forceNew) {
             await db.collection("marketing_plans").updateMany({ firebase_uid, status: "active" }, {
@@ -2816,6 +2879,8 @@ export async function POST(req: Request) {
                 planDays,
                 planData: lifecyclePlanDays,
                 narrativePlan: narrativePlan || "",
+                aiBusinessPlan: aiBusinessPlan ?? null,
+                missingProfileFields,
             },
             reused: false,
         }, { status: 200 });

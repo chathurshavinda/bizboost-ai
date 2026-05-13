@@ -1,8 +1,9 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { motion, useReducedMotion } from "framer-motion";
+import { ArrowRight, CalendarDays, CheckCircle2, ClipboardList, Hash, ListChecks, Megaphone, PartyPopper, Sparkles, Target } from "lucide-react";
 import { FaChevronRight, FaCalendarCheck, FaChartLine, FaClipboardCheck, FaEdit, FaFileAlt, FaIdBadge, FaImages, FaListOl, FaSignInAlt, FaUserCheck, } from "react-icons/fa";
 import GradientText from "@/src/components/ui/GradientText";
 import { BackgroundPaths } from "@/components/ui/background-paths";
@@ -75,11 +76,34 @@ const HOW_STEPS = [
     },
 ];
 const WHAT_YOU_GET = [
-    { title: "Growth Action Plan", desc: "Daily tasks tailored to your profile" },
-    { title: "Post Ideas + Captions", desc: "Ready-to-use copy for social posts" },
-    { title: "Hashtag Suggestions", desc: "Relevant tags for reach" },
-    { title: "Calendar View", desc: "Biz Calendar for your full timeline" },
-    { title: "Save & Resume", desc: "Plans saved in your account (DB)" },
+    {
+        title: "Growth",
+        desc: "Daily growth actions and business tasks tailored to your profile, goals, and plan length.",
+    },
+    {
+        title: "Marketing",
+        desc: "Marketing activations and channel guidance aligned to each day—built from your business context.",
+    },
+    {
+        title: "Poster generator",
+        desc: "Turn ideas into branded posters with layouts, templates, and AI-assisted visual hints.",
+    },
+    {
+        title: "Post ideas & captions",
+        desc: "Ready-to-use hooks and caption ideas for Instagram, Facebook, and other channels.",
+    },
+    {
+        title: "Hashtag suggestions",
+        desc: "Curated hashtag sets to improve discovery, relevance, and reach for each post.",
+    },
+    {
+        title: "Calendar view",
+        desc: "See your full timeline and daily focus in Biz Calendar at a glance.",
+    },
+    {
+        title: "Save & resume",
+        desc: "Plans and progress stay in your account—pick up where you left off anytime.",
+    },
 ];
 const PREVIEW_ROWS = [
     { date: "Apr 21", title: "Bundle promo launch" },
@@ -88,13 +112,167 @@ const PREVIEW_ROWS = [
     { date: "Apr 24", title: "Behind-the-scenes process" },
     { date: "Apr 25", title: "Weekend special activation" },
 ];
+const PREVIEW_PLAN_SAMPLE = {
+    businessName: "Kandy Spice Kitchen",
+    goal: "Grow weekday lunch covers and weekend takeaway orders within 30 days.",
+    checklist: [
+        { label: "Shoot 3 hero plates in natural light", done: true },
+        { label: "Schedule post for 6:00 PM", done: true },
+        { label: "Reply to comments within 2 hours", done: false },
+    ],
+    progressPct: 42,
+};
+/** Sample growth-plan rows: daily business / ops actions */
+const PREVIEW_GROWTH_DAYS = [
+    {
+        day: "Day 10",
+        week: "Week 2",
+        date: "Tue · May 13",
+        action: "Email 12 past catering clients with a weekday lunch bundle menu PDF.",
+    },
+    {
+        day: "Day 11",
+        week: "Week 2",
+        date: "Wed · May 14",
+        action: "Coach counter staff on a 60-second upsell script for the weekend combo.",
+    },
+    {
+        day: "Day 12",
+        week: "Week 2",
+        date: "Thu · May 15",
+        action: "Share a carousel of your top 3 dishes with a limited weekend combo price.",
+    },
+];
+/** Sample marketing-plan rows: social hooks + caption + hashtags */
+const PREVIEW_MARKETING_DAYS = [
+    {
+        day: "Day 10",
+        hook: "Bring-a-friend lunch",
+        caption: "Two platters, one table — tag who you'd invite for lunch tomorrow. Bundle ends Wed.",
+        tags: ["#LunchDeal", "#KandyEats", "#ShopLocalLK"],
+    },
+    {
+        day: "Day 11",
+        hook: "Behind the pass",
+        caption: "60 seconds in our kitchen — fresh grind, fresh fry. Sound on for the sizzle.",
+        tags: ["#BTS", "#SriLankanFood", "#SmallBiz"],
+    },
+    {
+        day: "Day 12",
+        hook: "Weekend combo drop",
+        caption:
+            "Weekend flavours just landed — tag someone you'd split our tasting platter with. Combo ends Sunday night!",
+        tags: ["#WeekendSpecial", "#KandyEats", "#SriLankanFood", "#ShopLocalLK"],
+    },
+];
 const WHY_BULLETS = [
     "Made for Sri Lankan SMEs",
     "Simple templates now, AI later",
     "Works even with minimal marketing knowledge",
 ];
+/**
+ * Animated home gallery — swap `src` for your real screenshots (e.g. `/showcase/profile-1.png`).
+ * Keep `id` unique. `row`: 0 = top strip, 1 = middle, 2 = bottom. `size` controls tile footprint (masonry feel).
+ */
+type HomeShowcaseGalleryImage = {
+    id: string;
+    src: string;
+    alt: string;
+    category: "profile" | "poster" | "social";
+    size: "sm" | "md" | "lg";
+    row: 0 | 1 | 2;
+    objectPosition?: string;
+    objectFit?: "cover" | "contain";
+};
+const HOME_SHOWCASE_GALLERY_IMAGES: HomeShowcaseGalleryImage[] = [
+    { id: "g01", src: "/auth-growth-hero.jpg", alt: "Sample business profile workspace in BizBoost", category: "profile", size: "lg", row: 0, objectPosition: "12% 28%" },
+    { id: "g02", src: "https://picsum.photos/id/292/540/720", alt: "Placeholder poster preview — replace with your export", category: "poster", size: "md", row: 0 },
+    { id: "g03", src: "/auth-growth-hero.jpg", alt: "Sample plan and profile context", category: "profile", size: "sm", row: 0, objectPosition: "72% 40%" },
+    { id: "g04", src: "https://picsum.photos/id/429/480/640", alt: "Placeholder social-style visual — replace with your post mockup", category: "social", size: "md", row: 0 },
+    { id: "g05", src: "/bizboost-mark.png", alt: "BizBoost brand mark placeholder tile", category: "poster", size: "sm", row: 0, objectPosition: "center", objectFit: "contain" },
+    { id: "g06", src: "https://picsum.photos/id/431/520/700", alt: "Placeholder campaign poster tile", category: "poster", size: "lg", row: 0 },
+    { id: "g07", src: "https://picsum.photos/id/866/500/660", alt: "Placeholder feed-style preview", category: "social", size: "md", row: 1 },
+    { id: "g08", src: "/auth-growth-hero.jpg", alt: "Sample profile detail view", category: "profile", size: "md", row: 1, objectPosition: "45% 55%" },
+    { id: "g09", src: "https://picsum.photos/id/225/560/740", alt: "Placeholder poster artwork", category: "poster", size: "lg", row: 1 },
+    { id: "g10", src: "https://picsum.photos/id/364/420/560", alt: "Placeholder story-format preview", category: "social", size: "sm", row: 1 },
+    { id: "g11", src: "/auth-growth-hero.jpg", alt: "Sample dashboard-style crop", category: "profile", size: "sm", row: 1, objectPosition: "30% 70%" },
+    { id: "g12", src: "https://picsum.photos/id/326/500/680", alt: "Placeholder promotional tile", category: "poster", size: "md", row: 1 },
+    { id: "g13", src: "https://picsum.photos/id/628/540/720", alt: "Placeholder social post visual", category: "social", size: "md", row: 2 },
+    { id: "g14", src: "/auth-growth-hero.jpg", alt: "Sample BizBoost output crop", category: "profile", size: "lg", row: 2, objectPosition: "55% 22%" },
+    { id: "g15", src: "https://picsum.photos/id/668/480/640", alt: "Placeholder square poster", category: "poster", size: "sm", row: 2 },
+    { id: "g16", src: "https://picsum.photos/id/237/520/700", alt: "Placeholder marketing still", category: "social", size: "lg", row: 2 },
+    { id: "g17", src: "/auth-growth-hero.jpg", alt: "Sample profile hero crop", category: "profile", size: "md", row: 2, objectPosition: "80% 45%" },
+    { id: "g18", src: "https://picsum.photos/id/180/500/660", alt: "Placeholder print-style poster", category: "poster", size: "md", row: 2 },
+];
+const HOME_GALLERY_ROW_0 = HOME_SHOWCASE_GALLERY_IMAGES.filter((img) => img.row === 0);
+const HOME_GALLERY_ROW_1 = HOME_SHOWCASE_GALLERY_IMAGES.filter((img) => img.row === 1);
+const HOME_GALLERY_ROW_2 = HOME_SHOWCASE_GALLERY_IMAGES.filter((img) => img.row === 2);
+function GalleryMarqueeChunk({ items, floatSeed, chunkSuffix, }: {
+    items: HomeShowcaseGalleryImage[];
+    floatSeed: number;
+    chunkSuffix: string;
+}) {
+    return (<>
+      {items.map((item, i) => {
+            const delay = (floatSeed + i * 0.42) % 5;
+            const imgStyle: CSSProperties = {
+                objectFit: item.objectFit ?? "cover",
+                ...(item.objectPosition ? { objectPosition: item.objectPosition } : {}),
+            };
+            return (<div key={`${chunkSuffix}-${item.id}`} className={`galleryTileWrap galleryTileWrap--${item.size}`} style={{ animationDelay: `${delay}s` }}>
+              <figure className={`galleryTileFrame${item.objectFit === "contain" ? " galleryTileFrame--contain" : ""}`}>
+                <img src={item.src} alt={item.alt} className="galleryTileImg" loading="lazy" decoding="async" sizes="(max-width: 520px) 42vw, 280px" style={imgStyle}/>
+                <figcaption className="galleryTileCaption">
+                  {item.category === "profile" ? "Profile" : item.category === "poster" ? "Poster" : "Social"}
+                </figcaption>
+              </figure>
+            </div>);
+        })}
+    </>);
+}
+function HomeShowcaseGalleryRow({ direction, durationSec, items, floatSeed, }: {
+    direction: "toRight" | "toLeft";
+    durationSec: number;
+    items: HomeShowcaseGalleryImage[];
+    floatSeed: number;
+}) {
+    return (<div className={`galleryMarqueeRow galleryMarqueeRow--${direction}`}>
+      <div className="galleryMarqueeViewport">
+        <div className="galleryMarqueeTrack" style={{ animationDuration: `${durationSec}s` }}>
+          <div className="galleryMarqueeChunk">
+            <GalleryMarqueeChunk items={items} floatSeed={floatSeed} chunkSuffix="a"/>
+          </div>
+          <div className="galleryMarqueeChunk" aria-hidden="true">
+            <GalleryMarqueeChunk items={items} floatSeed={floatSeed + 1.2} chunkSuffix="b"/>
+          </div>
+        </div>
+      </div>
+    </div>);
+}
+const SUPPORT_MAILTO = "mailto:hello@bizboost.ai?subject=BizBoost%20support";
 function cleanTitle(title: string): string {
     return title.replace(/^Week\s*\d+\s*/i, "").replace(/^Day\s*\d+\s*/i, "").trim();
+}
+function useLandingReveal() {
+    const ref = useRef<HTMLElement | null>(null);
+    useEffect(() => {
+        const el = ref.current;
+        if (!el || typeof window === "undefined")
+            return;
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            el.classList.add("landingReveal--visible");
+            return;
+        }
+        const io = new IntersectionObserver(([entry]) => {
+            if (entry?.isIntersecting) {
+                entry.target.classList.add("landingReveal--visible");
+                io.disconnect();
+            }
+        }, { threshold: 0.09, rootMargin: "0px 0px -12% 0px" });
+        io.observe(el);
+        return () => io.disconnect();
+    }, []);
+    return ref;
 }
 export default function Home() {
     const router = useRouter();
@@ -107,6 +285,14 @@ export default function Home() {
     }>>([]);
     const [taskCompletedMap, setTaskCompletedMap] = useState<Record<number, boolean>>({});
     const [taskPlanDays, setTaskPlanDays] = useState<number>(0);
+    /** From DB via `/api/marketing-plan/latest` — user has at least one saved Plan Builder plan (not skeleton-only). */
+    const [hasGeneratedPlan, setHasGeneratedPlan] = useState(false);
+    const revealHow = useLandingReveal();
+    const revealFeatures = useLandingReveal();
+    const revealPreview = useLandingReveal();
+    const revealAbout = useLandingReveal();
+    const revealCta = useLandingReveal();
+    const revealShowcase = useLandingReveal();
     useEffect(() => {
         if (loading)
             return;
@@ -114,11 +300,13 @@ export default function Home() {
             setTaskDays([]);
             setTaskCompletedMap({});
             setTaskPlanDays(0);
+            setHasGeneratedPlan(false);
             return;
         }
         let cancelled = false;
         const loadTaskData = async () => {
             setTaskLoading(true);
+            setHasGeneratedPlan(false);
             try {
                 const [latestRes, statusesRes] = await Promise.all([
                     fetch(`/api/marketing-plan/latest?firebase_uid=${encodeURIComponent(user.uid)}`, { cache: "no-store" }),
@@ -132,8 +320,10 @@ export default function Home() {
                     setTaskDays([]);
                     setTaskCompletedMap({});
                     setTaskPlanDays(0);
+                    setHasGeneratedPlan(false);
                     return;
                 }
+                setHasGeneratedPlan(Boolean(latestJson.hasGeneratedPlan));
                 const rawDays = Array.isArray(latestJson?.plan?.planDays) ? latestJson.plan.planDays : [];
                 const normalizedDays = rawDays
                     .map((day: {
@@ -182,6 +372,7 @@ export default function Home() {
                 setTaskDays([]);
                 setTaskCompletedMap({});
                 setTaskPlanDays(0);
+                setHasGeneratedPlan(false);
             }
             finally {
                 if (!cancelled)
@@ -209,10 +400,11 @@ export default function Home() {
             isFallbackTask,
         };
     }, [taskDays, taskCompletedMap]);
+    const prefersReducedMotion = useReducedMotion();
     return (<main className="landingRoot">
       <section className="heroShell">
         <div className="heroPathsLayer" aria-hidden>
-          <BackgroundPaths title="" />
+          <BackgroundPaths pathsOnly />
         </div>
         <div className="heroGradientBase" aria-hidden/>
         <div className="heroGradientMesh" aria-hidden/>
@@ -267,46 +459,88 @@ export default function Home() {
         </div>
       </section>
 
-      {!loading && user && (<div className="todayTaskWrap">
-          {taskState.planFullyCompleted ? (<div className="homePlanCompleteCard">
-              <p className="homePlanCompleteTitle">Plan Completed 🎉</p>
-              <p className="homePlanCompleteText">Great work! You completed all scheduled tasks.</p>
-              <button type="button" className="homeTaskBtn homeTaskBtnPrimary" onClick={() => router.push("/select-plan?mode=new")}>
-                Start New Plan
-              </button>
-            </div>) : (<section className={`homeTaskCard ${taskState.isTodayTaskCompleted ? "homeTaskCelebration" : ""}`}>
-              <div className="homeTaskHead">
-                <h3>
-                  {taskState.isTodayTaskCompleted ? "Today completed 🎉" : taskState.isFallbackTask ? "Next Task" : "Today’s Task"}
-                </h3>
-                {taskPlanDays > 0 ? <span>{taskPlanDays} Days</span> : null}
-              </div>
-              {taskLoading ? (<div className="homeTaskBody">
-                  <p className="homeTaskSub">Loading today&apos;s task…</p>
-                </div>) : taskState.taskDay ? (<div className="homeTaskBody">
-                  <span className="homeTaskDate">{taskState.taskDay.dateLabel || "Today"}</span>
-                  <p className="homeTaskTitle">
-                    {cleanTitle(taskState.taskDay.mainActionTitle || "") || taskState.taskDay.mainActionTitle || `Day ${taskState.taskDay.dayNumber} action`}
+      {!loading && user && !taskLoading && hasGeneratedPlan && (<div className="todayTaskWrap">
+          {taskState.planFullyCompleted ? (<motion.section
+              className="todayTaskBanner todayTaskBanner--complete"
+              layout
+              initial={prefersReducedMotion ? undefined : { opacity: 0, y: 22, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.48, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <div className="todayTaskBannerMesh todayTaskBannerMesh--gold" aria-hidden/>
+              <div className="todayTaskBannerInner">
+                <div className="todayTaskBannerIcon todayTaskBannerIcon--gold" aria-hidden>
+                  <PartyPopper size={26} strokeWidth={1.75}/>
+                </div>
+                <div className="todayTaskBannerCopy">
+                  <p className="todayTaskEyebrow">Milestone</p>
+                  <h3 className="todayTaskBannerTitle">Plan completed</h3>
+                  <p className="todayTaskBannerLead">
+                    Every day in your schedule is done—start a fresh plan when you&apos;re ready.
                   </p>
-                  {taskState.isTodayTaskCompleted ? (<>
-                      <div className="homeTaskActionsRow">
-                        <button type="button" className="homeTaskBtn homeTaskBtnSecondary" disabled>Completed</button>
-                        {taskState.fallbackDay && taskState.fallbackDay.dayNumber !== taskState.taskDay.dayNumber ? (<button type="button" className="homeTaskBtn homeTaskBtnPrimary" onClick={() => router.push(`/marketing-plan/day/${taskState.fallbackDay.dayNumber}`)}>
-                            View Tomorrow →
-                          </button>) : null}
+                  <button type="button" className="todayTaskCta" onClick={() => router.push("/select-plan?mode=new")}>
+                    Start new plan
+                    <ArrowRight size={18} aria-hidden strokeWidth={2}/>
+                  </button>
+                </div>
+              </div>
+            </motion.section>) : (<motion.section
+              className={`todayTaskBanner ${taskState.isTodayTaskCompleted ? "todayTaskBanner--done" : taskState.isFallbackTask ? "todayTaskBanner--next" : "todayTaskBanner--active"}`}
+              layout
+              initial={prefersReducedMotion ? undefined : { opacity: 0, y: 22, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.48, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <div className={`todayTaskBannerMesh ${taskState.isTodayTaskCompleted ? "todayTaskBannerMesh--muted" : "todayTaskBannerMesh--accent"}`} aria-hidden/>
+              <div className="todayTaskBannerInner">
+                <div className={`todayTaskBannerIcon ${taskState.isTodayTaskCompleted ? "todayTaskBannerIcon--success" : ""}`} aria-hidden>
+                  {taskState.isTodayTaskCompleted ? (<CheckCircle2 size={26} strokeWidth={1.75}/>) : taskState.isFallbackTask ? (<CalendarDays size={26} strokeWidth={1.75}/>) : (<Sparkles size={26} strokeWidth={1.75}/>)}
+                </div>
+                <div className="todayTaskBannerCopy">
+                  <div className="todayTaskBannerMeta">
+                    <span className="todayTaskEyebrow">
+                      {taskState.isTodayTaskCompleted ? "All caught up" : taskState.isFallbackTask ? "Up next" : "Daily focus"}
+                    </span>
+                    {taskPlanDays > 0 ? (<span className="todayTaskPlanPill">{taskPlanDays}-day plan</span>) : null}
+                  </div>
+                  <h3 className="todayTaskBannerTitle">
+                    {taskState.isTodayTaskCompleted ? "Today's win" : taskState.isFallbackTask ? "Your next task" : "Today's task"}
+                  </h3>
+                  {taskLoading ? (<div className="todayTaskPanel todayTaskPanel--loading">
+                      <div className="todayTaskSkeletonLine"/>
+                      <div className="todayTaskSkeletonLine todayTaskSkeletonLine--short"/>
+                    </div>) : taskState.taskDay ? (<div className="todayTaskPanel">
+                      <div className="todayTaskPanelHead">
+                        <span className="todayTaskDateChip">{taskState.taskDay.dateLabel || "Today"}</span>
+                        <span className="todayTaskDayChip">Day {taskState.taskDay.dayNumber}</span>
                       </div>
-                      <p className="homeTaskSub">Today is done. Keep the streak going!</p>
-                    </>) : (<button type="button" className="homeTaskBtn homeTaskBtnPrimary" onClick={() => router.push(`/marketing-plan/day/${taskState.taskDay.dayNumber}`)}>
-                      Open Day Detail
-                    </button>)}
-                </div>) : (<div className="homeTaskBody">
-                  <p className="homeTaskSub">No task available yet.</p>
-                </div>)}
-            </section>)}
+                      <p className="todayTaskHeadline">
+                        {cleanTitle(taskState.taskDay.mainActionTitle || "") || taskState.taskDay.mainActionTitle || `Day ${taskState.taskDay.dayNumber} action`}
+                      </p>
+                      {taskState.isTodayTaskCompleted ? (<>
+                          <div className="todayTaskActions">
+                            <span className="todayTaskBadgeDone">Completed</span>
+                            {taskState.fallbackDay && taskState.taskDay && taskState.fallbackDay.dayNumber !== taskState.taskDay.dayNumber ? (<button type="button" className="todayTaskCta todayTaskCta--ghost" onClick={() => router.push(`/marketing-plan/day/${taskState.fallbackDay!.dayNumber}`)}>
+                                Next day
+                                <ArrowRight size={16} aria-hidden strokeWidth={2}/>
+                              </button>) : null}
+                          </div>
+                          <p className="todayTaskFoot">Nice—come back tomorrow or peek at what&apos;s ahead.</p>
+                        </>) : (<button type="button" className="todayTaskCta" onClick={() => router.push(`/marketing-plan/day/${taskState.taskDay.dayNumber}`)}>
+                          Open day detail
+                          <ArrowRight size={18} aria-hidden strokeWidth={2}/>
+                        </button>)}
+                    </div>) : (<div className="todayTaskPanel todayTaskPanel--empty">
+                      <p className="todayTaskFoot">No task yet—finish onboarding or generate a plan to see your day here.</p>
+                    </div>)}
+                </div>
+              </div>
+            </motion.section>)}
         </div>)}
 
-      <div className="scrollStack">
-        <section id="how-it-works" className="scrollSection glassPanel">
+      <div className="landingLower">
+        <section ref={revealHow} id="how-it-works" className="landingSection landingSection--dark landingReveal">
+          <div className="landingSectionInner">
             <div className="workflowHeader">
               <p className="sectionEyebrow">Workflow</p>
               <h2 className="sectionTitle">How BizBoost Works</h2>
@@ -366,87 +600,302 @@ export default function Home() {
                   </div>))}
               </div>
             </div>
-          </section>
+          </div>
+        </section>
 
-        <section id="features" className="scrollSection glassPanel">
+        <section ref={revealFeatures} id="features" className="landingSection landingSection--light landingReveal">
+          <div className="landingSectionInner">
             <p className="sectionEyebrow">Inside the app</p>
             <h2 className="sectionTitle">What you get</h2>
-            <p className="sectionLead">Everything tied to your business profile and selected plan length.</p>
+            <p className="sectionLead">
+              Growth plans, marketing actions, poster creation, post ideas, captions, hashtags, and more—aligned to your business profile and selected plan length.
+            </p>
 
-            <div className="featureGrid">
-              {WHAT_YOU_GET.map((f) => (<div key={f.title}>
+            <div className="featureGrid" role="list">
+              {WHAT_YOU_GET.map((f) => (
+                <div key={f.title} role="listitem">
                   <article className="featureCard">
                     <h3>{f.title}</h3>
                     <p>{f.desc}</p>
                   </article>
-                </div>))}
+                </div>
+              ))}
             </div>
-          </section>
+          </div>
+        </section>
 
-        <section id="example-preview" className="scrollSection glassPanel">
-            <p className="sectionEyebrow">Preview</p>
-            <h2 className="sectionTitle">Example Preview</h2>
-            <p className="sectionLead">Sample day rows from a growth plan (illustrative).</p>
+        <section ref={revealPreview} id="example-preview" className="landingSection landingSection--dark landingReveal">
+          <div className="landingSectionInner landingSectionInner--previewWide">
+            <div className="previewShowcase">
+              <div className="previewShowcaseIntro">
+                <p className="sectionEyebrow">Example preview</p>
+                <h2 className="sectionTitle">What a generated plan looks like</h2>
+                <p className="sectionLead">
+                  See how a generated plan splits into a <strong>growth plan</strong> (daily business actions) and a{" "}
+                  <strong>marketing plan</strong> (captions, hashtags, and post ideas)—plus timeline and progress.
+                </p>
+                <ul className="previewIntroList">
+                  <li>
+                    <CheckCircle2 size={18} strokeWidth={2} className="previewIntroCheck" aria-hidden/>
+                    Action steps aligned to your growth goal
+                  </li>
+                  <li>
+                    <CheckCircle2 size={18} strokeWidth={2} className="previewIntroCheck" aria-hidden/>
+                    Caption ideas &amp; hashtag sets per day
+                  </li>
+                  <li>
+                    <CheckCircle2 size={18} strokeWidth={2} className="previewIntroCheck" aria-hidden/>
+                    Schedule view + checklist progress
+                  </li>
+                </ul>
+                <Link href="/marketing-plan" className="previewShowcaseCta">
+                  Open plan builder
+                  <FaChevronRight size={12} aria-hidden/>
+                </Link>
+              </div>
 
-            <div className="previewList" role="presentation">
-              {PREVIEW_ROWS.map((row) => (<div key={row.date} className="previewRow">
-                  <span className="previewDate">{row.date}</span>
-                  <span className="previewTitle">{row.title}</span>
-                  <span className="previewArrow" aria-hidden>
-                    <FaChevronRight size={14}/>
-                  </span>
-                </div>))}
+              <div className="previewShowcaseMock">
+                <div className="planPreviewDevice" role="img" aria-label="Sample BizBoost growth plan and marketing plan interface">
+                  <div className="planPreviewChrome">
+                    <span className="planPreviewDots" aria-hidden>
+                      <span/><span/><span/>
+                    </span>
+                    <span className="planPreviewChromeTitle">BizBoost · Growth &amp; marketing plans</span>
+                  </div>
+
+                  <div className="planPreviewScroll">
+                    <header className="planPreviewHeader">
+                      <div className="planPreviewBrandRow">
+                        <span className="planPreviewAvatar" aria-hidden>K</span>
+                        <div>
+                          <p className="planPreviewBizName">{PREVIEW_PLAN_SAMPLE.businessName}</p>
+                          <p className="planPreviewBizMeta">14-day plan · Growth + marketing workspace</p>
+                        </div>
+                        <span className="planPreviewLiveBadge">Sample</span>
+                      </div>
+
+                      <div className="planPreviewGoalCard">
+                        <div className="planPreviewGoalIcon" aria-hidden>
+                          <Target size={18} strokeWidth={2}/>
+                        </div>
+                        <div>
+                          <p className="planPreviewGoalLabel">Growth goal</p>
+                          <p className="planPreviewGoalText">{PREVIEW_PLAN_SAMPLE.goal}</p>
+                        </div>
+                      </div>
+                    </header>
+
+                    <section className="planPreviewPlanSection planPreviewPlanSection--growth" aria-labelledby="preview-growth-heading">
+                      <div className="planPreviewPlanSectionHead">
+                        <span className="planPreviewPlanSectionIcon" aria-hidden>
+                          <ClipboardList size={20} strokeWidth={2}/>
+                        </span>
+                        <div>
+                          <p id="preview-growth-heading" className="planPreviewPlanSectionTitle">
+                            Growth plan
+                          </p>
+                          <p className="planPreviewPlanSectionSub">Daily business actions · sample days</p>
+                        </div>
+                      </div>
+                      <ul className="planPreviewGrowthDays">
+                        {PREVIEW_GROWTH_DAYS.map((row) => (<li key={row.day} className="planPreviewGrowthDay">
+                            <div className="planPreviewGrowthDayMeta">
+                              <span className="planPreviewDayPill">{row.day}</span>
+                              <span className="planPreviewWeekPill">{row.week}</span>
+                              <span className="planPreviewDateChip planPreviewDateChip--compact">
+                                <CalendarDays size={13} strokeWidth={2} aria-hidden/>
+                                {row.date}
+                              </span>
+                            </div>
+                            <p className="planPreviewGrowthAction">{row.action}</p>
+                          </li>))}
+                      </ul>
+                    </section>
+
+                    <section className="planPreviewPlanSection planPreviewPlanSection--marketing" aria-labelledby="preview-marketing-heading">
+                      <div className="planPreviewPlanSectionHead">
+                        <span className="planPreviewPlanSectionIcon planPreviewPlanSectionIcon--marketing" aria-hidden>
+                          <Megaphone size={20} strokeWidth={2}/>
+                        </span>
+                        <div>
+                          <p id="preview-marketing-heading" className="planPreviewPlanSectionTitle">
+                            Marketing plan
+                          </p>
+                          <p className="planPreviewPlanSectionSub">Posts, captions &amp; hashtags · sample days</p>
+                        </div>
+                      </div>
+                      <ul className="planPreviewMarketingDays">
+                        {PREVIEW_MARKETING_DAYS.map((row) => (<li key={row.day} className="planPreviewMarketingCard">
+                            <div className="planPreviewMarketingCardTop">
+                              <span className="planPreviewDayPill planPreviewDayPill--sm">{row.day}</span>
+                              <span className="planPreviewMarketingHook">{row.hook}</span>
+                            </div>
+                            <div className="planPreviewCaptionBlock planPreviewCaptionBlock--compact">
+                              <p className="planPreviewCaptionLabel">
+                                <Sparkles size={13} strokeWidth={2} aria-hidden/>
+                                Caption idea
+                              </p>
+                              <p className="planPreviewCaptionText">{row.caption}</p>
+                            </div>
+                            <div className="planPreviewTags planPreviewTags--compact">
+                              <span className="planPreviewTagsLabel">
+                                <Hash size={13} strokeWidth={2} aria-hidden/>
+                                Hashtags
+                              </span>
+                              <div className="planPreviewTagRow">
+                                {row.tags.map((tag) => (<span key={`${row.day}-${tag}`} className="planPreviewTag">
+                                    {tag}
+                                  </span>))}
+                              </div>
+                            </div>
+                          </li>))}
+                      </ul>
+                    </section>
+
+                    <section className="planPreviewProgressSec">
+                      <div className="planPreviewProgressHead">
+                        <span className="planPreviewProgressLabel">Overall plan progress</span>
+                        <span className="planPreviewProgressPct">{PREVIEW_PLAN_SAMPLE.progressPct}%</span>
+                      </div>
+                      <div className="planPreviewProgressTrack" aria-hidden>
+                        <div className="planPreviewProgressFill" style={{ width: `${PREVIEW_PLAN_SAMPLE.progressPct}%` }}/>
+                      </div>
+                      <ul className="planPreviewChecklist">
+                        {PREVIEW_PLAN_SAMPLE.checklist.map((item) => (<li key={item.label} className={`planPreviewCheckItem ${item.done ? "planPreviewCheckItem--done" : ""}`}>
+                            <span className="planPreviewCheckIcon" aria-hidden>
+                              {item.done ? <CheckCircle2 size={17} strokeWidth={2}/> : <span className="planPreviewCheckEmpty"/>}
+                            </span>
+                            <span>{item.label}</span>
+                          </li>))}
+                      </ul>
+                    </section>
+
+                    <section className="planPreviewTimelineSec">
+                      <div className="planPreviewTimelineHead">
+                        <ListChecks size={16} strokeWidth={2} aria-hidden/>
+                        <span>14-day timeline preview</span>
+                      </div>
+                      <ul className="planPreviewTimeline">
+                        {PREVIEW_ROWS.map((row) => (<li key={row.date} className="planPreviewTimelineRow">
+                            <span className="planPreviewTimelineDate">{row.date}</span>
+                            <span className="planPreviewTimelineTitle">{row.title}</span>
+                          </li>))}
+                      </ul>
+                    </section>
+                  </div>
+                </div>
+              </div>
             </div>
-          </section>
+          </div>
+        </section>
 
-        <section id="about" className="scrollSection glassPanel glassPanelCompact">
+        <section ref={revealAbout} id="about" className="landingSection landingSection--light landingReveal">
+          <div className="landingSectionInner">
             <p className="sectionEyebrow">Why us</p>
             <h2 className="sectionTitle">Why BizBoost</h2>
             <ul className="whyList">
               {WHY_BULLETS.map((text) => (<li key={text}>{text}</li>))}
             </ul>
-          </section>
+          </div>
+        </section>
 
-        <section id="pricing" className="ctaStrip">
-            <div className="ctaInner">
-              <h2 className="ctaTitle">Ready to build your plan?</h2>
-              <Link href="/select-plan" className="ctaBtn">
-                Build your plan
-                <FaChevronRight size={12} aria-hidden/>
-              </Link>
+        <section ref={revealCta} id="pricing" className="landingSection landingSection--dark landingSection--cta landingReveal">
+          <div className="landingSectionInner landingCtaInner">
+            <h2 className="landingCtaTitle">Ready to build your plan?</h2>
+            <Link href="/select-plan" className="landingCtaBtn">
+              Build your plan
+              <FaChevronRight size={12} aria-hidden/>
+            </Link>
+          </div>
+        </section>
+
+        <section ref={revealShowcase} id="showcase" className="landingSection landingSection--light landingSection--showcase landingReveal" aria-labelledby="home-showcase-title">
+          <div className="landingSectionInner showcaseSectionInner">
+            <h2 id="home-showcase-title" className="sectionTitle">
+              See BizBoost in Action
+            </h2>
+            <p className="sectionLead showcaseSectionLead">
+              Explore sample business profiles, generated posters, captions, and campaign previews created inside BizBoost.
+            </p>
+          </div>
+          <div className="galleryFullBleed">
+            <div className="galleryMarqueeStack" aria-label="Animated product image gallery">
+              <HomeShowcaseGalleryRow direction="toRight" durationSec={105} items={HOME_GALLERY_ROW_0} floatSeed={0}/>
+              <HomeShowcaseGalleryRow direction="toLeft" durationSec={118} items={HOME_GALLERY_ROW_1} floatSeed={0.5}/>
+              <HomeShowcaseGalleryRow direction="toRight" durationSec={112} items={HOME_GALLERY_ROW_2} floatSeed={1}/>
             </div>
-          </section>
+          </div>
+        </section>
+      </div>
 
-        <footer className="homeFooter">
+      <footer className="homeFooter">
+        <div className="homeFooterInner">
           <div className="homeFooterTop">
             <div className="homeFooterBrand">
-              <Image src="/bizboost-mark.png" alt="BizBoost mark" width={36} height={36} className="homeFooterLogo"/>
-              <Image src="/bizboost-wordmark.png" alt="BizBoost" width={170} height={40} className="homeFooterName"/>
+              <p className="homeFooterBrandName">BizBoost</p>
+              <p className="homeFooterTagline">
+                Daily growth plans, campaign-ready posters, and progress tracking—built so modern SMEs can execute with confidence.
+              </p>
+              <p className="homeFooterMeta">7 / 14 / 30-day plans · Templates + captions · One focused workspace</p>
             </div>
-            <nav className="homeFooterNav" aria-label="Footer">
-              <Link href="/">Home</Link>
-              <Link href="/#features">Features</Link>
-              <Link href="/#about">About</Link>
-              <a href="https://docs.google.com/forms/d/e/1FAIpQLSdcpfUEm9IjNt_b8HuKxofOL5L4i0OBwukpgiQSHe7P1fsEEg/viewform?usp=publish-editor" target="_blank" rel="noopener noreferrer">
-                Contact
-              </a>
-            </nav>
-            <nav className="homeFooterLegal" aria-label="Legal">
-              <Link href="/terms">Terms</Link>
-              <Link href="/privacy">Privacy</Link>
-            </nav>
+            <div className="homeFooterColumn">
+              <p className="homeFooterColumnTitle">Explore</p>
+              <nav className="homeFooterNav" aria-label="Explore BizBoost">
+                <Link className="homeFooterLink" href="/#features">Features</Link>
+                <Link className="homeFooterLink" href="/#how-it-works">How It Works</Link>
+                <Link className="homeFooterLink" href="/#about">About</Link>
+                <Link className="homeFooterLink" href="/#showcase">
+                  Showcase
+                </Link>
+              </nav>
+            </div>
+            <div className="homeFooterColumn">
+              <p className="homeFooterColumnTitle">Product</p>
+              <nav className="homeFooterNav" aria-label="Product links">
+                <Link className="homeFooterLink" href="/select-plan">Choose a Plan</Link>
+                <Link className="homeFooterLink" href="/marketing-plan">Plan Builder</Link>
+                <Link className="homeFooterLink" href="/dashboard">Biz Dashboard</Link>
+                <Link className="homeFooterLink" href="/poster-preview">Poster Preview</Link>
+                <Link className="homeFooterLink" href="/login">Login</Link>
+              </nav>
+            </div>
+            <div className="homeFooterColumn">
+              <p className="homeFooterColumnTitle">Legal</p>
+              <nav className="homeFooterNav" aria-label="Legal">
+                <Link className="homeFooterLink" href="/terms">Terms &amp; Conditions</Link>
+                <Link className="homeFooterLink" href="/privacy">Privacy Policy</Link>
+              </nav>
+            </div>
+            <div className="homeFooterColumn homeFooterColumn--support">
+              <p className="homeFooterColumnTitle">Support</p>
+              <nav className="homeFooterNav" aria-label="Support">
+                <Link className="homeFooterLink" href="/#showcase">
+                  Product gallery
+                </Link>
+                <a className="homeFooterLink" href={SUPPORT_MAILTO}>
+                  Email Support
+                </a>
+                <Link className="homeFooterLink" href="/terms#contact">
+                  FAQ
+                </Link>
+              </nav>
+            </div>
           </div>
-          <p className="homeFooterCopy">© {new Date().getFullYear()} BizBoost AI. All rights reserved.</p>
-        </footer>
-      </div>
+          <div className="homeFooterBottom">
+            <p className="homeFooterCopy">© {new Date().getFullYear()} BizBoost AI. All rights reserved.</p>
+          </div>
+        </div>
+      </footer>
 
       <style jsx>{`
         .landingRoot {
-          min-height: 100vh;
           width: 100%;
           max-width: 100%;
           overflow-x: clip;
           padding: 0;
+          padding-bottom: 0;
+          margin: 0;
+          margin-bottom: 0;
           background: #f8fafc;
         }
 
@@ -631,133 +1080,771 @@ export default function Home() {
           color: #cbd5e1;
         }
 
-        .scrollStack {
-          max-width: 1120px;
-          margin: 0 auto;
-          padding: 8px 0 28px;
+        .landingLower {
+          width: 100%;
           display: flex;
           flex-direction: column;
+        }
+
+        .landingSection {
+          width: 100%;
+          position: relative;
+          scroll-margin-top: 5.5rem;
+        }
+
+        .landingSectionInner {
+          width: 100%;
+          max-width: 1180px;
+          margin: 0 auto;
+          padding: clamp(72px, 11vw, 120px) max(22px, 5vw);
+          box-sizing: border-box;
+        }
+
+        .landingSection--dark {
+          background: #000000;
+          color: #f4f4f5;
+        }
+
+        .landingSection--light {
+          background: #fafafa;
+          color: #0f172a;
+        }
+
+        .landingReveal {
+          opacity: 0;
+          transform: translateY(44px);
+          transition:
+            opacity 0.85s cubic-bezier(0.22, 1, 0.36, 1),
+            transform 0.85s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .landingReveal.landingReveal--visible {
+          opacity: 1;
+          transform: translateY(0);
+        }
+
+        .landingSection--dark .sectionEyebrow {
+          color: rgba(255, 255, 255, 0.48);
+        }
+
+        .landingSection--dark .sectionTitle {
+          color: #ffffff;
+        }
+
+        .landingSection--dark .sectionLead {
+          color: rgba(255, 255, 255, 0.68);
+          max-width: 42rem;
+        }
+
+        .landingSection--light .sectionEyebrow {
+          color: #64748b;
+        }
+
+        .landingSection--light .sectionTitle {
+          color: #0f172a;
+        }
+
+        .landingSection--light .sectionLead {
+          color: #64748b;
+          max-width: 42rem;
+        }
+
+        .landingSection .workflowIntro,
+        .landingSection .timelineCard {
+          animation: none;
+        }
+
+        .landingSection--dark .workflowIntro {
+          border-color: rgba(255, 255, 255, 0.12);
+          background: rgba(255, 255, 255, 0.04);
+          box-shadow: none;
+        }
+
+        .landingSection--dark .workflowIntro::after {
+          background: radial-gradient(circle, rgba(255, 255, 255, 0.06), transparent 68%);
+        }
+
+        .landingSection--dark .workflowIntroTitle {
+          color: #ffffff;
+        }
+
+        .landingSection--dark .workflowIntro p {
+          color: rgba(255, 255, 255, 0.72);
+        }
+
+        .landingSection--dark .workflowKpi {
+          border-color: rgba(255, 255, 255, 0.12);
+          background: rgba(255, 255, 255, 0.05);
+        }
+
+        .landingSection--dark .workflowKpi strong {
+          color: #ffffff;
+        }
+
+        .landingSection--dark .workflowKpi span {
+          color: rgba(255, 255, 255, 0.55);
+        }
+
+        .landingSection--dark .setupBadge {
+          border-color: rgba(255, 255, 255, 0.18);
+          background: rgba(255, 255, 255, 0.06);
+          color: rgba(255, 255, 255, 0.85);
+        }
+
+        .landingSection--dark .workflowBtnPrimary {
+          background: #ffffff;
+          border-color: #ffffff;
+          color: #0f172a;
+        }
+
+        .landingSection--dark .workflowBtnPrimary:hover {
+          background: #e5e5e5;
+          border-color: #e5e5e5;
+        }
+
+        .landingSection--dark .workflowBtnGhost {
+          border-color: rgba(255, 255, 255, 0.35);
+          background: transparent;
+          color: #ffffff;
+        }
+
+        .landingSection--dark .workflowBtnGhost:hover {
+          border-color: rgba(255, 255, 255, 0.55);
+          background: rgba(255, 255, 255, 0.06);
+        }
+
+        .landingSection--dark .timelineCard {
+          border-color: rgba(255, 255, 255, 0.12);
+          background: rgba(255, 255, 255, 0.04);
+          box-shadow: none;
+        }
+
+        .landingSection--dark .timelineCard:hover {
+          border-color: rgba(255, 255, 255, 0.35);
+          box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+        }
+
+        .landingSection--dark .timelineCard h3 {
+          color: #ffffff;
+        }
+
+        .landingSection--dark .timelineCard p {
+          color: rgba(255, 255, 255, 0.62);
+        }
+
+        .landingSection--dark .stepNum {
+          border-color: rgba(255, 255, 255, 0.2);
+          background: rgba(255, 255, 255, 0.08);
+          color: rgba(255, 255, 255, 0.9);
+        }
+
+        .landingSection--dark .stepIconWrap {
+          border-color: rgba(255, 255, 255, 0.15);
+          background: rgba(255, 255, 255, 0.06);
+        }
+
+        .landingSection--dark .stepIcon {
+          color: rgba(255, 255, 255, 0.85);
+        }
+
+        .landingSection--dark .timelineMeta {
+          color: rgba(255, 255, 255, 0.45);
+        }
+
+        .landingSection--dark .stepGoLink {
+          color: #ffffff;
+          background: rgba(255, 255, 255, 0.08);
+          border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .landingSection--dark .stepGoLink:hover {
+          background: #ffffff;
+          color: #0f172a;
+          border-color: #ffffff;
+        }
+
+        .landingCtaInner {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
           gap: 22px;
+          text-align: center;
+        }
+
+        .landingSection--cta.landingSection--dark {
+          border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .landingCtaTitle {
+          margin: 0;
+          color: #ffffff;
+          font-size: clamp(24px, 4vw, 36px);
+          font-family: var(--font-playfair), Georgia, serif;
+          font-weight: 500;
+          letter-spacing: -0.02em;
+          line-height: 1.15;
+          max-width: 22ch;
+        }
+
+        .landingCtaBtn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          padding: 16px 34px;
+          border-radius: 999px;
+          font-weight: 600;
+          font-size: 15px;
+          letter-spacing: -0.005em;
+          text-decoration: none;
+          color: #0f172a;
+          background: #ffffff;
+          border: 1px solid #ffffff;
+          transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+        }
+
+        .landingCtaBtn:hover {
+          background: #e5e5e5;
+          border-color: #e5e5e5;
+          transform: translateY(-2px);
+        }
+
+        .landingSection--showcase {
+          position: relative;
+          overflow-x: clip;
+          overflow-y: visible;
+          padding-bottom: clamp(40px, 7vw, 72px);
+        }
+
+        .landingSection--showcase::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          z-index: 0;
+          background:
+            radial-gradient(ellipse 90% 55% at 50% -32%, rgba(99, 102, 241, 0.08), transparent 56%),
+            radial-gradient(ellipse 55% 42% at 100% 100%, rgba(16, 185, 129, 0.06), transparent 48%);
+        }
+
+        .showcaseSectionInner {
+          position: relative;
+          z-index: 1;
+          text-align: center;
+        }
+
+        .landingSection--showcase .showcaseSectionInner .sectionTitle {
+          margin-left: auto;
+          margin-right: auto;
+        }
+
+        .showcaseSectionLead {
+          max-width: 38rem;
+          margin-left: auto;
+          margin-right: auto;
+        }
+
+        .galleryFullBleed {
+          position: relative;
+          z-index: 1;
+          width: 100vw;
+          max-width: 100%;
+          margin-left: calc(50% - 50vw);
+          margin-right: calc(50% - 50vw);
+          margin-top: clamp(24px, 4vw, 40px);
+          overflow-x: clip;
+          overflow-y: visible;
+        }
+
+        .galleryMarqueeStack {
+          display: grid;
+          gap: clamp(14px, 2.5vw, 22px);
+        }
+
+        .galleryMarqueeRow {
+          position: relative;
+          width: 100%;
+        }
+
+        .galleryMarqueeViewport {
+          overflow: hidden;
+          width: 100%;
+          mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+          -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+        }
+
+        .galleryMarqueeTrack {
+          display: flex;
+          flex-direction: row;
+          width: max-content;
+          animation: galleryScrollToRight 105s linear infinite;
+          will-change: transform;
+        }
+
+        .galleryMarqueeRow--toLeft .galleryMarqueeTrack {
+          animation-name: galleryScrollToLeft;
+        }
+
+        .galleryMarqueeRow:hover .galleryMarqueeTrack {
+          animation-play-state: paused;
+        }
+
+        .galleryMarqueeChunk {
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+          gap: clamp(12px, 2vw, 20px);
+          flex-shrink: 0;
+          padding-inline: clamp(6px, 1vw, 10px);
+        }
+
+        @keyframes galleryScrollToRight {
+          from {
+            transform: translateX(-50%);
+          }
+          to {
+            transform: translateX(0);
+          }
+        }
+
+        @keyframes galleryScrollToLeft {
+          from {
+            transform: translateX(0);
+          }
+          to {
+            transform: translateX(-50%);
+          }
+        }
+
+        .galleryTileWrap {
+          flex: 0 0 auto;
+          animation: galleryTileFloat 7s ease-in-out infinite;
+        }
+
+        .galleryTileWrap--sm {
+          width: clamp(128px, 22vw, 168px);
+          height: clamp(148px, 26vw, 198px);
+        }
+
+        .galleryTileWrap--md {
+          width: clamp(158px, 28vw, 218px);
+          height: clamp(178px, 32vw, 248px);
+        }
+
+        .galleryTileWrap--lg {
+          width: clamp(188px, 34vw, 268px);
+          height: clamp(208px, 38vw, 298px);
+        }
+
+        @keyframes galleryTileFloat {
+          0%,
+          100% {
+            transform: translateY(0);
+          }
+          50% {
+            transform: translateY(-5px);
+          }
+        }
+
+        .galleryTileFrame {
+          position: relative;
+          margin: 0;
+          width: 100%;
+          height: 100%;
+          border-radius: clamp(14px, 2vw, 20px);
+          overflow: hidden;
+          border: 1px solid rgba(15, 23, 42, 0.08);
+          box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.65) inset,
+            0 20px 40px rgba(15, 23, 42, 0.12),
+            0 6px 14px rgba(15, 23, 42, 0.06);
+          background: #e2e8f0;
+        }
+
+        .galleryTileFrame--contain {
+          background: linear-gradient(160deg, #f8fafc 0%, #eef2ff 100%);
+        }
+
+        .galleryTileImg {
+          display: block;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+
+        .galleryTileCaption {
+          position: absolute;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          margin: 0;
+          padding: 18px 12px 10px;
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          color: rgba(248, 250, 252, 0.92);
+          text-align: left;
+          line-height: 1.2;
+          background: linear-gradient(180deg, transparent, rgba(2, 6, 23, 0.72));
+          pointer-events: none;
         }
 
         .todayTaskWrap {
-          max-width: 1120px;
-          margin: 52px auto 14px;
+          width: min(calc(100% - 36px), 1180px);
+          max-width: none;
+          margin: 48px auto 16px;
+          padding: 0 6px;
         }
-        .homeTaskCard,
-        .homePlanCompleteCard {
-          border-radius: 22px;
+
+        .todayTaskBanner {
+          position: relative;
+          overflow: hidden;
+          border-radius: 24px;
           border: 1px solid rgba(148, 163, 184, 0.28);
-          background: rgba(255, 255, 255, 0.8);
-          box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
-          padding: 14px 16px;
+          background:
+            linear-gradient(135deg, rgba(255, 255, 255, 0.92) 0%, rgba(248, 250, 252, 0.88) 45%, rgba(255, 255, 255, 0.94) 100%);
+          box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.65) inset,
+            0 24px 48px rgba(15, 23, 42, 0.09),
+            0 8px 16px rgba(15, 23, 42, 0.04);
+          transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s ease, border-color 0.35s ease;
         }
-        .homeTaskCelebration {
-          border-color: #e5e5e5;
-          background: #f5f5f5;
-          box-shadow: none;
+
+        .todayTaskBanner:hover {
+          transform: translateY(-3px);
+          border-color: rgba(100, 116, 139, 0.35);
+          box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.7) inset,
+            0 32px 56px rgba(15, 23, 42, 0.11),
+            0 12px 24px rgba(15, 23, 42, 0.06);
         }
-        .homeTaskHead {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 10px;
+
+        .todayTaskBanner--active:hover {
+          border-color: rgba(99, 102, 241, 0.35);
         }
-        .homeTaskHead h3 {
-          margin: 0;
-          color: #0f172a;
-          font-size: 17px;
+
+        .todayTaskBanner--done {
+          border-color: rgba(34, 197, 94, 0.28);
         }
-        .homeTaskHead span {
-          border-radius: 999px;
-          border: 1px solid rgba(148, 163, 184, 0.35);
-          background: rgba(255, 255, 255, 0.85);
-          color: #334155;
-          font-size: 12px;
-          font-weight: 700;
-          padding: 4px 8px;
+
+        .todayTaskBanner--next {
+          border-color: rgba(245, 158, 11, 0.35);
         }
-        .homeTaskBody {
-          margin-top: 10px;
-          border-radius: 14px;
-          border: 1px solid rgba(148, 163, 184, 0.24);
-          background: rgba(255, 255, 255, 0.75);
-          padding: 12px;
+
+        .todayTaskBanner--complete {
+          border-color: rgba(251, 191, 36, 0.45);
+          background:
+            linear-gradient(145deg, rgba(255, 251, 235, 0.95) 0%, rgba(255, 255, 255, 0.92) 40%, rgba(254, 249, 231, 0.9) 100%);
+        }
+
+        @keyframes todayMeshFloat {
+          0%,
+          100% {
+            opacity: 0.55;
+            transform: translate3d(0, 0, 0) scale(1);
+          }
+          50% {
+            opacity: 0.85;
+            transform: translate3d(6px, -8px, 0) scale(1.03);
+          }
+        }
+
+        .todayTaskBannerMesh {
+          position: absolute;
+          inset: -40%;
+          pointer-events: none;
+          background:
+            radial-gradient(ellipse 55% 42% at 18% 22%, rgba(99, 102, 241, 0.14), transparent 62%),
+            radial-gradient(ellipse 48% 38% at 88% 18%, rgba(236, 72, 153, 0.08), transparent 58%),
+            radial-gradient(ellipse 60% 45% at 52% 92%, rgba(14, 165, 233, 0.07), transparent 55%);
+          animation: todayMeshFloat 14s ease-in-out infinite;
+        }
+
+        .todayTaskBannerMesh--accent {
+          background:
+            radial-gradient(ellipse 52% 40% at 14% 24%, rgba(99, 102, 241, 0.18), transparent 60%),
+            radial-gradient(ellipse 46% 36% at 90% 12%, rgba(236, 72, 153, 0.1), transparent 56%),
+            radial-gradient(ellipse 58% 42% at 48% 88%, rgba(14, 165, 233, 0.09), transparent 54%);
+        }
+
+        .todayTaskBannerMesh--muted {
+          animation: none;
+          opacity: 0.45;
+          background:
+            radial-gradient(ellipse 50% 40% at 20% 30%, rgba(34, 197, 94, 0.12), transparent 58%),
+            radial-gradient(ellipse 44% 36% at 85% 20%, rgba(16, 185, 129, 0.06), transparent 55%);
+        }
+
+        .todayTaskBannerMesh--gold {
+          animation: todayMeshFloat 16s ease-in-out infinite;
+          background:
+            radial-gradient(ellipse 50% 42% at 22% 28%, rgba(251, 191, 36, 0.22), transparent 58%),
+            radial-gradient(ellipse 44% 38% at 82% 16%, rgba(245, 158, 11, 0.12), transparent 56%),
+            radial-gradient(ellipse 56% 44% at 50% 90%, rgba(253, 224, 71, 0.1), transparent 54%);
+        }
+
+        .todayTaskBannerInner {
+          position: relative;
+          z-index: 1;
           display: grid;
+          grid-template-columns: auto 1fr;
+          gap: clamp(16px, 3.5vw, 28px);
+          align-items: start;
+          padding: clamp(18px, 3vw, 26px) clamp(18px, 3.5vw, 28px);
+        }
+
+        .todayTaskBannerIcon {
+          width: 56px;
+          height: 56px;
+          border-radius: 18px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          color: #4f46e5;
+          background: linear-gradient(145deg, rgba(255, 255, 255, 0.95) 0%, rgba(238, 242, 255, 0.9) 100%);
+          border: 1px solid rgba(99, 102, 241, 0.22);
+          box-shadow:
+            0 10px 22px rgba(79, 70, 229, 0.12),
+            0 1px 0 rgba(255, 255, 255, 0.8) inset;
+        }
+
+        .todayTaskBannerIcon--success {
+          color: #15803d;
+          background: linear-gradient(145deg, rgba(240, 253, 244, 0.98) 0%, rgba(220, 252, 231, 0.92) 100%);
+          border-color: rgba(34, 197, 94, 0.35);
+          box-shadow:
+            0 10px 22px rgba(22, 163, 74, 0.14),
+            0 1px 0 rgba(255, 255, 255, 0.85) inset;
+        }
+
+        .todayTaskBannerIcon--gold {
+          color: #b45309;
+          background: linear-gradient(145deg, rgba(255, 251, 235, 0.98) 0%, rgba(254, 243, 199, 0.92) 100%);
+          border-color: rgba(251, 191, 36, 0.45);
+          box-shadow:
+            0 12px 26px rgba(245, 158, 11, 0.18),
+            0 1px 0 rgba(255, 255, 255, 0.85) inset;
+        }
+
+        .todayTaskBannerCopy {
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
           gap: 10px;
         }
-        .homeTaskDate {
-          width: fit-content;
-          border-radius: 999px;
-          border: 1px solid rgba(148, 163, 184, 0.35);
-          background: rgba(255, 255, 255, 0.85);
-          color: #334155;
-          font-size: 12px;
-          font-weight: 700;
-          padding: 5px 9px;
-        }
-        .homeTaskTitle {
-          margin: 0;
-          color: #0f172a;
-          font-size: 15px;
-          font-weight: 700;
-        }
-        .homeTaskSub {
-          margin: 0;
-          color: #64748b;
-          font-size: 13px;
-        }
-        .homeTaskActionsRow {
+
+        .todayTaskBannerMeta {
           display: flex;
           flex-wrap: wrap;
           align-items: center;
           gap: 10px;
         }
-        .homeTaskBtn {
-          border-radius: 10px;
-          padding: 9px 12px;
-          font-size: 13px;
-          font-weight: 700;
-          border: 1px solid transparent;
-          width: fit-content;
-        }
-        .homeTaskBtnPrimary {
-          background: #111111;
-          border-color: #111111;
-          color: #ffffff;
-          cursor: pointer;
-        }
-        .homeTaskBtnSecondary {
-          background: #ffffff;
-          border-color: rgba(148, 163, 184, 0.4);
-          color: #334155;
-          cursor: default;
-        }
-        .homePlanCompleteTitle {
+
+        .todayTaskEyebrow {
           margin: 0;
-          font-weight: 800;
-          color: #111111;
-          font-size: 17px;
-        }
-        .homePlanCompleteText {
-          margin: 8px 0 10px;
-          color: #444444;
-          font-size: 13px;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+          color: #64748b;
         }
 
-        .scrollSection {
-          padding: 28px 26px;
+        .todayTaskPlanPill {
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
+          padding: 5px 11px;
+          border-radius: 999px;
+          color: #4338ca;
+          background: rgba(99, 102, 241, 0.1);
+          border: 1px solid rgba(99, 102, 241, 0.2);
         }
 
-        .glassPanel {
-          border-radius: 28px;
+        .todayTaskBannerTitle {
+          margin: 0;
+          font-family: var(--font-playfair), Georgia, serif;
+          font-size: clamp(22px, 3.2vw, 30px);
+          font-weight: 600;
+          letter-spacing: -0.03em;
+          line-height: 1.15;
+          color: #0f172a;
+        }
+
+        .todayTaskBannerLead {
+          margin: 0;
+          font-size: 14px;
+          line-height: 1.55;
+          color: #64748b;
+          max-width: 42rem;
+        }
+
+        .todayTaskPanel {
+          margin-top: 4px;
+          padding: 14px 16px;
+          border-radius: 16px;
           border: 1px solid rgba(148, 163, 184, 0.22);
-          background: rgba(255, 255, 255, 0.82);
-          box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+          background: rgba(255, 255, 255, 0.72);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          display: grid;
+          gap: 12px;
         }
 
-        .glassPanelCompact {
-          padding: 24px 26px;
+        .todayTaskPanel--loading {
+          gap: 10px;
+        }
+
+        .todayTaskPanel--empty .todayTaskFoot {
+          margin: 0;
+        }
+
+        .todayTaskPanelHead {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .todayTaskDateChip {
+          font-size: 12px;
+          font-weight: 700;
+          padding: 6px 11px;
+          border-radius: 999px;
+          color: #334155;
+          background: rgba(248, 250, 252, 0.95);
+          border: 1px solid rgba(148, 163, 184, 0.35);
+        }
+
+        .todayTaskDayChip {
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          padding: 6px 10px;
+          border-radius: 999px;
+          color: #64748b;
+          background: rgba(241, 245, 249, 0.9);
+          border: 1px dashed rgba(148, 163, 184, 0.45);
+        }
+
+        .todayTaskHeadline {
+          margin: 0;
+          font-size: clamp(15px, 1.35vw, 17px);
+          font-weight: 650;
+          line-height: 1.45;
+          color: #0f172a;
+          letter-spacing: -0.015em;
+        }
+
+        .todayTaskActions {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .todayTaskBadgeDone {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          padding: 10px 18px;
+          border-radius: 999px;
+          color: rgba(248, 250, 252, 0.96);
+          background:
+            linear-gradient(148deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.02) 38%, transparent 52%),
+            linear-gradient(180deg, #3f3f46 0%, #18181b 46%, #09090b 100%);
+          border: 1px solid rgba(255, 255, 255, 0.16);
+          box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.28) inset,
+            0 -1px 0 rgba(0, 0, 0, 0.45) inset,
+            0 14px 32px rgba(0, 0, 0, 0.38),
+            0 4px 12px rgba(0, 0, 0, 0.22);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+        }
+
+        .todayTaskFoot {
+          margin: 0;
+          font-size: 13px;
+          line-height: 1.5;
+          color: #64748b;
+        }
+
+        .todayTaskCta {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          width: fit-content;
+          margin-top: 2px;
+          padding: 12px 20px;
+          border-radius: 12px;
+          border: 1px solid #0f172a;
+          background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+          color: #ffffff;
+          font-size: 14px;
+          font-weight: 650;
+          letter-spacing: -0.01em;
+          cursor: pointer;
+          transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+          box-shadow: 0 12px 28px rgba(15, 23, 42, 0.22);
+        }
+
+        .todayTaskCta:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 16px 34px rgba(15, 23, 42, 0.28);
+          background: linear-gradient(180deg, #0f172a 0%, #020617 100%);
+        }
+
+        .todayTaskCta:active {
+          transform: translateY(0);
+        }
+
+        .todayTaskCta--ghost {
+          background: rgba(255, 255, 255, 0.92);
+          color: #0f172a;
+          border-color: rgba(148, 163, 184, 0.45);
+          box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+        }
+
+        .todayTaskCta--ghost:hover {
+          border-color: rgba(99, 102, 241, 0.45);
+          background: rgba(255, 255, 255, 1);
+          box-shadow: 0 10px 22px rgba(79, 70, 229, 0.12);
+        }
+
+        .todayTaskSkeletonLine {
+          height: 14px;
+          border-radius: 8px;
+          background: linear-gradient(
+            90deg,
+            rgba(226, 232, 240, 0.65) 0%,
+            rgba(241, 245, 249, 0.95) 48%,
+            rgba(226, 232, 240, 0.65) 100%
+          );
+          background-size: 200% 100%;
+          animation: todayShimmer 1.35s ease-in-out infinite;
+        }
+
+        .todayTaskSkeletonLine--short {
+          width: 62%;
+        }
+
+        @keyframes todayShimmer {
+          0% {
+            background-position: 100% 0;
+          }
+          100% {
+            background-position: -100% 0;
+          }
         }
 
         .sectionEyebrow {
@@ -800,13 +1887,26 @@ export default function Home() {
         }
 
         .workflowIntro {
+          overflow: hidden;
           border-radius: 24px;
           border: 1px solid rgba(148, 163, 184, 0.22);
-          background: rgba(255, 255, 255, 0.92);
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 250, 252, 0.92) 100%);
           padding: 20px 18px;
-          box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+          box-shadow: 0 12px 26px rgba(15, 23, 42, 0.1);
           position: sticky;
           top: 14px;
+          animation: fadeSlideIn 0.5s ease both;
+        }
+        .workflowIntro::after {
+          content: "";
+          position: absolute;
+          right: -80px;
+          top: -80px;
+          width: 220px;
+          height: 220px;
+          border-radius: 999px;
+          background: radial-gradient(circle, rgba(15, 23, 42, 0.08), transparent 68%);
+          pointer-events: none;
         }
 
         .workflowIntroTitle {
@@ -862,19 +1962,35 @@ export default function Home() {
         }
 
         .timelineCard {
+          position: relative;
+          overflow: hidden;
           border-radius: 18px;
           border: 1px solid rgba(148, 163, 184, 0.22);
-          background: rgba(255, 255, 255, 0.9);
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(248, 250, 252, 0.9) 100%);
           padding: 14px 14px 13px;
-          box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+          box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
           display: grid;
           gap: 8px;
           min-height: 100%;
-          transition: border-color 0.14s ease;
+          transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+          animation: fadeSlideIn 0.48s ease both;
+        }
+        .timelineCard::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(120deg, transparent 25%, rgba(255, 255, 255, 0.55) 50%, transparent 75%);
+          transform: translateX(-130%);
+          pointer-events: none;
         }
 
         .timelineCard:hover {
           border-color: #111111;
+          transform: translateY(-3px);
+          box-shadow: 0 16px 30px rgba(15, 23, 42, 0.14);
+        }
+        .timelineCard:hover::before {
+          animation: sheen 0.9s ease;
         }
 
         .timelineCardTop {
@@ -1009,7 +2125,10 @@ export default function Home() {
           align-items: center;
           justify-content: center;
           gap: 6px;
-          transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+          transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease, transform 0.14s ease;
+        }
+        .workflowBtn:hover {
+          transform: translateY(-1px);
         }
 
         .workflowBtnPrimary {
@@ -1033,79 +2152,681 @@ export default function Home() {
         }
 
         .featureGrid {
-          margin-top: 22px;
+          margin-top: 32px;
           display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 14px;
+          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+          gap: 20px;
         }
 
         .featureCard {
-          border-radius: 20px;
-          border: 1px solid rgba(148, 163, 184, 0.2);
-          background: rgba(255, 255, 255, 0.9);
-          padding: 20px 18px;
-          box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
+          position: relative;
+          min-height: 176px;
+          overflow: hidden;
+          border-radius: 24px;
+          border: 1px solid rgba(148, 163, 184, 0.22);
+          background: #ffffff;
+          padding: 28px 26px;
+          box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.85) inset,
+            0 14px 36px rgba(15, 23, 42, 0.07);
+          transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+        }
+
+        .featureCard::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          border-radius: inherit;
+          background:
+            radial-gradient(ellipse 90% 55% at 100% 0%, rgba(99, 102, 241, 0.07), transparent 62%),
+            radial-gradient(ellipse 70% 50% at 0% 100%, rgba(34, 197, 94, 0.05), transparent 55%);
+          opacity: 1;
+          pointer-events: none;
+          transition: opacity 0.22s ease;
+        }
+
+        .featureCard:hover {
+          transform: translateY(-4px);
+          border-color: rgba(148, 163, 184, 0.35);
+          box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.95) inset,
+            0 22px 48px rgba(15, 23, 42, 0.12);
+        }
+
+        .featureCard:hover::before {
+          opacity: 1;
         }
 
         .featureCard h3 {
+          position: relative;
           margin: 0;
-          font-size: 16px;
+          font-family: var(--font-sans), system-ui, sans-serif;
+          font-size: 17px;
           font-weight: 700;
           color: #0f172a;
+          letter-spacing: -0.015em;
+          line-height: 1.25;
         }
 
         .featureCard p {
-          margin: 8px 0 0;
+          position: relative;
+          margin: 12px 0 0;
           font-size: 14px;
           color: #64748b;
-          line-height: 1.5;
+          line-height: 1.62;
         }
 
-        .previewList {
-          margin-top: 20px;
+        .landingSectionInner--previewWide {
+          max-width: 1220px;
+        }
+
+        .previewShowcase {
+          display: grid;
+          grid-template-columns: minmax(260px, 1fr) minmax(300px, 1.12fr);
+          gap: clamp(28px, 5vw, 56px);
+          align-items: start;
+          margin-top: 8px;
+        }
+
+        .previewShowcaseIntro {
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+          max-width: 34rem;
+        }
+
+        .previewIntroList {
+          margin: 4px 0 0;
+          padding: 0;
+          list-style: none;
+          display: grid;
+          gap: 12px;
+        }
+
+        .previewIntroList li {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+          font-size: 14px;
+          line-height: 1.55;
+          color: rgba(255, 255, 255, 0.78);
+        }
+
+        .previewIntroCheck {
+          flex-shrink: 0;
+          margin-top: 2px;
+          color: rgba(52, 211, 153, 0.95);
+        }
+
+        .previewShowcaseCta {
+          margin-top: 8px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          width: fit-content;
+          padding: 14px 26px;
+          border-radius: 999px;
+          font-weight: 600;
+          font-size: 14px;
+          letter-spacing: -0.01em;
+          text-decoration: none;
+          color: #0f172a;
+          background: #ffffff;
+          border: 1px solid rgba(255, 255, 255, 0.85);
+          box-shadow: 0 14px 36px rgba(0, 0, 0, 0.35);
+          transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+        }
+
+        .previewShowcaseCta:hover {
+          transform: translateY(-2px);
+          background: #f8fafc;
+          box-shadow: 0 18px 44px rgba(0, 0, 0, 0.42);
+        }
+
+        .previewShowcaseMock {
+          position: relative;
+          width: 100%;
+          min-width: 0;
+        }
+
+        .planPreviewDevice {
+          border-radius: 22px;
+          border: 1px solid rgba(255, 255, 255, 0.14);
+          background: linear-gradient(165deg, rgba(255, 255, 255, 0.08) 0%, rgba(15, 23, 42, 0.65) 42%, rgba(2, 6, 23, 0.92) 100%);
+          box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.06) inset,
+            0 40px 80px rgba(0, 0, 0, 0.55),
+            0 16px 32px rgba(0, 0, 0, 0.35);
+          overflow: hidden;
+          backdrop-filter: blur(18px);
+          -webkit-backdrop-filter: blur(18px);
+        }
+
+        .planPreviewChrome {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 12px 16px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+          background: rgba(0, 0, 0, 0.35);
+        }
+
+        .planPreviewDots {
+          display: inline-flex;
+          gap: 6px;
+        }
+
+        .planPreviewDots span {
+          width: 9px;
+          height: 9px;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.18);
+        }
+
+        .planPreviewDots span:nth-child(1) {
+          background: rgba(248, 113, 113, 0.85);
+        }
+
+        .planPreviewDots span:nth-child(2) {
+          background: rgba(250, 204, 21, 0.85);
+        }
+
+        .planPreviewDots span:nth-child(3) {
+          background: rgba(74, 222, 128, 0.85);
+        }
+
+        .planPreviewChromeTitle {
+          font-size: 12px;
+          font-weight: 600;
+          letter-spacing: 0.02em;
+          color: rgba(255, 255, 255, 0.55);
+        }
+
+        .planPreviewScroll {
+          padding: 18px 18px 22px;
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+          max-height: min(640px, 72vh);
+          overflow-y: auto;
+          overscroll-behavior: contain;
+        }
+
+        .planPreviewScroll::-webkit-scrollbar {
+          width: 6px;
+        }
+
+        .planPreviewScroll::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.14);
+          border-radius: 999px;
+        }
+
+        .planPreviewHeader {
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+        }
+
+        .planPreviewBrandRow {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .planPreviewAvatar {
+          width: 44px;
+          height: 44px;
+          border-radius: 14px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 700;
+          font-size: 17px;
+          color: #0f172a;
+          background: linear-gradient(145deg, #ffffff 0%, #e2e8f0 100%);
+          border: 1px solid rgba(148, 163, 184, 0.35);
+          flex-shrink: 0;
+        }
+
+        .planPreviewBizName {
+          margin: 0;
+          font-size: 16px;
+          font-weight: 700;
+          letter-spacing: -0.02em;
+          color: #0f172a;
+        }
+
+        .planPreviewBizMeta {
+          margin: 2px 0 0;
+          font-size: 12px;
+          color: #64748b;
+        }
+
+        .planPreviewLiveBadge {
+          margin-left: auto;
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          padding: 6px 10px;
+          border-radius: 999px;
+          color: rgba(15, 23, 42, 0.85);
+          background: rgba(255, 255, 255, 0.92);
+          border: 1px solid rgba(148, 163, 184, 0.35);
+        }
+
+        .planPreviewGoalCard {
+          display: flex;
+          gap: 12px;
+          padding: 14px 14px;
+          border-radius: 16px;
+          background: #ffffff;
+          border: 1px solid rgba(226, 232, 240, 0.95);
+          box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+        }
+
+        .planPreviewGoalIcon {
+          width: 38px;
+          height: 38px;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          color: #4f46e5;
+          background: rgba(99, 102, 241, 0.1);
+          border: 1px solid rgba(99, 102, 241, 0.2);
+        }
+
+        .planPreviewGoalLabel {
+          margin: 0;
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          color: #64748b;
+        }
+
+        .planPreviewGoalText {
+          margin: 6px 0 0;
+          font-size: 13px;
+          line-height: 1.55;
+          color: #334155;
+        }
+
+        .planPreviewPlanSection {
+          padding: 14px 14px 16px;
+          border-radius: 18px;
+          background: rgba(255, 255, 255, 0.98);
+          border: 1px solid rgba(226, 232, 240, 0.95);
+          box-shadow: 0 14px 32px rgba(15, 23, 42, 0.07);
+        }
+
+        .planPreviewPlanSection--growth {
+          border-left: 3px solid rgba(99, 102, 241, 0.65);
+        }
+
+        .planPreviewPlanSection--marketing {
+          border-left: 3px solid rgba(236, 72, 153, 0.55);
+        }
+
+        .planPreviewPlanSectionHead {
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+          margin-bottom: 14px;
+          padding-bottom: 12px;
+          border-bottom: 1px solid rgba(226, 232, 240, 0.85);
+        }
+
+        .planPreviewPlanSectionIcon {
+          width: 40px;
+          height: 40px;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          color: #4338ca;
+          background: rgba(99, 102, 241, 0.12);
+          border: 1px solid rgba(99, 102, 241, 0.22);
+        }
+
+        .planPreviewPlanSectionIcon--marketing {
+          color: #be185d;
+          background: rgba(236, 72, 153, 0.1);
+          border-color: rgba(236, 72, 153, 0.22);
+        }
+
+        .planPreviewPlanSectionTitle {
+          margin: 0;
+          font-size: 15px;
+          font-weight: 800;
+          letter-spacing: -0.02em;
+          color: #0f172a;
+        }
+
+        .planPreviewPlanSectionSub {
+          margin: 4px 0 0;
+          font-size: 12px;
+          line-height: 1.45;
+          color: #64748b;
+        }
+
+        .planPreviewGrowthDays {
+          margin: 0;
+          padding: 0;
+          list-style: none;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .planPreviewGrowthDay {
+          padding: 12px 12px;
+          border-radius: 14px;
+          background: #f8fafc;
+          border: 1px solid rgba(226, 232, 240, 0.95);
+        }
+
+        .planPreviewGrowthDayMeta {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 8px;
+        }
+
+        .planPreviewGrowthAction {
+          margin: 0;
+          font-size: 13px;
+          line-height: 1.5;
+          font-weight: 600;
+          color: #1e293b;
+          letter-spacing: -0.01em;
+        }
+
+        .planPreviewDateChip--compact {
+          margin-left: 0;
+          font-size: 11px;
+          font-weight: 700;
+        }
+
+        .planPreviewMarketingDays {
+          margin: 0;
+          padding: 0;
+          list-style: none;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .planPreviewMarketingCard {
+          padding: 12px 12px;
+          border-radius: 14px;
+          background: linear-gradient(180deg, rgba(255, 255, 255, 1) 0%, rgba(253, 242, 248, 0.35) 100%);
+          border: 1px solid rgba(251, 207, 232, 0.65);
           display: flex;
           flex-direction: column;
           gap: 10px;
         }
 
-        .previewRow {
-          display: grid;
-          grid-template-columns: auto 1fr auto;
+        .planPreviewMarketingCardTop {
+          display: flex;
+          flex-wrap: wrap;
           align-items: center;
-          gap: 8px 14px;
-          padding: 12px 14px;
-          border-radius: 16px;
-          border: 1px solid rgba(148, 163, 184, 0.22);
-          background: #ffffff;
-          box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05);
+          gap: 10px;
         }
 
-        .previewDate {
+        .planPreviewMarketingHook {
+          font-size: 13px;
+          font-weight: 700;
+          color: #9d174d;
+          letter-spacing: -0.015em;
+        }
+
+        .planPreviewDayPill--sm {
+          padding: 5px 9px;
+          font-size: 10px;
+        }
+
+        .planPreviewCaptionBlock--compact {
+          padding: 10px 12px;
+        }
+
+        .planPreviewTags--compact {
+          gap: 6px;
+        }
+
+        .planPreviewDayPill {
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          padding: 6px 11px;
+          border-radius: 999px;
+          color: #312e81;
+          background: rgba(99, 102, 241, 0.12);
+          border: 1px solid rgba(99, 102, 241, 0.22);
+        }
+
+        .planPreviewWeekPill {
+          font-size: 11px;
+          font-weight: 700;
+          padding: 6px 11px;
+          border-radius: 999px;
+          color: #475569;
+          background: #f1f5f9;
+          border: 1px solid rgba(148, 163, 184, 0.35);
+        }
+
+        .planPreviewDateChip {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          margin-left: auto;
+          font-size: 12px;
+          font-weight: 600;
+          color: #64748b;
+        }
+
+        .planPreviewCaptionBlock {
+          padding: 12px 14px;
+          border-radius: 14px;
+          background: linear-gradient(135deg, rgba(248, 250, 252, 0.98) 0%, rgba(241, 245, 249, 0.95) 100%);
+          border: 1px solid rgba(226, 232, 240, 0.9);
+        }
+
+        .planPreviewCaptionLabel {
+          margin: 0 0 8px;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          color: #6366f1;
+        }
+
+        .planPreviewCaptionText {
+          margin: 0;
+          font-size: 13px;
+          line-height: 1.55;
+          color: #334155;
+          font-style: italic;
+        }
+
+        .planPreviewTags {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .planPreviewTagsLabel {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          color: #64748b;
+        }
+
+        .planPreviewTagRow {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+
+        .planPreviewTag {
+          font-size: 12px;
+          font-weight: 600;
+          padding: 6px 11px;
+          border-radius: 999px;
+          color: #334155;
+          background: #f8fafc;
+          border: 1px solid rgba(226, 232, 240, 0.95);
+        }
+
+        .planPreviewProgressSec {
+          padding: 14px 16px;
+          border-radius: 16px;
+          background: #ffffff;
+          border: 1px solid rgba(226, 232, 240, 0.95);
+          box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
+        }
+
+        .planPreviewProgressHead {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 10px;
+        }
+
+        .planPreviewProgressLabel {
           font-size: 12px;
           font-weight: 700;
-          padding: 4px 10px;
-          border-radius: 999px;
-          background: rgba(15, 23, 42, 0.06);
           color: #64748b;
+          letter-spacing: 0.02em;
+        }
+
+        .planPreviewProgressPct {
+          font-size: 13px;
+          font-weight: 800;
+          color: #0f172a;
+          font-variant-numeric: tabular-nums;
+        }
+
+        .planPreviewProgressTrack {
+          height: 8px;
+          border-radius: 999px;
+          background: #e2e8f0;
+          overflow: hidden;
+          margin-bottom: 14px;
+        }
+
+        .planPreviewProgressFill {
+          height: 100%;
+          border-radius: 999px;
+          background: linear-gradient(90deg, #6366f1 0%, #22c55e 100%);
+          transition: width 0.4s ease;
+        }
+
+        .planPreviewChecklist {
+          margin: 0;
+          padding: 0;
+          list-style: none;
+          display: grid;
+          gap: 10px;
+        }
+
+        .planPreviewCheckItem {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+          font-size: 13px;
+          line-height: 1.45;
+          color: #475569;
+        }
+
+        .planPreviewCheckItem--done {
+          color: #334155;
+        }
+
+        .planPreviewCheckIcon {
+          flex-shrink: 0;
+          margin-top: 1px;
+          color: #22c55e;
+          display: flex;
+          align-items: center;
+        }
+
+        .planPreviewCheckEmpty {
+          width: 17px;
+          height: 17px;
+          border-radius: 999px;
+          border: 2px solid #cbd5e1;
+          box-sizing: border-box;
+        }
+
+        .planPreviewTimelineSec {
+          padding: 14px 16px;
+          border-radius: 16px;
+          background: rgba(255, 255, 255, 0.97);
+          border: 1px solid rgba(226, 232, 240, 0.95);
+        }
+
+        .planPreviewTimelineHead {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 12px;
+          font-size: 12px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          color: #64748b;
+        }
+
+        .planPreviewTimeline {
+          margin: 0;
+          padding: 0;
+          list-style: none;
+          display: flex;
+          flex-direction: column;
+          gap: 0;
+        }
+
+        .planPreviewTimelineRow {
+          display: grid;
+          grid-template-columns: auto 1fr;
+          gap: 10px 14px;
+          padding: 10px 0;
+          border-bottom: 1px solid rgba(226, 232, 240, 0.85);
+          font-size: 13px;
+          align-items: baseline;
+        }
+
+        .planPreviewTimelineRow:last-child {
+          border-bottom: none;
+          padding-bottom: 0;
+        }
+
+        .planPreviewTimelineDate {
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          color: #6366f1;
           white-space: nowrap;
         }
 
-        .previewTitle {
-          font-size: 14px;
-          font-weight: 600;
-          color: #0f172a;
-        }
-
-        .previewArrow {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 36px;
-          height: 36px;
-          border-radius: 12px;
-          border: 1px solid rgba(148, 163, 184, 0.22);
-          background: #ffffff;
-          color: #64748b;
+        .planPreviewTimelineTitle {
+          color: #334155;
+          line-height: 1.45;
         }
 
         .whyList {
@@ -1124,143 +2845,199 @@ export default function Home() {
           margin-bottom: 0;
         }
 
-        .ctaStrip {
-          border-radius: 24px;
-          border: 1px solid rgba(148, 163, 184, 0.2);
-          background: rgba(255, 255, 255, 0.9);
-          box-shadow: 0 10px 24px rgba(15, 23, 42, 0.07);
-          padding: 28px 22px;
-        }
-
-        .ctaInner {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 16px;
-          text-align: center;
-        }
-
-        .ctaTitle {
-          margin: 0;
-          color: #0f172a;
-          font-size: clamp(22px, 3vw, 30px);
-          font-family: var(--font-playfair), Georgia, serif;
-          font-weight: 500;
-          letter-spacing: -0.02em;
-        }
-
-        .ctaBtn {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          gap: 10px;
-          padding: 15px 30px;
-          border-radius: 999px;
-          font-weight: 600;
-          font-size: 15px;
-          letter-spacing: -0.005em;
-          text-decoration: none;
-          color: #ffffff;
-          background: #111111;
-          border: 1px solid #111111;
-          transition: background 0.12s ease, border-color 0.12s ease;
-        }
-
-        .ctaBtn:hover {
-          background: #000000;
-          border-color: #000000;
-        }
-
         .homeFooter {
-          margin-top: 8px;
-          padding: 28px 16px 20px;
-          border-radius: 24px;
-          border: 1px solid rgba(148, 163, 184, 0.2);
-          background: rgba(255, 255, 255, 0.9);
-          box-shadow: 0 10px 20px rgba(15, 23, 42, 0.07);
+          width: 100%;
+          max-width: 100%;
+          margin: 0;
+          margin-bottom: 0;
+          padding: clamp(52px, 7vw, 82px) max(20px, calc((100% - 1180px) / 2 + 20px)) clamp(24px, 4vw, 36px);
+          border-radius: 0;
+          border: 0;
+          background: #000000;
+          box-shadow: none;
+        }
+
+        .homeFooterInner {
+          width: 100%;
+          max-width: 1180px;
+          margin: 0 auto;
         }
 
         .homeFooterTop {
-          display: flex;
-          flex-wrap: wrap;
-          align-items: center;
-          justify-content: space-between;
-          gap: 18px;
+          display: grid;
+          grid-template-columns: minmax(240px, 1.2fr) repeat(4, minmax(0, 1fr));
+          align-items: start;
+          gap: clamp(28px, 4vw, 56px);
+          column-gap: clamp(20px, 3vw, 40px);
         }
 
         .homeFooterBrand {
-          display: flex;
-          align-items: center;
-          gap: 10px;
+          display: grid;
+          gap: 14px;
+          max-width: 360px;
         }
 
-        .homeFooterLogo {
-          width: 36px;
-          height: 36px;
-          object-fit: contain;
-        }
-
-        .homeFooterName {
-          width: auto;
-          height: 32px;
-          object-fit: contain;
-        }
-
-        .homeFooterNav,
-        .homeFooterLegal {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 14px 18px;
-          align-items: center;
-        }
-
-        .homeFooterNav :global(a),
-        .homeFooterLegal :global(a) {
-          font-size: 14px;
+        .homeFooterBrandName {
+          margin: 0;
+          color: #ffffff;
+          font-family: var(--font-playfair), Georgia, serif;
+          font-size: clamp(32px, 3.4vw, 46px);
           font-weight: 600;
-          color: #64748b;
-          text-decoration: none;
-          transition: color 0.16s ease;
+          letter-spacing: -0.035em;
         }
 
-        .homeFooterNav :global(a:hover),
-        .homeFooterLegal :global(a:hover) {
-          color: #0f172a;
+        .homeFooterTagline {
+          margin: 0;
+          color: rgba(255, 255, 255, 0.62);
+          font-size: 14px;
+          line-height: 1.7;
         }
 
-        .homeFooterLegal :global(a) {
+        .homeFooterMeta {
+          margin: 0;
+          font-size: 12px;
+          line-height: 1.65;
+          color: rgba(255, 255, 255, 0.42);
           font-weight: 500;
-          color: #64748b;
-          font-size: 13px;
+          letter-spacing: 0.01em;
         }
 
-        .homeFooterLegal :global(a:hover) {
-          color: #0f172a;
+        .homeFooterColumn {
+          display: grid;
+          gap: 14px;
+        }
+
+        .homeFooterColumnTitle {
+          margin: 0;
+          color: #ffffff;
+          font-size: 14px;
+          font-weight: 700;
+          letter-spacing: -0.01em;
+        }
+
+        .homeFooterNav {
+          display: grid;
+          gap: 13px;
+        }
+
+        .homeFooterNav :global(a.homeFooterLink) {
+          display: inline-block;
+          width: fit-content;
+          max-width: 100%;
+          color: rgba(255, 255, 255, 0.72);
+          font-size: 13px;
+          font-weight: 500;
+          line-height: 1.45;
+          text-decoration: none;
+          border: none;
+          background: transparent;
+          padding: 0;
+          margin: 0;
+          box-shadow: none;
+          transition: color 0.18s ease, transform 0.18s ease;
+        }
+
+        .homeFooterNav :global(a.homeFooterLink:hover) {
+          color: #ffffff;
+          transform: translateX(3px);
+        }
+
+        .homeFooterNav :global(a.homeFooterLink:focus) {
+          outline: none;
+        }
+
+        .homeFooterNav :global(a.homeFooterLink:focus-visible) {
+          outline: 2px solid rgba(255, 255, 255, 0.45);
+          outline-offset: 3px;
+          border-radius: 2px;
+        }
+
+        .homeFooterBottom {
+          margin-top: clamp(34px, 5vw, 52px);
+          padding-top: 24px;
+          border-top: 1px solid rgba(255, 255, 255, 0.1);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
         }
 
         .homeFooterCopy {
-          margin: 20px 0 0;
-          text-align: center;
+          margin: 0;
           font-size: 12px;
-          color: #64748b;
+          color: rgba(255, 255, 255, 0.46);
         }
 
-        .scrollStack,
-        .todayTaskWrap {
-          width: min(calc(100% - 36px), 1180px);
-          max-width: none;
+        @keyframes fadeSlideIn {
+          0% {
+            opacity: 0;
+            transform: translateY(8px);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
 
-        .scrollStack {
-          padding: 40px 0 44px;
+        @keyframes sheen {
+          0% {
+            transform: translateX(-130%);
+          }
+          100% {
+            transform: translateX(130%);
+          }
         }
 
-        .glassPanel,
-        .ctaStrip,
-        .homeFooter {
-          border-color: rgba(148, 163, 184, 0.18) !important;
-          background: rgba(255, 255, 255, 0.86) !important;
-          box-shadow: 0 10px 22px rgba(15, 23, 42, 0.05) !important;
+        @media (prefers-reduced-motion: reduce) {
+          .landingReveal {
+            opacity: 1 !important;
+            transform: none !important;
+            transition: none !important;
+          }
+
+          .todayTaskBanner,
+          .workflowIntro,
+          .timelineCard {
+            animation: none !important;
+          }
+
+          .todayTaskBannerMesh {
+            animation: none !important;
+          }
+
+          .todayTaskSkeletonLine {
+            animation: none !important;
+          }
+
+          .todayTaskBanner:hover,
+          .timelineCard:hover,
+          .workflowBtn:hover,
+          .todayTaskCta:hover,
+          .landingCtaBtn:hover {
+            transform: none !important;
+          }
+
+          .galleryMarqueeTrack {
+            animation: none !important;
+            transform: none !important;
+          }
+
+          .galleryMarqueeRow:hover .galleryMarqueeTrack {
+            animation: none !important;
+          }
+
+          .galleryTileWrap {
+            animation: none !important;
+          }
+
+          .timelineCard::before,
+          .timelineCard:hover::before {
+            animation: none !important;
+          }
+
+          .homeFooterNav :global(a.homeFooterLink:hover) {
+            transform: none !important;
+          }
         }
 
         @media (max-width: 980px) {
@@ -1305,13 +3082,30 @@ export default function Home() {
             grid-template-columns: 1fr;
           }
 
-          .scrollSection {
-            padding: 22px 18px;
+          .previewShowcase {
+            grid-template-columns: 1fr;
+            gap: 36px;
+          }
+
+          .previewShowcaseIntro {
+            max-width: none;
+          }
+
+          .planPreviewScroll {
+            max-height: none;
+          }
+
+          .landingSectionInner {
+            padding-left: 18px;
+            padding-right: 18px;
           }
 
           .homeFooterTop {
-            flex-direction: column;
-            align-items: flex-start;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+
+          .homeFooterColumn--support {
+            grid-column: 1 / -1;
           }
         }
 
@@ -1364,24 +3158,48 @@ export default function Home() {
             margin-top: 26px;
           }
 
+          .homeFooterTop {
+            grid-template-columns: 1fr;
+          }
+
+          .homeFooterBottom {
+            align-items: center;
+          }
+
           .heroTrustDot {
             display: none;
           }
 
-          .previewRow {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 10px;
+          .previewShowcaseCta {
+            width: 100%;
           }
 
-          .previewTitle {
-            flex: 1 1 160px;
-            min-width: 0;
+          .planPreviewDateChip {
+            margin-left: 0;
           }
 
-          .previewArrow {
-            margin-left: auto;
+          .todayTaskBannerInner {
+            grid-template-columns: 1fr;
+          }
+
+          .todayTaskBannerIcon {
+            width: 48px;
+            height: 48px;
+            border-radius: 16px;
+          }
+
+          .todayTaskCta {
+            width: 100%;
+          }
+
+          .todayTaskCta--ghost {
+            width: auto;
+            flex: 1 1 auto;
+          }
+
+          .todayTaskActions {
+            flex-direction: column;
+            align-items: stretch;
           }
         }
       `}</style>

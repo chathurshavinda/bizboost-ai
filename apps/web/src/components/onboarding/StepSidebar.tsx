@@ -11,27 +11,27 @@ type StepSidebarProps = {
     onStepClick?: (step: StepId) => void;
 };
 export default function StepSidebar({ currentStep, onStepClick }: StepSidebarProps) {
-    return (<aside className="onboardingSidebar">
-      <ol className="onboardingStepList">
+    return (<aside className="onboardingSidebar">
+      <ol className="onboardingStepList">
         {steps.map((step, index) => {
             const isCompleted = index < steps.findIndex((s) => s.id === currentStep);
             const isActive = step.id === currentStep;
-            return (<li key={step.id} className="onboardingStepItem" onClick={() => onStepClick && onStepClick(step.id)} style={onStepClick ? { cursor: "pointer" } : undefined}>
-              <div className="onboardingStepMarkerCol">
+            return (<li key={step.id} className="onboardingStepItem" onClick={() => onStepClick && onStepClick(step.id)} style={onStepClick ? { cursor: "pointer" } : undefined} aria-current={isActive ? "step" : undefined}>
+              <div className="onboardingStepMarkerCol">
                 <div className={"onboardingStepIcon " +
-                    (isActive ? "onboardingStepIcon--active" : isCompleted ? "onboardingStepIcon--done" : "")}>
-                  <span className="onboardingStepIconDot"/>
-                </div>
-                {index < steps.length - 1 && <div className="onboardingStepLine"/>}
-              </div>
-              <div className="onboardingStepLabelCol">
+                    (isActive ? "onboardingStepIcon--active" : isCompleted ? "onboardingStepIcon--done" : "")}>
+                  <span className="onboardingStepIconDot"/>
+                </div>
+                {index < steps.length - 1 && <div className="onboardingStepLine"/>}
+              </div>
+              <div className="onboardingStepLabelCol">
                 <span className={"onboardingStepLabel " +
-                    (isActive ? "onboardingStepLabel--active" : isCompleted ? "onboardingStepLabel--done" : "")}>
-                  {step.label}
-                </span>
-              </div>
+                    (isActive ? "onboardingStepLabel--active" : isCompleted ? "onboardingStepLabel--done" : "")}>
+                  {step.label}
+                </span>
+              </div>
             </li>);
-        })}
-      </ol>
+        })}
+      </ol>
     </aside>);
 }

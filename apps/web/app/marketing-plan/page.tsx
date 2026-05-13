@@ -35,6 +35,46 @@ type GeneratedDay = {
     completed?: boolean;
 };
 type ModalType = "missingBusiness" | "incompleteBusiness" | "missingPlan" | "serverError" | null;
+type AiGrowthPillar = {
+    title?: string;
+    why?: string;
+    how?: string[];
+    kpis?: string[];
+};
+type AiMarketingStrategy = {
+    overview?: string;
+    primaryChannels?: string[];
+    contentMix?: string[];
+    audienceTips?: string[];
+    weeklyRhythm?: string[];
+};
+type AiWeeklyMilestone = {
+    week?: number;
+    focus?: string;
+    goals?: string[];
+    actions?: string[];
+};
+type AiBusinessPlanDto = {
+    generatedAt?: string;
+    language?: string;
+    businessSummary?: string;
+    mainGrowthGoal?: string;
+    keyOpportunities?: string[];
+    keyChallenges?: string[];
+    growthStrategy?: AiGrowthPillar[];
+    marketingStrategy?: AiMarketingStrategy;
+    weeklyActionPlan?: AiWeeklyMilestone[];
+    contentIdeas?: string[];
+    captionSuggestions?: string[];
+    hashtagSuggestions?: string[];
+    promotionIdeas?: string[];
+    customerAttractionIdeas?: string[];
+    customerRetentionIdeas?: string[];
+    salesImprovementIdeas?: string[];
+    successMetrics?: string[];
+    finalRecommendations?: string[];
+    missingDetails?: string[];
+};
 type LatestPlanResponse = {
     ok?: boolean;
     plan?: {
@@ -47,6 +87,8 @@ type LatestPlanResponse = {
             percent?: number;
         };
         narrativePlan?: string;
+        aiBusinessPlan?: AiBusinessPlanDto | null;
+        missingProfileFields?: string[];
     };
     data?: Record<string, unknown>;
     error?: string;
@@ -227,6 +269,11 @@ export default function MarketingPlanPage() {
     const [hasGenerated, setHasGenerated] = useState(false);
     const [narrativePlan, setNarrativePlan] = useState<string>("");
     const [narrativeOpen, setNarrativeOpen] = useState(false);
+    const [aiPlan, setAiPlan] = useState<AiBusinessPlanDto | null>(null);
+    const [planMissingFields, setPlanMissingFields] = useState<string[]>([]);
+    const [activeStrategyTab, setActiveStrategyTab] = useState<
+        "summary" | "growth" | "marketing" | "weekly" | "content" | "captions" | "hashtags" | "promotions" | "metrics" | "recommendations"
+    >("summary");
     const [completedMap, setCompletedMap] = useState<Record<number, boolean>>({});
     const [savingDayNumber, setSavingDayNumber] = useState<number | null>(null);
     const [planId, setPlanId] = useState<string>("");
@@ -286,6 +333,8 @@ export default function MarketingPlanPage() {
                 setGeneratedPlan([]);
                 setHasGenerated(false);
                 setNarrativePlan("");
+                setAiPlan(null);
+                setPlanMissingFields([]);
                 setCompletedMap({});
                 setPlanId("");
                 setPlanStatus("active");
@@ -308,6 +357,8 @@ export default function MarketingPlanPage() {
                 setHasGenerated(normalized.length > 0 && !legacyFallback);
                 setSelectedPlanDays(Number(plan?.durationDays ?? days));
                 setNarrativePlan(typeof plan?.narrativePlan === "string" ? plan.narrativePlan : "");
+                setAiPlan(plan?.aiBusinessPlan && typeof plan.aiBusinessPlan === "object" ? plan.aiBusinessPlan : null);
+                setPlanMissingFields(Array.isArray(plan?.missingProfileFields) ? plan.missingProfileFields.map(String) : []);
                 const completedDays = normalized.filter((day) => day.completed).map((day) => day.dayNumber);
                 setCompletedMap(completedDays.reduce<Record<number, boolean>>((acc, day) => {
                     const dayNumber = Number(day);
@@ -322,6 +373,8 @@ export default function MarketingPlanPage() {
                 setGeneratedPlan([]);
                 setHasGenerated(false);
                 setNarrativePlan("");
+                setAiPlan(null);
+                setPlanMissingFields([]);
                 setCompletedMap({});
             }
         }
@@ -395,6 +448,20 @@ export default function MarketingPlanPage() {
                     : "";
             setNarrativePlan(nextNarrative);
             setNarrativeOpen(Boolean(nextNarrative));
+            const nextAiPlan: AiBusinessPlanDto | null =
+                result?.plan?.aiBusinessPlan && typeof result.plan.aiBusinessPlan === "object"
+                    ? (result.plan.aiBusinessPlan as AiBusinessPlanDto)
+                    : result?.data?.aiBusinessPlan && typeof result.data.aiBusinessPlan === "object"
+                        ? (result.data.aiBusinessPlan as AiBusinessPlanDto)
+                        : null;
+            setAiPlan(nextAiPlan);
+            const nextMissing: string[] = Array.isArray(result?.data?.missingProfileFields)
+                ? (result.data.missingProfileFields as unknown[]).map((v) => String(v))
+                : Array.isArray(result?.plan?.missingProfileFields)
+                    ? (result.plan.missingProfileFields as unknown[]).map((v) => String(v))
+                    : [];
+            setPlanMissingFields(nextMissing);
+            if (nextAiPlan) setActiveStrategyTab("summary");
             setCompletedMap(nextPlan.reduce<Record<number, boolean>>((acc, day) => {
                 if (day.completed)
                     acc[day.dayNumber] = true;
@@ -541,17 +608,21 @@ export default function MarketingPlanPage() {
     const taskDay = todayPlanDay ?? fallbackDay;
     const isTodayTaskCompleted = Boolean(todayPlanDay && completedMap[todayPlanDay.dayNumber]);
     const isFallbackTask = !todayPlanDay && Boolean(fallbackDay);
-    return (<div className="planPage">
-      <div className="planShell">
-        <section className="topCard">
-          <div className="topInner">
-            <p className="eyebrow">Plan Builder</p>
-            <h1>Marketing Plan</h1>
-            <p className="subtitle">
-              Generate a business growth plan (operations &amp; revenue first) with matching marketing activation ideas from your profile and plan length.
-            </p>
-          </div>
+    return (<div className="bb-page">
+      <section className="bb-hero-dark bb-hero-dark--planHeroBreath">
+        <div className="bb-hero-dark-inner bb-hero-centered bb-hero-planBuilder mx-auto w-full max-w-3xl px-4 text-center sm:px-6">
+          <p className="bb-eyebrow-dark">Plan Builder</p>
+          <h1 className="bb-title-dark">Marketing Plan</h1>
+          <p className="bb-lead-dark bb-lead-dark--planBuilder">
+            Generate a business growth plan (operations &amp; revenue first) with matching marketing activation ideas from your profile and plan length.
+          </p>
+        </div>
+      </section>
 
+      <section className="bb-band-light">
+        <div className="bb-shell">
+          <div className="planShell">
+        <section className="topCard">
           <div className="summaryGrid">
             <div className="summaryCard">
               <div className="summaryLabel">Business Name</div>
@@ -690,11 +761,190 @@ export default function MarketingPlanPage() {
             </div>)}
         </section>
 
+        {aiPlan && (<section className="strategyCard">
+            <div className="strategyHead">
+              <div>
+                <p className="eyebrow">AI Business + Marketing Plan</p>
+                <h2>Your Personalized Growth Strategy</h2>
+                <p className="narrativeHint">
+                  Built from your business profile, products/services, location, and selected plan duration.
+                </p>
+              </div>
+            </div>
+            {planMissingFields.length > 0 && (<div className="missingBanner">
+                <p className="missingTitle">Make this plan even sharper</p>
+                <p className="missingText">
+                  Complete these business profile details for stronger next-time results:&nbsp;
+                  <strong>{planMissingFields.join(", ")}.</strong>
+                </p>
+                <button type="button" className="missingBtn" onClick={() => router.push("/onboarding/business-details")}>
+                  Update Business Details
+                </button>
+              </div>)}
+            <div className="strategyTabs" role="tablist">
+              {([
+                ["summary", "Business Summary"],
+                ["growth", "Growth Strategy"],
+                ["marketing", "Marketing Strategy"],
+                ["weekly", "Weekly Plan"],
+                ["content", "Content Ideas"],
+                ["captions", "Captions"],
+                ["hashtags", "Hashtags"],
+                ["promotions", "Promotions"],
+                ["metrics", "Success Metrics"],
+                ["recommendations", "Recommendations"],
+              ] as const).map(([id, label]) => (<button key={id} type="button" role="tab" aria-selected={activeStrategyTab === id} className={`strategyTab ${activeStrategyTab === id ? "active" : ""}`} onClick={() => setActiveStrategyTab(id)}>
+                  {label}
+                </button>))}
+            </div>
+            <div className="strategyBody">
+              {activeStrategyTab === "summary" && (<div className="strategySection">
+                  {aiPlan.businessSummary && (<p className="strategyPara">{aiPlan.businessSummary}</p>)}
+                  {aiPlan.mainGrowthGoal && (<div className="strategyBlock">
+                      <h3>Main Growth Goal</h3>
+                      <p className="strategyPara">{aiPlan.mainGrowthGoal}</p>
+                    </div>)}
+                  {Array.isArray(aiPlan.keyOpportunities) && aiPlan.keyOpportunities.length > 0 && (<div className="strategyBlock">
+                      <h3>Key Opportunities</h3>
+                      <ul className="strategyList">
+                        {aiPlan.keyOpportunities.map((item, idx) => (<li key={`op-${idx}`}>{item}</li>))}
+                      </ul>
+                    </div>)}
+                  {Array.isArray(aiPlan.keyChallenges) && aiPlan.keyChallenges.length > 0 && (<div className="strategyBlock">
+                      <h3>Key Challenges</h3>
+                      <ul className="strategyList">
+                        {aiPlan.keyChallenges.map((item, idx) => (<li key={`ch-${idx}`}>{item}</li>))}
+                      </ul>
+                    </div>)}
+                </div>)}
+
+              {activeStrategyTab === "growth" && (<div className="strategySection">
+                  {Array.isArray(aiPlan.growthStrategy) && aiPlan.growthStrategy.length > 0 ? (aiPlan.growthStrategy.map((pillar, idx) => (<div key={`pillar-${idx}`} className="strategyPillar">
+                        <h3>{pillar.title || `Growth Pillar ${idx + 1}`}</h3>
+                        {pillar.why && <p className="strategyPara">{pillar.why}</p>}
+                        {Array.isArray(pillar.how) && pillar.how.length > 0 && (<ul className="strategyList">
+                            {pillar.how.map((step, sidx) => (<li key={`p-${idx}-h-${sidx}`}>{step}</li>))}
+                          </ul>)}
+                        {Array.isArray(pillar.kpis) && pillar.kpis.length > 0 && (<p className="strategyKpi">
+                            <strong>KPIs:</strong> {pillar.kpis.join(" · ")}
+                          </p>)}
+                      </div>))) : (<p className="strategyEmpty">No growth pillars yet.</p>)}
+                </div>)}
+
+              {activeStrategyTab === "marketing" && (<div className="strategySection">
+                  {aiPlan.marketingStrategy?.overview && (<p className="strategyPara">{aiPlan.marketingStrategy.overview}</p>)}
+                  {Array.isArray(aiPlan.marketingStrategy?.primaryChannels) && aiPlan.marketingStrategy!.primaryChannels!.length > 0 && (<div className="strategyBlock">
+                      <h3>Primary Channels</h3>
+                      <ul className="strategyList">
+                        {aiPlan.marketingStrategy!.primaryChannels!.map((item, idx) => (<li key={`ch-${idx}`}>{item}</li>))}
+                      </ul>
+                    </div>)}
+                  {Array.isArray(aiPlan.marketingStrategy?.contentMix) && aiPlan.marketingStrategy!.contentMix!.length > 0 && (<div className="strategyBlock">
+                      <h3>Content Mix</h3>
+                      <ul className="strategyList">
+                        {aiPlan.marketingStrategy!.contentMix!.map((item, idx) => (<li key={`mix-${idx}`}>{item}</li>))}
+                      </ul>
+                    </div>)}
+                  {Array.isArray(aiPlan.marketingStrategy?.audienceTips) && aiPlan.marketingStrategy!.audienceTips!.length > 0 && (<div className="strategyBlock">
+                      <h3>Reaching Your Audience</h3>
+                      <ul className="strategyList">
+                        {aiPlan.marketingStrategy!.audienceTips!.map((item, idx) => (<li key={`at-${idx}`}>{item}</li>))}
+                      </ul>
+                    </div>)}
+                  {Array.isArray(aiPlan.marketingStrategy?.weeklyRhythm) && aiPlan.marketingStrategy!.weeklyRhythm!.length > 0 && (<div className="strategyBlock">
+                      <h3>Weekly Rhythm</h3>
+                      <ul className="strategyList">
+                        {aiPlan.marketingStrategy!.weeklyRhythm!.map((item, idx) => (<li key={`wr-${idx}`}>{item}</li>))}
+                      </ul>
+                    </div>)}
+                </div>)}
+
+              {activeStrategyTab === "weekly" && (<div className="strategySection">
+                  {Array.isArray(aiPlan.weeklyActionPlan) && aiPlan.weeklyActionPlan.length > 0 ? (aiPlan.weeklyActionPlan.map((week, idx) => (<div key={`week-${idx}`} className="strategyPillar">
+                        <h3>Week {week.week || idx + 1}{week.focus ? ` — ${week.focus}` : ""}</h3>
+                        {Array.isArray(week.goals) && week.goals.length > 0 && (<>
+                            <p className="strategyPara"><strong>Goals</strong></p>
+                            <ul className="strategyList">
+                              {week.goals.map((g, gi) => (<li key={`wg-${idx}-${gi}`}>{g}</li>))}
+                            </ul>
+                          </>)}
+                        {Array.isArray(week.actions) && week.actions.length > 0 && (<>
+                            <p className="strategyPara"><strong>Actions</strong></p>
+                            <ul className="strategyList">
+                              {week.actions.map((a, ai) => (<li key={`wa-${idx}-${ai}`}>{a}</li>))}
+                            </ul>
+                          </>)}
+                      </div>))) : (<p className="strategyEmpty">No weekly milestones yet.</p>)}
+                </div>)}
+
+              {activeStrategyTab === "content" && (<div className="strategySection">
+                  {[
+                {
+                    title: "Sales Improvement Ideas",
+                    items: aiPlan.salesImprovementIdeas,
+                },
+                {
+                    title: "Customer Attraction Ideas",
+                    items: aiPlan.customerAttractionIdeas,
+                },
+                {
+                    title: "Customer Retention Ideas",
+                    items: aiPlan.customerRetentionIdeas,
+                },
+                {
+                    title: "Content Ideas",
+                    items: aiPlan.contentIdeas,
+                },
+            ].map(({ title, items }) => Array.isArray(items) && items.length > 0 ? (<div key={title} className="strategyBlock">
+                      <h3>{title}</h3>
+                      <ul className="strategyList">
+                        {items.map((item, idx) => (<li key={`${title}-${idx}`}>{item}</li>))}
+                      </ul>
+                    </div>) : null)}
+                </div>)}
+
+              {activeStrategyTab === "captions" && (<div className="strategySection">
+                  {Array.isArray(aiPlan.captionSuggestions) && aiPlan.captionSuggestions.length > 0 ? (aiPlan.captionSuggestions.map((c, idx) => (<div key={`cap-${idx}`} className="captionCard">
+                        <pre className="captionPre">{c}</pre>
+                        <button type="button" className="copyBtn" onClick={() => {
+                            void navigator.clipboard?.writeText(c).catch(() => undefined);
+                        }}>
+                          Copy
+                        </button>
+                      </div>))) : (<p className="strategyEmpty">No caption suggestions yet.</p>)}
+                </div>)}
+
+              {activeStrategyTab === "hashtags" && (<div className="strategySection">
+                  {Array.isArray(aiPlan.hashtagSuggestions) && aiPlan.hashtagSuggestions.length > 0 ? (<div className="hashtagWrap">
+                      {aiPlan.hashtagSuggestions.map((tag, idx) => (<span key={`tag-${idx}`} className="hashtagChip">{tag.startsWith("#") ? tag : `#${tag.replace(/^#+/, "")}`}</span>))}
+                    </div>) : (<p className="strategyEmpty">No hashtags yet.</p>)}
+                </div>)}
+
+              {activeStrategyTab === "promotions" && (<div className="strategySection">
+                  {Array.isArray(aiPlan.promotionIdeas) && aiPlan.promotionIdeas.length > 0 ? (<ul className="strategyList">
+                      {aiPlan.promotionIdeas.map((p, idx) => (<li key={`promo-${idx}`}>{p}</li>))}
+                    </ul>) : (<p className="strategyEmpty">No promotion ideas yet.</p>)}
+                </div>)}
+
+              {activeStrategyTab === "metrics" && (<div className="strategySection">
+                  {Array.isArray(aiPlan.successMetrics) && aiPlan.successMetrics.length > 0 ? (<ul className="strategyList">
+                      {aiPlan.successMetrics.map((m, idx) => (<li key={`metric-${idx}`}>{m}</li>))}
+                    </ul>) : (<p className="strategyEmpty">No success metrics yet.</p>)}
+                </div>)}
+
+              {activeStrategyTab === "recommendations" && (<div className="strategySection">
+                  {Array.isArray(aiPlan.finalRecommendations) && aiPlan.finalRecommendations.length > 0 ? (<ul className="strategyList">
+                      {aiPlan.finalRecommendations.map((r, idx) => (<li key={`rec-${idx}`}>{r}</li>))}
+                    </ul>) : (<p className="strategyEmpty">No recommendations yet.</p>)}
+                </div>)}
+            </div>
+          </section>)}
+
         {narrativePlan && (<section className="narrativeCard">
             <div className="narrativeHead">
               <div>
                 <p className="eyebrow">AI Strategy Report</p>
-                <h2>Personalized Marketing Plan</h2>
+                <h2>Full Plan in Detail</h2>
                 <p className="narrativeHint">
                   Generated from your business details using Gemini. Tailored for small businesses in Sri Lanka.
                 </p>
@@ -705,7 +955,9 @@ export default function MarketingPlanPage() {
             </div>
             {narrativeOpen && (<div className="narrativeBody">{renderMarkdownPlan(narrativePlan)}</div>)}
           </section>)}
-      </div>
+          </div>
+        </div>
+      </section>
 
       {modalContent && (<div className="modalOverlay">
           <div className="modalCard">
@@ -723,33 +975,23 @@ export default function MarketingPlanPage() {
         </div>)}
 
       <style jsx>{`
-        .planPage {
-          min-height: 100vh;
-          padding: 28px 16px 12px;
-          background: var(--page-bg);
-        }
-
         .planShell {
           max-width: 1120px;
           margin: 0 auto;
           display: grid;
-          gap: 18px;
+          gap: clamp(18px, 3vw, 24px);
         }
 
         .topCard,
         .listCard {
           border-radius: 28px;
-          border: 1px solid rgba(148, 163, 184, 0.28);
-          background: rgba(255, 255, 255, 0.76);
-          box-shadow: 0 20px 60px rgba(15, 23, 42, 0.1);
+          border: 1px solid rgba(226, 232, 240, 0.95);
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(250, 250, 250, 0.94) 100%);
+          box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.9) inset,
+            0 24px 64px rgba(15, 23, 42, 0.09);
           backdrop-filter: blur(14px);
-          padding: 24px 20px;
-        }
-
-        .topInner {
-          max-width: 760px;
-          margin: 0 auto;
-          text-align: center;
+          padding: clamp(20px, 3vw, 28px);
         }
 
         .eyebrow {
@@ -761,23 +1003,8 @@ export default function MarketingPlanPage() {
           font-weight: 700;
         }
 
-        h1 {
-          margin: 10px 0 0;
-          color: #0f172a;
-          font-size: clamp(32px, 5vw, 52px);
-          line-height: 1.06;
-          letter-spacing: -0.02em;
-        }
-
-        .subtitle {
-          margin: 10px 0 0;
-          color: #64748b;
-          font-size: 15px;
-          line-height: 1.6;
-        }
-
         .summaryGrid {
-          margin-top: 16px;
+          margin-top: 0;
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
           gap: 12px;
@@ -824,22 +1051,22 @@ export default function MarketingPlanPage() {
           border: 1px solid #111111;
           background: #111111;
           color: #ffffff;
-          border-radius: 14px;
-          min-width: 250px;
-          padding: 14px 18px;
+          border-radius: 999px;
+          min-width: min(280px, 100%);
+          padding: 15px 28px;
           font-size: 15px;
           font-weight: 700;
           display: inline-flex;
           align-items: center;
           justify-content: center;
           gap: 8px;
-          box-shadow: none;
+          box-shadow: 0 16px 34px rgba(15, 23, 42, 0.22);
           cursor: pointer;
-          transition: transform 0.15s ease, filter 0.15s ease;
+          transition: transform 0.18s ease, filter 0.18s ease, box-shadow 0.18s ease;
         }
 
         .generateBtn:hover {
-          transform: translateY(-1px);
+          transform: translateY(-2px);
           filter: brightness(1.02);
         }
 
@@ -1336,11 +1563,13 @@ export default function MarketingPlanPage() {
 
         .narrativeCard {
           border-radius: 28px;
-          border: 1px solid rgba(148, 163, 184, 0.28);
-          background: rgba(255, 255, 255, 0.78);
-          box-shadow: 0 20px 60px rgba(15, 23, 42, 0.1);
+          border: 1px solid rgba(226, 232, 240, 0.95);
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(248, 250, 252, 0.96) 100%);
+          box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.9) inset,
+            0 28px 72px rgba(15, 23, 42, 0.1);
           backdrop-filter: blur(14px);
-          padding: 24px 20px;
+          padding: clamp(22px, 3vw, 30px);
         }
 
         .narrativeHead {
@@ -1367,20 +1596,30 @@ export default function MarketingPlanPage() {
         }
 
         .toggleBtn {
-          border: 1px solid rgba(14, 165, 233, 0.45);
-          background: rgba(240, 249, 255, 0.95);
-          color: #0369a1;
-          border-radius: 12px;
-          padding: 10px 14px;
+          border: 1px solid rgba(99, 102, 241, 0.35);
+          background: rgba(255, 255, 255, 0.95);
+          color: #4338ca;
+          border-radius: 999px;
+          padding: 11px 18px;
           font-size: 13px;
           font-weight: 700;
           cursor: pointer;
+          transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+          box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+        }
+
+        .toggleBtn:hover {
+          background: rgba(238, 242, 255, 0.98);
+          border-color: rgba(99, 102, 241, 0.5);
+          transform: translateY(-1px);
         }
 
         .narrativeBody {
-          margin-top: 18px;
-          border-top: 1px dashed rgba(148, 163, 184, 0.45);
-          padding-top: 18px;
+          margin-top: 20px;
+          border-radius: 18px;
+          border: 1px solid rgba(226, 232, 240, 0.9);
+          background: rgba(248, 250, 252, 0.65);
+          padding: clamp(16px, 2.5vw, 22px);
         }
 
         .narrativeBody :global(.mdWrap) {
@@ -1455,6 +1694,181 @@ export default function MarketingPlanPage() {
 
         .narrativeBody :global(.mdTable tr:last-child td) {
           border-bottom: none;
+        }
+
+        .strategyCard {
+          border-radius: 28px;
+          border: 1px solid rgba(226, 232, 240, 0.95);
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.95) 100%);
+          box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 24px 64px rgba(15, 23, 42, 0.09);
+          padding: clamp(20px, 3vw, 28px);
+          display: grid;
+          gap: 16px;
+        }
+        .strategyHead h2 {
+          margin: 4px 0 0;
+          font-size: 22px;
+          font-weight: 700;
+          color: #0f172a;
+        }
+        .missingBanner {
+          border-radius: 16px;
+          border: 1px solid rgba(245, 158, 11, 0.35);
+          background: linear-gradient(180deg, rgba(254, 243, 199, 0.7), rgba(254, 243, 199, 0.4));
+          padding: 14px 16px;
+          display: grid;
+          gap: 8px;
+        }
+        .missingTitle {
+          margin: 0;
+          font-size: 13px;
+          font-weight: 700;
+          color: #92400e;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+        }
+        .missingText {
+          margin: 0;
+          font-size: 14px;
+          color: #78350f;
+        }
+        .missingBtn {
+          align-self: start;
+          border-radius: 12px;
+          padding: 8px 14px;
+          font-size: 13px;
+          font-weight: 600;
+          border: 1px solid rgba(120, 53, 15, 0.35);
+          background: #fff;
+          color: #78350f;
+          cursor: pointer;
+          transition: all 160ms ease;
+        }
+        .missingBtn:hover {
+          background: #78350f;
+          color: #fff;
+        }
+        .strategyTabs {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          padding-bottom: 4px;
+          border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+        }
+        .strategyTab {
+          border: 1px solid rgba(148, 163, 184, 0.35);
+          background: #fff;
+          color: #475569;
+          font-size: 13px;
+          font-weight: 600;
+          padding: 8px 14px;
+          border-radius: 999px;
+          cursor: pointer;
+          transition: all 140ms ease;
+        }
+        .strategyTab:hover {
+          color: #0f172a;
+          border-color: #0f172a;
+        }
+        .strategyTab.active {
+          background: #0f172a;
+          color: #fff;
+          border-color: #0f172a;
+        }
+        .strategyBody {
+          display: grid;
+          gap: 14px;
+        }
+        .strategySection {
+          display: grid;
+          gap: 16px;
+        }
+        .strategyBlock h3,
+        .strategyPillar h3 {
+          margin: 0 0 6px;
+          font-size: 15px;
+          font-weight: 700;
+          color: #0f172a;
+        }
+        .strategyPara {
+          margin: 0;
+          font-size: 14.5px;
+          line-height: 1.6;
+          color: #1f2937;
+        }
+        .strategyList {
+          margin: 6px 0 0;
+          padding-left: 18px;
+          display: grid;
+          gap: 6px;
+        }
+        .strategyList li {
+          font-size: 14px;
+          line-height: 1.55;
+          color: #334155;
+        }
+        .strategyPillar {
+          border-radius: 16px;
+          border: 1px solid rgba(148, 163, 184, 0.25);
+          background: rgba(255, 255, 255, 0.85);
+          padding: 14px 16px;
+          display: grid;
+          gap: 6px;
+        }
+        .strategyKpi {
+          margin: 4px 0 0;
+          font-size: 13px;
+          color: #475569;
+        }
+        .strategyEmpty {
+          font-size: 14px;
+          color: #64748b;
+        }
+        .captionCard {
+          border-radius: 14px;
+          border: 1px solid rgba(148, 163, 184, 0.3);
+          background: rgba(255, 255, 255, 0.9);
+          padding: 12px 14px;
+          display: grid;
+          gap: 8px;
+        }
+        .captionPre {
+          margin: 0;
+          font-family: inherit;
+          white-space: pre-wrap;
+          font-size: 14px;
+          line-height: 1.55;
+          color: #1f2937;
+        }
+        .copyBtn {
+          justify-self: start;
+          border-radius: 10px;
+          padding: 6px 12px;
+          font-size: 12px;
+          font-weight: 600;
+          border: 1px solid rgba(15, 23, 42, 0.15);
+          background: #fff;
+          color: #0f172a;
+          cursor: pointer;
+          transition: all 140ms ease;
+        }
+        .copyBtn:hover {
+          background: #0f172a;
+          color: #fff;
+        }
+        .hashtagWrap {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+        .hashtagChip {
+          font-size: 13px;
+          font-weight: 600;
+          color: #1d4ed8;
+          background: rgba(59, 130, 246, 0.08);
+          border: 1px solid rgba(59, 130, 246, 0.25);
+          padding: 6px 10px;
+          border-radius: 999px;
         }
 
         @media (max-width: 900px) {

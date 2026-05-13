@@ -18,14 +18,14 @@ export default function OnboardingPage() {
         setReady(true);
     }, [user, loading, router]);
     if (!ready) {
-        return (<div className="authWrap">
-        <div style={{ color: "var(--text-muted)" }}>Loading your onboarding...</div>
+        return (<div className="authWrap">
+        <div style={{ color: "var(--text-muted)" }}>Loading your onboarding...</div>
       </div>);
     }
-    return (<div className="onboardingWrap">
-      <div className="onboardingCard">
-        <StepSidebar currentStep="business"/>
-        <BusinessForm />
-      </div>
+    return (<div className="onboardingWrap">
+      <div className="onboardingCard onboardingCard--light">
+        <StepSidebar currentStep="business"/>
+        <BusinessForm />
+      </div>
     </div>);
 }
