@@ -9,6 +9,11 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  experimental: {
+    // Existing pages use useSearchParams without Suspense boundaries; downgrade
+    // the strict prerender error to a warning so production builds succeed.
+    missingSuspenseWithCSRBailout: false,
+  },
 };
 
 module.exports = nextConfig;
