@@ -76,9 +76,19 @@ function squash(s: string, max: number): string {
         return "";
     return t.length <= max ? t : `${t.slice(0, max - 1).trim()}…`;
 }
+function removeInstructionPhrases(input: string): string {
+    const t = (input || "").replace(/\s+/g, " ").trim();
+    if (!t)
+        return "";
+    return t
+        .replace(/^(caption|headline|subheadline|cta)\s*:\s*/i, "")
+        .replace(/\b(post about|use this caption|what to post|create post about|show this|idea:)\b/gi, "")
+        .replace(/\s+/g, " ")
+        .trim();
+}
 function captionFirstLine(caption: string): string {
     const line = caption.split(/\r?\n/).map((x) => x.trim()).find(Boolean);
-    return line ? squash(line.replace(/^[#•\-\*]\s*/, ""), 72) : "";
+    return line ? squash(removeInstructionPhrases(line.replace(/^[#•\-\*]\s*/, "")), 72) : "";
 }
 function mapUiDayThemeToInternal(ui: string | undefined): InternalPlanTheme {
     const u = (ui || "").toLowerCase();
@@ -130,10 +140,10 @@ export function buildPosterSeedFromPlan(args: {
     posterContext?: PosterSeedContext | null;
 }): Pick<PosterDesign, "brandName" | "headline" | "subheadline" | "offerBadge" | "ctaLabel"> {
     const ma = args.marketingActivation ?? null;
-    const packHeadline = (ma?.posterHeadlineHint || "").trim();
-    const packSub = (ma?.posterSubheadline || "").trim();
-    const packCta = (ma?.posterCtaLabel || "").trim();
-    const packBadge = (ma?.posterOfferBadge || "").trim();
+    const packHeadline = removeInstructionPhrases((ma?.posterHeadlineHint || "").trim());
+    const packSub = removeInstructionPhrases((ma?.posterSubheadline || "").trim());
+    const packCta = removeInstructionPhrases((ma?.posterCtaLabel || "").trim());
+    const packBadge = removeInstructionPhrases((ma?.posterOfferBadge || "").trim());
     let headline = packHeadline;
     let subheadline = packSub;
     let offerBadge = packBadge;
@@ -162,25 +172,25 @@ export function buildPosterSeedFromPlan(args: {
     const captionRest = args.caption.replace(/^[^\r\n]+\r?\n?/, "").trim();
     if (!headline) {
         headline =
-            squash(ma?.hook || "", 56) ||
+            squash(removeInstructionPhrases(ma?.hook || ""), 56) ||
                 captionFirstLine(args.caption) ||
-                squash(args.mainActionTitle || "", 56) ||
+                squash(removeInstructionPhrases(args.mainActionTitle || ""), 56) ||
                 "YOUR OFFER TODAY";
     }
     if (!subheadline) {
         subheadline =
-            squash(ma?.postIdea || ma?.postBrief || ma?.contentBrief || ma?.whatToPost || "", 100) ||
-                squash(captionRest, 100) ||
-                squash(args.businessGrowthAction || "", 100);
+            squash(removeInstructionPhrases(ma?.postIdea || ma?.postBrief || ma?.contentBrief || ma?.whatToPost || ""), 100) ||
+                squash(removeInstructionPhrases(captionRest), 100) ||
+                squash(removeInstructionPhrases(args.businessGrowthAction || ""), 100);
     }
     if (!ctaLabel) {
-        const rawCta = (ma?.cta || "DM US").trim();
+        const rawCta = removeInstructionPhrases((ma?.cta || "DM US").trim());
         const ctaWords = rawCta.split(/\s+/).slice(0, 3).join(" ");
         ctaLabel = squash(ctaWords, 28) || "DM US";
     }
     if (!offerBadge) {
-        offerBadge = squash(ma?.offerDeadlineHint || "", 28) ||
-            squash(ma?.posterHint || args.posterHintFallback || "", 28);
+        offerBadge = squash(removeInstructionPhrases(ma?.offerDeadlineHint || ""), 28) ||
+            squash(removeInstructionPhrases(ma?.posterHint || args.posterHintFallback || ""), 28);
     }
     return {
         brandName: squash(args.businessName, 40) || "Your Brand",

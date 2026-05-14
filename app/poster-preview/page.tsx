@@ -65,25 +65,19 @@ async function posterWrapToPngDataUrl(posterWrap: HTMLElement): Promise<string> 
     if (w !== h) {
         console.warn("[poster-preview] Export posterWrap is not square; output may be letterboxed. Size:", w, h);
     }
-    const boxShadow = posterWrap.style.boxShadow, borderRadius = posterWrap.style.borderRadius, outline = posterWrap.style.outline, filter = posterWrap.style.filter;
-    posterWrap.style.boxShadow = "none";
-    posterWrap.style.borderRadius = "0";
-    posterWrap.style.outline = "none";
-    posterWrap.style.filter = "none";
+    const side = Math.min(w, h);
+    const pixelRatio = Math.min(8, Math.max(1, POSTER_EXPORT_PX / side));
     const toPngOpts = {
         cacheBust: true,
-        pixelRatio: 1,
-        width: POSTER_EXPORT_PX,
-        height: POSTER_EXPORT_PX,
+        pixelRatio,
         backgroundColor: "rgba(0,0,0,0)",
-        skipFonts: true,
+        skipFonts: false,
     };
     try {
         return await toPng(posterWrap, toPngOpts);
     }
     catch {
         const { default: html2canvas } = await import("html2canvas");
-        const side = Math.min(w, h);
         const scale = POSTER_EXPORT_PX / side;
         const canvas = await html2canvas(posterWrap, {
             backgroundColor: null,
@@ -107,18 +101,8 @@ async function posterWrapToPngDataUrl(posterWrap: HTMLElement): Promise<string> 
         ctx.drawImage(canvas, 0, 0, POSTER_EXPORT_PX, POSTER_EXPORT_PX);
         return out.toDataURL("image/png");
     }
-    finally {
-        posterWrap.style.boxShadow = boxShadow;
-        posterWrap.style.borderRadius = borderRadius;
-        posterWrap.style.outline = outline;
-        posterWrap.style.filter = filter;
-    }
 }
-async function posterWrapFromExportMountOrPreview(posterCanvasEl: HTMLElement | null): Promise<string | null> {
-    const mount = typeof document !== "undefined" ? document.getElementById("poster-export-mount") : null;
-    const mountWrap = mount ? resolvePosterWrapElement(mount) : null;
-    if (mountWrap)
-        return posterWrapToPngDataUrl(mountWrap);
+async function posterWrapFromVisiblePreview(posterCanvasEl: HTMLElement | null): Promise<string | null> {
     if (!posterCanvasEl)
         return null;
     const wrap = resolvePosterWrapElement(posterCanvasEl);
@@ -238,7 +222,7 @@ export default function PosterPreviewPage() {
             await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
             canvasEl = posterRef.current ?? (document.getElementById("poster-canvas") as HTMLElement | null);
         }
-        return posterWrapFromExportMountOrPreview(canvasEl);
+        return posterWrapFromVisiblePreview(canvasEl);
     }, []);
     useEffect(() => {
         if (!hasPoster || loading)
@@ -442,10 +426,10 @@ export default function PosterPreviewPage() {
     }, [draft?.posterDesign, draft?.posterStyle]);
     return (<div className="bb-page">
       <section className="bb-hero-dark">
-        <div className="bb-hero-dark-inner bb-hero-centered mx-auto max-w-3xl text-center">
+        <div className="bb-hero-dark-inner mx-auto max-w-3xl posterPreviewHero">
           <p className="bb-eyebrow-dark">Export</p>
           <h1 className="bb-title-dark">Poster Preview</h1>
-          <p className="bb-lead-dark mx-auto">
+          <p className="bb-lead-dark">
             Review your poster, confirm when it looks right, then download or share to your channels.
           </p>
         </div>
@@ -453,16 +437,22 @@ export default function PosterPreviewPage() {
 
       <section className="bb-band-light">
         <div className="bb-shell">
-          <div id="poster-export-mount" className="posterExportMount" aria-hidden="true">
-            {!loading && draft?.imageDataUrl ? (<PosterTemplate key={`${draft?._id ?? "draft"}-${draft.imageDataUrl.length}`} imageUrl={draft.imageDataUrl} design={effectivePosterDesign}/>) : null}
-          </div>
       <div className="posterShell">
         <section className="posterCanvas">
+          <div className="posterCanvasTop">
+            <div>
+              <p className="canvasEyebrow">Final creative</p>
+              <h2 className="canvasTitle">Review your square poster</h2>
+            </div>
+            <span className="sizePill">1080 x 1080</span>
+          </div>
           <div className="posterViewport">
+            <div className="posterStageGlow" aria-hidden/>
             <div id="poster-canvas" ref={posterRef} className="posterFrame">
               {loading ? (<div className="placeholder">Loading draft...</div>) : draft?.imageDataUrl ? (<PosterTemplate imageUrl={draft.imageDataUrl} design={effectivePosterDesign}/>) : (<div className="placeholder">No draft image found.</div>)}
             </div>
           </div>
+          <p className="canvasHint">This is the exact square composition exported for Instagram and Facebook posts.</p>
         </section>
 
         <aside className="actionsCard">
@@ -567,11 +557,11 @@ export default function PosterPreviewPage() {
 
       <style jsx>{`
         .posterShell {
-          max-width: 1120px;
+          max-width: 1360px;
           margin: 0 auto;
           display: grid;
-          grid-template-columns: 1.35fr 0.65fr;
-          gap: clamp(14px, 2.5vw, 22px);
+          grid-template-columns: minmax(0, 1.75fr) minmax(320px, 0.75fr);
+          gap: clamp(14px, 2.4vw, 28px);
           align-items: start;
         }
         .posterCanvas,
@@ -588,57 +578,101 @@ export default function PosterPreviewPage() {
         .posterCanvas {
           display: flex;
           flex-direction: column;
-          align-items: center;
-          justify-content: center;
+          gap: 16px;
+          align-items: stretch;
+          justify-content: flex-start;
+          min-height: min(86vh, 980px);
+        }
+        .posterCanvasTop {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 12px;
+        }
+        .canvasEyebrow {
+          margin: 0;
+          font-size: 11px;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+          color: #64748b;
+          font-weight: 700;
+        }
+        .canvasTitle {
+          margin: 6px 0 0;
+          color: #0f172a;
+          font-size: clamp(20px, 2.2vw, 30px);
+          line-height: 1.1;
+          letter-spacing: -0.02em;
+          font-family: var(--font-playfair), Georgia, serif;
+        }
+        .sizePill {
+          border-radius: 999px;
+          border: 1px solid rgba(99, 102, 241, 0.3);
+          background: rgba(99, 102, 241, 0.1);
+          color: #3730a3;
+          padding: 8px 12px;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
         }
         .posterViewport {
           position: relative;
           width: 100%;
           display: flex;
           justify-content: center;
+          align-items: center;
+          flex: 1;
+          min-height: min(72vh, 860px);
+        }
+        .posterStageGlow {
+          position: absolute;
+          width: min(82vw, 900px);
+          aspect-ratio: 1 / 1;
+          border-radius: 999px;
+          background: radial-gradient(circle at center, rgba(99, 102, 241, 0.16), rgba(236, 72, 153, 0.09) 45%, transparent 70%);
+          filter: blur(10px);
+          pointer-events: none;
         }
         .posterFrame {
           position: relative;
           width: 100%;
-          max-width: min(100%, 520px);
+          max-width: min(100%, 780px);
           margin: 0 auto;
           aspect-ratio: 1 / 1;
           overflow: hidden;
-          border-radius: 18px;
+          border-radius: 24px;
           background: rgba(15, 23, 42, 0.04);
-          border: 1px solid rgba(226, 232, 240, 0.85);
-          box-shadow: 0 28px 64px rgba(15, 23, 42, 0.14);
+          border: 1px solid rgba(148, 163, 184, 0.38);
+          box-shadow:
+            0 30px 80px rgba(15, 23, 42, 0.25),
+            0 0 0 8px rgba(255, 255, 255, 0.55);
           display: flex;
           flex-direction: column;
           align-items: stretch;
+          z-index: 1;
         }
         .placeholder {
           color: #94a3b8;
           font-size: 14px;
           margin: auto;
         }
-        .posterExportMount {
-          position: fixed;
-          left: -10000px;
-          top: 0;
-          width: 1080px;
-          height: 1080px;
+        .canvasHint {
           margin: 0;
-          padding: 0;
-          border: none;
-          overflow: hidden;
-          pointer-events: none;
-          z-index: 0;
-          background: transparent;
+          color: #64748b;
+          font-size: 13px;
+          text-align: center;
         }
-        .posterExportMount :global(.posterWrap) {
-          width: 100% !important;
-          height: 100% !important;
-          max-width: none !important;
-          margin: 0 !important;
-          border-radius: 0 !important;
-          box-shadow: none !important;
-          aspect-ratio: auto !important;
+        .posterPreviewHero {
+          text-align: center;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+        }
+        .posterPreviewHero :global(.bb-lead-dark) {
+          text-align: center;
+          margin-left: auto;
+          margin-right: auto;
         }
         .posterOverlayBottom {
           position: absolute;
@@ -669,6 +703,10 @@ export default function PosterPreviewPage() {
           line-height: 1.4;
           padding: 8px 12px;
           word-break: break-word;
+        }
+        .actionsCard {
+          position: sticky;
+          top: 14px;
         }
         .actionsEyebrow {
           margin: 0;
@@ -781,15 +819,15 @@ export default function PosterPreviewPage() {
           width: 100%;
         }
         .primaryBtn {
-          border: 1px solid #111111;
-          background: #111111;
+          border: 1px solid #4338ca;
+          background: linear-gradient(90deg, #4f46e5, #7c3aed);
           color: #fff;
           border-radius: 999px;
-          padding: 12px 18px;
+          padding: 13px 18px;
           font-size: 13px;
-          font-weight: 700;
+          font-weight: 800;
           cursor: pointer;
-          box-shadow: 0 14px 30px rgba(15, 23, 42, 0.2);
+          box-shadow: 0 14px 32px rgba(79, 70, 229, 0.35);
           transition: transform 0.18s ease, filter 0.18s ease;
         }
         .primaryBtn:hover:not(:disabled) {
@@ -810,10 +848,11 @@ export default function PosterPreviewPage() {
           font-weight: 700;
           cursor: pointer;
           transition: transform 0.18s ease, box-shadow 0.18s ease;
-          box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+          box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
         }
         .secondaryBtn:hover:not(:disabled) {
           transform: translateY(-1px);
+          box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
         }
         .secondaryBtn:disabled {
           opacity: 0.55;
@@ -907,6 +946,16 @@ export default function PosterPreviewPage() {
           }
           .posterCanvas {
             order: -1;
+            min-height: auto;
+          }
+          .posterViewport {
+            min-height: auto;
+          }
+          .posterFrame {
+            max-width: min(100%, 640px);
+          }
+          .actionsCard {
+            position: static;
           }
         }
       `}</style>

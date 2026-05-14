@@ -89,7 +89,11 @@ function isGeminiQuotaExceededUserFacing(message: string): boolean {
     return /\(HTTP 429\)|\[429 Too Many Requests\]/i.test(message) &&
         /exceeded your current quota|Quota exceeded|RESOURCE_EXHAUSTED/i.test(message);
 }
+function isGeminiApiKeyInvalid(message: string): boolean {
+    return /API_KEY_INVALID|API key expired|API key not valid|invalid API key|PERMISSION_DENIED.*API key/i.test(message);
+}
 const GEMINI_QUOTA_USER_MESSAGE = "Google Gemini blocked this request because your API key hit its free-tier quota (daily limits per model, or this model is not available on free tier). Open Google AI Studio → check usage and billing, wait until limits reset tomorrow, or create a new API key/project. Details: https://ai.google.dev/gemini-api/docs/rate-limits";
+const GEMINI_API_KEY_INVALID_MESSAGE = "Your Google Gemini API key is invalid or expired. Create a new key at https://aistudio.google.com/apikey , set GEMINI_API_KEY in .env.local (and in your host’s environment for production), then restart the dev server.";
 const SUPPORTED_TYPES = [
     "marketing-plan",
     "poster",
@@ -816,6 +820,13 @@ export async function POST(req: Request) {
                 console.error(`[api/ai/generate] Gemini error on model ${modelName} (attempt ${attempt + 1}):`, message);
                 lastError = error;
                 lastErrorMessage = message;
+                if (isGeminiApiKeyInvalid(message)) {
+                    return NextResponse.json({
+                        ok: false,
+                        error: GEMINI_API_KEY_INVALID_MESSAGE,
+                        errorCode: "gemini_api_key_invalid",
+                    }, { status: 500 });
+                }
                 if (isGemini429NonRetryable(message)) {
                     break;
                 }
@@ -833,6 +844,13 @@ export async function POST(req: Request) {
                 return NextResponse.json({ ok: false, error: `Gemini generation failed: ${message}` }, { status: 500 });
             }
         }
+    }
+    if (isGeminiApiKeyInvalid(lastErrorMessage)) {
+        return NextResponse.json({
+            ok: false,
+            error: GEMINI_API_KEY_INVALID_MESSAGE,
+            errorCode: "gemini_api_key_invalid",
+        }, { status: 500 });
     }
     if (isGeminiQuotaExceededUserFacing(lastErrorMessage)) {
         return NextResponse.json({

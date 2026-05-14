@@ -1351,11 +1351,27 @@ export default function BizEditorPage() {
           color: #64748b;
         }
         .posterStage {
-          border-radius: 18px;
+          position: relative;
+          border-radius: 22px;
           overflow: hidden;
-          border: 1px solid rgba(226, 232, 240, 0.85);
-          box-shadow: 0 24px 56px rgba(15, 23, 42, 0.12);
-          background: rgba(248, 250, 252, 0.5);
+          border: 1px solid rgba(148, 163, 184, 0.4);
+          box-shadow:
+            0 30px 76px rgba(15, 23, 42, 0.18),
+            0 0 0 8px rgba(255, 255, 255, 0.55);
+          background:
+            radial-gradient(circle at center, rgba(99, 102, 241, 0.12), rgba(236, 72, 153, 0.08) 40%, transparent 72%),
+            rgba(15, 23, 42, 0.04);
+          max-width: min(100%, 920px);
+          margin: 0 auto;
+          aspect-ratio: 1 / 1;
+          display: flex;
+          align-items: stretch;
+        }
+        .posterStage :global(.posterWrap) {
+          width: 100%;
+          height: 100%;
+          border-radius: 0;
+          box-shadow: none;
         }
         .designTuning {
           margin-top: 14px;

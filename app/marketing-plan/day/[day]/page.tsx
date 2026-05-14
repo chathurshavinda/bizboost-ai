@@ -767,28 +767,80 @@ export default function MarketingPlanDayPage() {
           font-weight: 800;
           padding: 8px 12px;
         }
+        @keyframes editorBtnRing {
+          0%,
+          100% {
+            box-shadow:
+              0 1px 0 rgba(255, 255, 255, 0.07) inset,
+              0 10px 28px rgba(0, 0, 0, 0.45),
+              0 0 0 0 rgba(255, 255, 255, 0);
+          }
+          50% {
+            box-shadow:
+              0 1px 0 rgba(255, 255, 255, 0.09) inset,
+              0 14px 36px rgba(0, 0, 0, 0.5),
+              0 0 0 1px rgba(255, 255, 255, 0.06);
+          }
+        }
+        @keyframes editorBtnShineSweep {
+          0% {
+            transform: translateX(-120%) skewX(-12deg);
+            opacity: 0;
+          }
+          12% {
+            opacity: 0.55;
+          }
+          28% {
+            transform: translateX(120%) skewX(-12deg);
+            opacity: 0.35;
+          }
+          100% {
+            transform: translateX(120%) skewX(-12deg);
+            opacity: 0;
+          }
+        }
         .editorBtn {
           position: relative;
           min-height: 48px;
           padding: 0;
-          border: none;
+          border: 1px solid rgba(255, 255, 255, 0.1);
           border-radius: 999px;
           cursor: pointer;
-          color: #f8fafc;
-          background: linear-gradient(135deg, #1e1b4b 0%, #4f46e5 42%, #7c3aed 100%);
+          color: #fafafa;
+          background: linear-gradient(165deg, #1f1f1f 0%, #0a0a0a 42%, #121212 100%);
           box-shadow:
-            0 1px 0 rgba(255, 255, 255, 0.18) inset,
-            0 14px 32px rgba(79, 70, 229, 0.35),
-            0 4px 12px rgba(15, 23, 42, 0.18);
-          transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s ease, filter 0.22s ease;
+            0 1px 0 rgba(255, 255, 255, 0.07) inset,
+            0 10px 28px rgba(0, 0, 0, 0.45);
+          transition:
+            transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+            border-color 0.28s ease,
+            box-shadow 0.28s ease,
+            filter 0.28s ease;
+          animation: editorBtnRing 3.2s ease-in-out infinite;
         }
         .editorBtnShine {
           pointer-events: none;
           position: absolute;
-          inset: 0;
+          inset: -1px;
           border-radius: inherit;
-          background: linear-gradient(120deg, transparent 40%, rgba(255, 255, 255, 0.18) 50%, transparent 62%);
-          opacity: 0.55;
+          overflow: hidden;
+        }
+        .editorBtnShine::after {
+          content: "";
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 55%;
+          height: 100%;
+          background: linear-gradient(
+            105deg,
+            transparent 0%,
+            rgba(255, 255, 255, 0) 35%,
+            rgba(255, 255, 255, 0.22) 50%,
+            rgba(255, 255, 255, 0) 65%,
+            transparent 100%
+          );
+          animation: editorBtnShineSweep 4.2s ease-in-out infinite;
         }
         .editorBtnInner {
           position: relative;
@@ -801,19 +853,24 @@ export default function MarketingPlanDayPage() {
           box-sizing: border-box;
         }
         .editorBtn:hover {
-          transform: translateY(-2px);
-          filter: brightness(1.05);
+          transform: translateY(-3px) scale(1.01);
+          border-color: rgba(255, 255, 255, 0.18);
+          filter: brightness(1.06);
           box-shadow:
-            0 1px 0 rgba(255, 255, 255, 0.22) inset,
-            0 18px 40px rgba(79, 70, 229, 0.42),
-            0 8px 16px rgba(15, 23, 42, 0.22);
+            0 1px 0 rgba(255, 255, 255, 0.12) inset,
+            0 18px 40px rgba(0, 0, 0, 0.55),
+            0 0 28px rgba(255, 255, 255, 0.06);
+          animation: none;
         }
         .editorBtn:active {
-          transform: translateY(0);
-          filter: brightness(0.98);
+          transform: translateY(-1px) scale(0.99);
+          filter: brightness(0.96);
+          box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.05) inset,
+            0 6px 18px rgba(0, 0, 0, 0.5);
         }
         .editorBtn:focus-visible {
-          outline: 2px solid rgba(129, 140, 248, 0.95);
+          outline: 2px solid rgba(250, 250, 250, 0.85);
           outline-offset: 3px;
         }
         .editorBtnIcon {
@@ -823,9 +880,15 @@ export default function MarketingPlanDayPage() {
           display: grid;
           place-items: center;
           flex-shrink: 0;
-          background: rgba(255, 255, 255, 0.14);
-          border: 1px solid rgba(255, 255, 255, 0.22);
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+          background: rgba(255, 255, 255, 0.06);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+          transition: background 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
+        }
+        .editorBtn:hover .editorBtnIcon {
+          background: rgba(255, 255, 255, 0.1);
+          border-color: rgba(255, 255, 255, 0.2);
+          transform: rotate(-6deg) scale(1.04);
         }
         .editorBtnCopy {
           display: flex;
@@ -846,18 +909,37 @@ export default function MarketingPlanDayPage() {
           font-size: 11px;
           font-weight: 600;
           letter-spacing: 0.02em;
-          color: rgba(248, 250, 252, 0.72);
+          color: rgba(250, 250, 250, 0.55);
           line-height: 1.2;
           white-space: nowrap;
         }
         .editorBtnChevron {
           flex-shrink: 0;
-          opacity: 0.85;
+          opacity: 0.75;
           margin-left: 2px;
-          transition: transform 0.2s ease;
+          transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease;
         }
         .editorBtn:hover .editorBtnChevron {
-          transform: translateX(3px);
+          transform: translateX(5px);
+          opacity: 1;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .editorBtn {
+            animation: none;
+          }
+          .editorBtnShine::after {
+            animation: none;
+            opacity: 0;
+          }
+          .editorBtn:hover {
+            transform: none;
+          }
+          .editorBtn:hover .editorBtnIcon {
+            transform: none;
+          }
+          .editorBtn:hover .editorBtnChevron {
+            transform: none;
+          }
         }
         .sectionTitleRow {
           display: flex;
