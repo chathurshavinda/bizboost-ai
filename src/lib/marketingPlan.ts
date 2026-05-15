@@ -9,10 +9,11 @@ export type MarketingPlanDay = {
     mainActionTitle: string;
     businessGrowthAction: string;
     marketingActivation?: {
-        platform?: "Instagram" | "Facebook" | "Both";
+        platform?: string;
         format?: "Reel" | "Story" | "Feed" | "Carousel";
         bestTime?: string;
         goal?: "DMs" | "Orders" | "Bookings" | "Footfall" | "Leads";
+        marketingObjective?: string;
         postBrief?: string;
         whatToPost?: string;
         hook?: string;
@@ -71,6 +72,21 @@ export type MarketingPlanDocument = {
     aiBusinessPlan?: AiBusinessPlan;
     missingProfileFields?: string[];
 };
+function derivePlatformLabel(channelRaw: unknown, formatRaw: unknown, platformRaw: unknown): string {
+    const platform = String(platformRaw ?? "").trim();
+    if (platform && !/^both$/i.test(platform)) {
+        return platform;
+    }
+    const channel = String(channelRaw ?? "").toLowerCase().trim();
+    const format = String(formatRaw ?? "").trim() || "Feed";
+    if (channel === "instagram") {
+        return `Instagram ${format}`;
+    }
+    if (channel === "facebook") {
+        return `Facebook ${format}`;
+    }
+    return `Instagram ${format} + Facebook ${format}`;
+}
 export function documentLooksGenerated(doc: Record<string, unknown> | null | undefined): boolean {
     if (!doc)
         return false;
@@ -161,9 +177,7 @@ export function buildLifecyclePlanDays(rawPlanDays: Array<Partial<MarketingPlanD
                             .map((s) => String(s))
                             .filter((s) => ["Reel", "Story", "FeedPost", "Carousel"].includes(s)) as Array<"Reel" | "Story" | "FeedPost" | "Carousel">)
                         : [],
-                    platform: ["Instagram", "Facebook", "Both"].includes(String((raw.marketingActivation as Record<string, unknown>).platform ?? ""))
-                        ? (String((raw.marketingActivation as Record<string, unknown>).platform ?? "") as "Instagram" | "Facebook" | "Both")
-                        : "Both",
+                    platform: derivePlatformLabel((raw.marketingActivation as Record<string, unknown>).channel, (raw.marketingActivation as Record<string, unknown>).format, (raw.marketingActivation as Record<string, unknown>).platform),
                     format: ["Reel", "Story", "Feed", "Carousel"].includes(String((raw.marketingActivation as Record<string, unknown>).format ?? ""))
                         ? (String((raw.marketingActivation as Record<string, unknown>).format ?? "") as "Reel" | "Story" | "Feed" | "Carousel")
                         : "Feed",
@@ -171,6 +185,7 @@ export function buildLifecyclePlanDays(rawPlanDays: Array<Partial<MarketingPlanD
                     goal: ["DMs", "Orders", "Bookings", "Footfall", "Leads"].includes(String((raw.marketingActivation as Record<string, unknown>).goal ?? ""))
                         ? (String((raw.marketingActivation as Record<string, unknown>).goal ?? "") as "DMs" | "Orders" | "Bookings" | "Footfall" | "Leads")
                         : "Leads",
+                    marketingObjective: String((raw.marketingActivation as Record<string, unknown>).marketingObjective ?? ""),
                     postBrief: String((raw.marketingActivation as Record<string, unknown>).postBrief ?? ""),
                     whatToPost: String((raw.marketingActivation as Record<string, unknown>).whatToPost ??
                         (raw.marketingActivation as Record<string, unknown>).postIdea ??

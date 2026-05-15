@@ -14,10 +14,11 @@ type DayPlan = {
     postIdea?: string;
     caption?: string;
     marketingActivation?: {
-        platform?: "Instagram" | "Facebook" | "Both";
+        platform?: string;
         format?: "Reel" | "Story" | "Feed" | "Carousel";
         bestTime?: string;
         goal?: "DMs" | "Orders" | "Bookings" | "Footfall" | "Leads";
+        marketingObjective?: string;
         whatToPost?: string;
         postBrief?: string;
         hook?: string;
@@ -342,20 +343,40 @@ export default function MarketingPlanDayPage() {
         if (!currentDay)
             return null;
         const ma = currentDay.marketingActivation;
+        const resolvePlatform = () => {
+            const raw = (ma?.platform || "").trim();
+            if (raw && !/^both$/i.test(raw))
+                return raw;
+            const format = ma?.format || "Feed";
+            const formatLabel = format === "Feed" ? "Feed Post" : format;
+            if (ma?.channel === "instagram")
+                return `Instagram ${formatLabel}`;
+            if (ma?.channel === "facebook")
+                return `Facebook ${formatLabel}`;
+            return `Instagram ${formatLabel} + Facebook ${formatLabel}`;
+        };
         const squash = (s: string, max: number) => {
             const t = (s || "").replace(/\s+/g, " ").trim();
             if (!t)
                 return "";
             return t.length <= max ? t : `${t.slice(0, max - 1).trim()}…`;
         };
-        const platform = ma?.platform ?? "Both";
+        const platform = resolvePlatform();
         const format = ma?.format ?? "Feed";
         const bestTime = ma?.bestTime || ma?.postingTime || "7:30 PM";
         const goal = ma?.goal ?? "Leads";
+        const objective = squash(ma?.marketingObjective ||
+            ma?.matchNote ||
+            (goal === "Orders"
+                ? "Convert this campaign into paid orders today."
+                : goal === "Bookings"
+                    ? "Drive confirmed bookings from today's social activity."
+                    : goal === "Footfall"
+                        ? "Increase walk-ins by promoting this exact day offer."
+                        : "Generate qualified leads and direct conversations for this offer."), 190);
         const whatToPost = squash(ma?.whatToPost || ma?.contentBrief || ma?.postBrief || "", 220);
         const postIdeaText = squash(ma?.postIdea || currentDay.postIdea || "", 260);
         const hookLine = squash(ma?.hook || "", 160);
-        const whyWorks = squash(ma?.matchNote || `Lines up with today's task and nudges people toward ${goal.toLowerCase()}.`, 190);
         const defaultVisuals = [
             "Show your product or service clearly with good light.",
             "Add one short on-image line with the main benefit.",
@@ -374,10 +395,10 @@ export default function MarketingPlanDayPage() {
             platform,
             format,
             bestTime,
+            objective,
             whatToPost,
             postIdeaText,
             hookLine,
-            whyWorks,
             visuals,
             captionText,
             cta,
@@ -457,10 +478,12 @@ export default function MarketingPlanDayPage() {
             </p>
           </div>
           <div className="dayHeroActions">
-            {isCompleted ? <span className="completedBadge">✓ Completed</span> : null}
-            <button type="button" onClick={() => void toggleDayCompleted()} className="dayCompletePill" disabled={isLoading || !currentDay || isCompleting || isCompleted}>
-              {isCompleting ? "Saving..." : "Mark day completed"}
-            </button>
+            {isCompleted ? (<span className="completedBadge" role="status" aria-live="polite">
+                <span className="completedBadgeCheck" aria-hidden>✓</span>
+                Completed
+              </span>) : (<button type="button" onClick={() => void toggleDayCompleted()} className="dayCompletePill" disabled={isLoading || !currentDay || isCompleting}>
+                {isCompleting ? "Saving..." : "Mark day completed"}
+              </button>)}
             <button type="button" onClick={() => router.push("/marketing-plan")} className="dayBackPill">
               Back to plan
             </button>
@@ -468,7 +491,7 @@ export default function MarketingPlanDayPage() {
         </div>
       </section>
 
-      <section className="bb-band-light">
+      <section className="bb-band-light bb-app-canvas">
         <div className="bb-shell">
           <div className="dayShell">
         {!isLoading && currentDay && (<>
@@ -477,7 +500,9 @@ export default function MarketingPlanDayPage() {
                 <span className="pill pillGrowth">1 · Business growth</span>
                 <h2 className="sectionH">Business growth task</h2>
               </div>
-              <p className="lede">{currentDay.businessGrowthAction || ""}</p>
+              <div className="sectionGuidance sectionGuidance--growth">
+                <p className="lede">{currentDay.businessGrowthAction || ""}</p>
+              </div>
               <h3 className="miniH">Focus</h3>
               <p className="focusTitle">{growthTitle}</p>
               <h3 className="miniH">Execution steps</h3>
@@ -503,41 +528,48 @@ export default function MarketingPlanDayPage() {
                     <div className="activationHeadLeft">
                       <span className="pill pillActivation">2 · Marketing activation</span>
                       <h2 className="sectionH activationMainTitle">{"Today's social post"}</h2>
-                      <p className="activationSub">One post on Instagram or Facebook that matches your task above.</p>
+                      <div className="sectionGuidance sectionGuidance--activation">
+                        <p className="activationSub">Clear, ready-to-run promotion steps for today’s growth action.</p>
+                      </div>
                     </div>
                     <button type="button" onClick={() => openBizEditor()} className="editorBtn editorBtnHeader" aria-label="Open Biz Editor with today’s post context" title="Opens Biz Editor with caption, post idea, and poster hints from this day">
-                      <span className="editorBtnShine" aria-hidden/>
                       <span className="editorBtnInner">
                         <span className="editorBtnIcon" aria-hidden>
                           <FaEdit size={15}/>
                         </span>
                         <span className="editorBtnCopy">
                           <span className="editorBtnText">Go to Biz Editor</span>
-                          <span className="editorBtnSub">Poster · caption · export</span>
+                          <span className="editorBtnSub">Poster · Caption · Export</span>
                         </span>
-                        <FaChevronRight className="editorBtnChevron" size={12} aria-hidden/>
+                        <span className="editorBtnTrail" aria-hidden>
+                          <FaChevronRight className="editorBtnChevron" size={12}/>
+                        </span>
                       </span>
                     </button>
                   </div>
 
                   <div className="activationSummaryStrip" role="group" aria-label="Post format summary">
                     <div className="summaryCell">
-                      <span className="summaryLabel">{"Today's platform"}</span>
+                      <span className="summaryLabel">Marketing objective</span>
+                      <span className="summaryValue">{activationView.objective}</span>
+                    </div>
+                    <div className="summaryCell">
+                      <span className="summaryLabel">Recommended platform</span>
                       <span className="summaryValue">{activationView.platform}</span>
                     </div>
                     <div className="summaryCell">
-                      <span className="summaryLabel">Format</span>
+                      <span className="summaryLabel">Post format</span>
                       <span className="summaryValue">{activationView.format}</span>
                     </div>
                     <div className="summaryCell">
-                      <span className="summaryLabel">Best time</span>
+                      <span className="summaryLabel">Best posting time</span>
                       <span className="summaryValue">{activationView.bestTime}</span>
                     </div>
                   </div>
 
                   <div className="activationStack">
                     <div className="activationCard">
-                      <h3 className="activationCardLabel">What to post</h3>
+                      <h3 className="activationCardLabel">What to create</h3>
                       <p className="activationOneLiner">{activationView.whatToPost || "—"}</p>
                       {activationView.hookLine ? (<>
                           <p className="activationSubLabel">Hook line</p>
@@ -546,13 +578,8 @@ export default function MarketingPlanDayPage() {
                     </div>
 
                     <div className="activationCard activationCardPostIdea">
-                      <h3 className="activationCardLabel">Post Idea</h3>
+                      <h3 className="activationCardLabel">Poster / Video idea</h3>
                       <p className="activationOneLiner">{activationView.postIdeaText || "—"}</p>
-                    </div>
-
-                    <div className="activationCard">
-                      <h3 className="activationCardLabel">Why this works</h3>
-                      <p className="activationOneLiner">{activationView.whyWorks}</p>
                     </div>
 
                     <div className="activationCard">
@@ -612,7 +639,7 @@ export default function MarketingPlanDayPage() {
             <section className="card scoreCard">
               <div className="scoreHead">
                 <div>
-                  <span className="pill pillKpi">4 · AI estimate</span>
+                  <span className="pill pillKpi"> AI estimate</span>
                   <h2 className="sectionH">Estimated Success Probability</h2>
                 </div>
                 <button type="button" className="recalculateBtn" onClick={() => void handleRecalculateScore()} disabled={scoreLoading}>
@@ -755,140 +782,89 @@ export default function MarketingPlanDayPage() {
           transition: transform 0.18s ease;
         }
         .copyBtn:hover,
-        .modalPrimary:hover {
+        .modalPrimary:hover,
+        .editorBtn:hover {
           transform: translateY(-1px);
         }
         .completedBadge {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
           border-radius: 999px;
-          border: 1px solid rgba(52, 211, 153, 0.45);
-          background: rgba(16, 185, 129, 0.18);
+          border: 1px solid rgba(167, 243, 208, 0.42);
+          background: linear-gradient(180deg, rgba(16, 185, 129, 0.32) 0%, rgba(5, 150, 105, 0.22) 100%);
           color: #ecfdf5;
           font-size: 13px;
           font-weight: 800;
-          padding: 8px 12px;
+          letter-spacing: 0.02em;
+          padding: 10px 18px 10px 12px;
+          box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.22) inset,
+            0 12px 32px rgba(0, 0, 0, 0.22);
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
         }
-        @keyframes editorBtnRing {
-          0%,
-          100% {
-            box-shadow:
-              0 1px 0 rgba(255, 255, 255, 0.07) inset,
-              0 10px 28px rgba(0, 0, 0, 0.45),
-              0 0 0 0 rgba(255, 255, 255, 0);
-          }
-          50% {
-            box-shadow:
-              0 1px 0 rgba(255, 255, 255, 0.09) inset,
-              0 14px 36px rgba(0, 0, 0, 0.5),
-              0 0 0 1px rgba(255, 255, 255, 0.06);
-          }
-        }
-        @keyframes editorBtnShineSweep {
-          0% {
-            transform: translateX(-120%) skewX(-12deg);
-            opacity: 0;
-          }
-          12% {
-            opacity: 0.55;
-          }
-          28% {
-            transform: translateX(120%) skewX(-12deg);
-            opacity: 0.35;
-          }
-          100% {
-            transform: translateX(120%) skewX(-12deg);
-            opacity: 0;
-          }
+
+        .completedBadgeCheck {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 22px;
+          height: 22px;
+          border-radius: 999px;
+          background: rgba(6, 78, 59, 0.92);
+          color: #ecfdf5;
+          font-size: 12px;
+          font-weight: 900;
+          line-height: 1;
+          box-shadow: 0 0 0 1px rgba(167, 243, 208, 0.35);
         }
         .editorBtn {
           position: relative;
-          min-height: 48px;
+          min-height: 44px;
           padding: 0;
-          border: 1px solid rgba(255, 255, 255, 0.1);
+          border: 1px solid #111111;
           border-radius: 999px;
           cursor: pointer;
-          color: #fafafa;
-          background: linear-gradient(165deg, #1f1f1f 0%, #0a0a0a 42%, #121212 100%);
-          box-shadow:
-            0 1px 0 rgba(255, 255, 255, 0.07) inset,
-            0 10px 28px rgba(0, 0, 0, 0.45);
-          transition:
-            transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
-            border-color 0.28s ease,
-            box-shadow 0.28s ease,
-            filter 0.28s ease;
-          animation: editorBtnRing 3.2s ease-in-out infinite;
-        }
-        .editorBtnShine {
-          pointer-events: none;
-          position: absolute;
-          inset: -1px;
-          border-radius: inherit;
-          overflow: hidden;
-        }
-        .editorBtnShine::after {
-          content: "";
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 55%;
-          height: 100%;
-          background: linear-gradient(
-            105deg,
-            transparent 0%,
-            rgba(255, 255, 255, 0) 35%,
-            rgba(255, 255, 255, 0.22) 50%,
-            rgba(255, 255, 255, 0) 65%,
-            transparent 100%
-          );
-          animation: editorBtnShineSweep 4.2s ease-in-out infinite;
+          color: #ffffff;
+          background: #111111;
+          box-shadow: none;
+          transition: transform 0.18s ease;
         }
         .editorBtnInner {
           position: relative;
           z-index: 1;
           display: inline-flex;
           align-items: center;
-          gap: 12px;
-          padding: 11px 18px 11px 14px;
-          min-height: 48px;
+          gap: 10px;
+          padding: 9px 16px;
+          min-height: 44px;
           box-sizing: border-box;
-        }
-        .editorBtn:hover {
-          transform: translateY(-3px) scale(1.01);
-          border-color: rgba(255, 255, 255, 0.18);
-          filter: brightness(1.06);
-          box-shadow:
-            0 1px 0 rgba(255, 255, 255, 0.12) inset,
-            0 18px 40px rgba(0, 0, 0, 0.55),
-            0 0 28px rgba(255, 255, 255, 0.06);
-          animation: none;
+          width: 100%;
         }
         .editorBtn:active {
-          transform: translateY(-1px) scale(0.99);
-          filter: brightness(0.96);
-          box-shadow:
-            0 1px 0 rgba(255, 255, 255, 0.05) inset,
-            0 6px 18px rgba(0, 0, 0, 0.5);
+          transform: translateY(0);
         }
         .editorBtn:focus-visible {
-          outline: 2px solid rgba(250, 250, 250, 0.85);
+          outline: 2px solid #111111;
           outline-offset: 3px;
         }
         .editorBtnIcon {
-          width: 34px;
-          height: 34px;
-          border-radius: 12px;
-          display: grid;
+          width: auto;
+          height: auto;
+          border-radius: 0;
+          display: inline-flex;
           place-items: center;
           flex-shrink: 0;
-          background: rgba(255, 255, 255, 0.06);
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
-          transition: background 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
+          background: transparent;
+          border: none;
+          color: #ffffff;
+          padding: 0;
+          transition: opacity 0.18s ease;
         }
         .editorBtn:hover .editorBtnIcon {
-          background: rgba(255, 255, 255, 0.1);
-          border-color: rgba(255, 255, 255, 0.2);
-          transform: rotate(-6deg) scale(1.04);
+          opacity: 0.92;
         }
         .editorBtnCopy {
           display: flex;
@@ -897,44 +873,56 @@ export default function MarketingPlanDayPage() {
           gap: 2px;
           text-align: left;
           min-width: 0;
+          flex: 1 1 auto;
+          padding: 1px 0;
         }
         .editorBtnText {
-          font-size: 14px;
-          font-weight: 800;
-          letter-spacing: -0.02em;
-          line-height: 1.15;
-          white-space: nowrap;
-        }
-        .editorBtnSub {
-          font-size: 11px;
-          font-weight: 600;
-          letter-spacing: 0.02em;
-          color: rgba(250, 250, 250, 0.55);
+          font-size: 13px;
+          font-weight: 700;
+          letter-spacing: -0.01em;
           line-height: 1.2;
           white-space: nowrap;
+          color: #ffffff;
+        }
+        .editorBtnSub {
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: rgba(255, 255, 255, 0.72);
+          line-height: 1.25;
+          white-space: nowrap;
+        }
+        .editorBtnTrail {
+          flex-shrink: 0;
+          margin-left: auto;
+          width: auto;
+          height: auto;
+          border-radius: 0;
+          display: inline-flex;
+          place-items: center;
+          background: transparent;
+          border: none;
+          color: #ffffff;
+          padding: 0;
+          transition: opacity 0.18s ease;
         }
         .editorBtnChevron {
-          flex-shrink: 0;
-          opacity: 0.75;
-          margin-left: 2px;
-          transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease;
+          display: block;
+          opacity: 0.85;
+          transition: transform 0.18s ease, opacity 0.18s ease;
+        }
+        .editorBtn:hover .editorBtnTrail {
+          opacity: 1;
         }
         .editorBtn:hover .editorBtnChevron {
-          transform: translateX(5px);
+          transform: translateX(2px);
           opacity: 1;
         }
         @media (prefers-reduced-motion: reduce) {
-          .editorBtn {
-            animation: none;
-          }
-          .editorBtnShine::after {
-            animation: none;
-            opacity: 0;
-          }
+          .copyBtn:hover,
+          .modalPrimary:hover,
           .editorBtn:hover {
-            transform: none;
-          }
-          .editorBtn:hover .editorBtnIcon {
             transform: none;
           }
           .editorBtn:hover .editorBtnChevron {
@@ -946,6 +934,60 @@ export default function MarketingPlanDayPage() {
           flex-direction: column;
           gap: 8px;
           margin-bottom: 10px;
+        }
+
+        .sectionGuidance {
+          border-radius: 13px;
+          padding: 12px 14px 12px 15px;
+          border: 1px solid rgba(226, 232, 240, 0.95);
+          border-left: 3px solid #475569;
+          background: linear-gradient(
+            145deg,
+            rgba(255, 255, 255, 0.92) 0%,
+            rgba(248, 250, 252, 0.94) 45%,
+            rgba(241, 245, 249, 0.78) 100%
+          );
+          box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.92) inset,
+            0 6px 18px rgba(15, 23, 42, 0.045);
+        }
+
+        .sectionGuidance--growth {
+          margin-top: 2px;
+          margin-bottom: 16px;
+        }
+
+        .sectionGuidance--activation {
+          margin-top: 10px;
+          margin-bottom: 0;
+          max-width: min(52ch, 100%);
+          border-left-color: #2563eb;
+          border-color: rgba(147, 197, 253, 0.42);
+          background: linear-gradient(
+            145deg,
+            rgba(239, 246, 255, 0.88) 0%,
+            rgba(255, 255, 255, 0.94) 50%,
+            rgba(248, 250, 252, 0.9) 100%
+          );
+        }
+
+        .sectionGuidance .lede {
+          margin: 0;
+          font-size: 14.5px;
+          font-weight: 600;
+          color: #334155;
+          line-height: 1.55;
+          letter-spacing: -0.012em;
+        }
+
+        .sectionGuidance--activation .activationSub {
+          margin: 0;
+          font-size: 14px;
+          font-weight: 600;
+          color: #334155;
+          line-height: 1.5;
+          letter-spacing: -0.012em;
+          max-width: none;
         }
         .activationHeadRow {
           display: flex;
@@ -962,20 +1004,14 @@ export default function MarketingPlanDayPage() {
         .activationMainTitle {
           margin-top: 6px;
         }
-        .activationSub {
-          margin: 6px 0 0;
-          font-size: 14px;
-          color: #64748b;
-          line-height: 1.45;
-          max-width: 52ch;
-        }
         .editorBtnHeader {
           flex-shrink: 0;
           align-self: flex-start;
+          max-width: min(100%, 340px);
         }
         .activationSummaryStrip {
           display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
+          grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 12px;
           padding: 14px 16px;
           border-radius: 16px;
@@ -1148,12 +1184,6 @@ export default function MarketingPlanDayPage() {
           border: 1px solid rgba(245, 158, 11, 0.35);
           text-transform: none;
           letter-spacing: 0;
-        }
-        .lede {
-          color: #475569;
-          line-height: 1.65;
-          margin: 0 0 14px;
-          font-size: 15px;
         }
         .miniH {
           margin: 16px 0 6px;
@@ -1453,9 +1483,10 @@ export default function MarketingPlanDayPage() {
           }
           .editorBtnHeader {
             width: 100%;
+            max-width: 100%;
           }
           .editorBtnHeader .editorBtnInner {
-            justify-content: center;
+            justify-content: flex-start;
             width: 100%;
           }
         }

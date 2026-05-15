@@ -70,10 +70,30 @@ const PROFILE_PAGE_STYLES = String.raw `
   .profilePage {
     min-height: 100vh;
     padding: 28px 16px 14px;
-  background: var(--page-bg);
+    position: relative;
+    isolation: isolate;
+    background-color: #cbd5e1;
+    background-image: linear-gradient(180deg, #cbd5e1 0%, #94a3b8 100%);
+    background-repeat: no-repeat;
+    background-size: 100% 100%;
+  }
+
+  .profilePage::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(120% 75% at 50% -10%, rgba(255, 255, 255, 0.22), transparent 62%),
+      radial-gradient(95% 65% at 50% 110%, rgba(15, 23, 42, 0.12), transparent 68%);
+    opacity: 0.9;
+    filter: blur(1.5px);
   }
 
   .profileShell {
+    position: relative;
+    z-index: 1;
     max-width: 1120px;
     margin: 0 auto;
     border-radius: 28px;
@@ -285,6 +305,8 @@ export default function BusinessProfilePage() {
     const [retryKey, setRetryKey] = useState(0);
     const [planGateOpen, setPlanGateOpen] = useState(false);
     const [checkingPlan, setCheckingPlan] = useState(false);
+    const [openPlanBuilderLoading, setOpenPlanBuilderLoading] = useState(false);
+    const [openPlanBuilderError, setOpenPlanBuilderError] = useState<string | null>(null);
     const [moreDetailsOpen, setMoreDetailsOpen] = useState(false);
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [deletingProfile, setDeletingProfile] = useState(false);
@@ -344,6 +366,55 @@ export default function BusinessProfilePage() {
             isMounted = false;
         };
     }, [authLoading, retryKey, router, user]);
+    async function handleOpenPlanBuilder() {
+        const uid = user?.uid ?? auth?.currentUser?.uid;
+        if (!uid) {
+            router.replace("/login");
+            return;
+        }
+        setOpenPlanBuilderLoading(true);
+        setOpenPlanBuilderError(null);
+        try {
+            const selUrl = `/api/select-plan?firebase_uid=${encodeURIComponent(uid)}`;
+            const latestUrl = `/api/marketing-plan/latest?firebase_uid=${encodeURIComponent(uid)}`;
+            const [selRes, latestRes] = await Promise.all([
+                fetch(selUrl, { cache: "no-store" }),
+                fetch(latestUrl, { cache: "no-store" }),
+            ]);
+            const selJson = (await selRes.json().catch(() => ({}))) as {
+                ok?: boolean;
+                active?: boolean;
+                planDays?: number | null;
+            };
+            const latestJson = (await latestRes.json().catch(() => ({}))) as {
+                ok?: boolean;
+                hasGeneratedPlan?: boolean;
+            };
+            if (!selRes.ok || selJson.ok !== true) {
+                setOpenPlanBuilderError("We couldn't verify your selected plan. Please try again.");
+                return;
+            }
+            if (!latestRes.ok || latestJson.ok !== true) {
+                setOpenPlanBuilderError("We couldn't verify your marketing plan. Please try again.");
+                return;
+            }
+            const planDaysNum = Number(selJson.planDays ?? 0);
+            const hasValidSelectedPlan = selJson.active === true && [7, 14, 30].includes(planDaysNum);
+            const hasGeneratedMarketingPlan = latestJson.hasGeneratedPlan === true;
+            if (hasValidSelectedPlan || hasGeneratedMarketingPlan) {
+                router.push("/marketing-plan");
+            }
+            else {
+                router.push("/select-plan");
+            }
+        }
+        catch {
+            setOpenPlanBuilderError("Something went wrong. Please try again in a moment.");
+        }
+        finally {
+            setOpenPlanBuilderLoading(false);
+        }
+    }
     async function handleStrategyGeneratorClick() {
         const uid = user?.uid ?? auth?.currentUser?.uid;
         console.log("UID", uid);
@@ -369,10 +440,10 @@ export default function BusinessProfilePage() {
                 setPlanGateOpen(true);
                 return;
             }
-            router.push("/select-plan");
+            router.push("/dashboard");
         }
         catch {
-            router.push("/select-plan");
+            setPlanGateOpen(true);
         }
         finally {
             setCheckingPlan(false);
@@ -546,13 +617,16 @@ export default function BusinessProfilePage() {
           </div>
 
           <div className="businessProfileActionsRow">
-            <button type="button" className="btn primary businessProfileActionButton" onClick={() => router.push("/select-plan")}>
-              Open Plan Builder
+            <button type="button" className="btn primary businessProfileActionButton" disabled={openPlanBuilderLoading} onClick={() => void handleOpenPlanBuilder()}>
+              {openPlanBuilderLoading ? "Checking…" : "Open Plan Builder"}
             </button>
             <button type="button" className="btn businessProfileGhostButton" onClick={() => router.push("/onboarding/business-details")}>
               Edit business details
             </button>
           </div>
+          {openPlanBuilderError ? (<p className="businessProfilePlanBuilderError" role="alert">
+              {openPlanBuilderError}
+            </p>) : null}
           </div>
         </section>
 

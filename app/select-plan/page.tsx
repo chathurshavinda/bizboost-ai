@@ -6,114 +6,114 @@ import Script from "next/script";
 import Link from "next/link";
 import { useAuth } from "@/src/lib/useAuth";
 type PlanCardConfig = {
-    name: string;
-    days: 7 | 14 | 30;
-    label: string;
-    price: number;
-    currency: string;
-    cadence: string;
-    bullets: string[];
+  name: string;
+  days: 7 | 14 | 30;
+  label: string;
+  price: number;
+  currency: string;
+  cadence: string;
+  bullets: string[];
 };
 const FREE_STARTER_DAYS = 7 as const;
 const plans: PlanCardConfig[] = [
-    {
-        name: "Starter",
-        days: 7,
-        label: "7 Days",
+  {
+    name: "Starter",
+    days: 7,
+    label: "7 Days",
         price: 0,
-        currency: "LKR",
+    currency: "LKR",
         cadence: "No payment required",
-        bullets: ["Quick launch", "Simple actions", "Fast results"],
-    },
-    {
-        name: "Pro",
-        days: 14,
-        label: "14 Days",
-        price: 900,
-        currency: "LKR",
-        cadence: "billed every 2 weeks",
-        bullets: ["More reach", "Steady growth", "Better rhythm"],
-    },
-    {
-        name: "Premium",
-        days: 30,
-        label: "30 Days",
-        price: 1500,
-        currency: "LKR",
-        cadence: "billed every month",
-        bullets: ["Full month", "Deeper planning", "Strong momentum"],
-    },
+    bullets: ["Quick launch", "Simple actions", "Fast results"],
+  },
+  {
+    name: "Pro",
+    days: 14,
+    label: "14 Days",
+    price: 900,
+    currency: "LKR",
+    cadence: "billed every 2 weeks",
+    bullets: ["More reach", "Steady growth", "Better rhythm"],
+  },
+  {
+    name: "Premium",
+    days: 30,
+    label: "30 Days",
+    price: 1500,
+    currency: "LKR",
+    cadence: "billed every month",
+    bullets: ["Full month", "Deeper planning", "Strong momentum"],
+  },
 ];
 type PayHerePopupConfig = {
-    sandbox: boolean;
-    merchant_id: string;
-    return_url?: string | null;
-    cancel_url?: string | null;
-    notify_url: string;
-    order_id: string;
-    items: string;
-    amount: string;
-    currency: string;
-    hash: string;
-    recurrence?: string;
-    duration?: string;
-    first_name?: string;
-    last_name?: string;
-    email?: string;
-    phone?: string;
-    address?: string;
-    city?: string;
-    country?: string;
-    custom_1?: string;
-    custom_2?: string;
+  sandbox: boolean;
+  merchant_id: string;
+  return_url?: string | null;
+  cancel_url?: string | null;
+  notify_url: string;
+  order_id: string;
+  items: string;
+  amount: string;
+  currency: string;
+  hash: string;
+  recurrence?: string;
+  duration?: string;
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  country?: string;
+  custom_1?: string;
+  custom_2?: string;
 };
 type PayHereSDK = {
-    startPayment: (config: PayHerePopupConfig) => void;
-    onCompleted?: (orderId: string) => void;
-    onDismissed?: () => void;
-    onError?: (error: string) => void;
+  startPayment: (config: PayHerePopupConfig) => void;
+  onCompleted?: (orderId: string) => void;
+  onDismissed?: () => void;
+  onError?: (error: string) => void;
 };
 declare global {
-    interface Window {
-        payhere?: PayHereSDK;
-    }
+  interface Window {
+    payhere?: PayHereSDK;
+  }
 }
 type InitiateResponse = {
-    ok: boolean;
-    error?: string;
-    data?: {
-        orderId: string;
-        popupConfig: PayHerePopupConfig;
-        plan: {
-            name: string;
-            price: number;
-            currency: string;
-            recurrence: string;
-            duration: string;
-            planDays: number;
-        };
+  ok: boolean;
+  error?: string;
+  data?: {
+    orderId: string;
+    popupConfig: PayHerePopupConfig;
+    plan: {
+      name: string;
+      price: number;
+      currency: string;
+      recurrence: string;
+      duration: string;
+      planDays: number;
     };
+  };
 };
 type SubscriptionData = {
-    status?: string;
-    planDays?: number | null;
-    planName?: string | null;
-    amount?: number | null;
-    currency?: string | null;
-    nextRenewalAt?: string | null;
-    lastPaidAt?: string | null;
+  status?: string;
+  planDays?: number | null;
+  planName?: string | null;
+  amount?: number | null;
+  currency?: string | null;
+  nextRenewalAt?: string | null;
+  lastPaidAt?: string | null;
     lastOrderId?: string | null;
 };
 type SubscriptionResponse = {
-    ok: boolean;
-    data?: SubscriptionData;
+  ok: boolean;
+  data?: SubscriptionData;
 };
 type ProfileData = {
-    businessName?: string;
-    ownerOrManagerName?: string;
-    contactEmail?: string;
-    city?: string;
-    country?: string;
+  businessName?: string;
+  ownerOrManagerName?: string;
+  contactEmail?: string;
+  city?: string;
+  country?: string;
 };
 type CheckoutStage = {
     kind: "idle";
@@ -265,119 +265,119 @@ function SuccessModalIconSmall({ variant }: {
     </div>);
 }
 export default function SelectPlanPage() {
-    const router = useRouter();
-    const searchParams = useSearchParams();
-    const { user, loading: authLoading } = useAuth();
-    const isNewMode = searchParams.get("mode") === "new";
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { user, loading: authLoading } = useAuth();
+  const isNewMode = searchParams.get("mode") === "new";
     const [selected, setSelected] = useState<(number | null)>(null);
-    const [planHydrated, setPlanHydrated] = useState(false);
+  const [planHydrated, setPlanHydrated] = useState(false);
     const [subscription, setSubscription] = useState<(SubscriptionData | null)>(null);
     const [profile, setProfile] = useState<(ProfileData | null)>(null);
     const [stage, setStage] = useState<(CheckoutStage)>({ kind: "idle" });
-    const [sdkReady, setSdkReady] = useState(false);
-    const handlersBoundRef = useRef(false);
+  const [sdkReady, setSdkReady] = useState(false);
+  const handlersBoundRef = useRef(false);
     const paymentPollCancelRef = useRef({ cancelled: false });
     const clearPaymentPoll = useCallback(() => {
         paymentPollCancelRef.current.cancelled = true;
     }, []);
     useEffect(() => () => clearPaymentPoll(), [clearPaymentPoll]);
-    useEffect(() => {
-        if (!authLoading && !user) {
-            router.replace("/login");
-        }
-    }, [authLoading, user, router]);
-    useEffect(() => {
-        if (authLoading || !user?.uid || isNewMode) {
-            setPlanHydrated(true);
-            return;
-        }
-        let cancelled = false;
-        const loadSelected = async () => {
-            try {
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace("/login");
+    }
+  }, [authLoading, user, router]);
+  useEffect(() => {
+    if (authLoading || !user?.uid || isNewMode) {
+      setPlanHydrated(true);
+      return;
+    }
+    let cancelled = false;
+    const loadSelected = async () => {
+      try {
                 const res = await fetch(`/api/select-plan?firebase_uid=${encodeURIComponent(user.uid)}`, { cache: "no-store" });
-                const data = await res.json();
+        const data = await res.json();
                 if (cancelled)
                     return;
                 if (res.ok && data?.ok) {
                     if (data.active === false)
                         return;
                     const days = Number(data.planDays ?? data.data?.plan_days ?? data.data?.planDays ?? 0);
-                    if ([7, 14, 30].includes(days)) {
-                        setSelected(days);
-                    }
-                }
+          if ([7, 14, 30].includes(days)) {
+            setSelected(days);
+          }
+        }
             }
             catch {
             }
             finally {
                 if (!cancelled)
                     setPlanHydrated(true);
-            }
-        };
-        void loadSelected();
-        return () => {
-            cancelled = true;
-        };
-    }, [authLoading, user?.uid, isNewMode]);
+      }
+    };
+    void loadSelected();
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, user?.uid, isNewMode]);
     const fetchSubscription = useCallback(async (uid: string): Promise<(SubscriptionData | null)> => {
         try {
             const res = await fetch(`/api/subscription?firebase_uid=${encodeURIComponent(uid)}`, { cache: "no-store" });
             if (res.status === 404)
                 return null;
-            const data = (await res.json()) as SubscriptionResponse;
+        const data = (await res.json()) as SubscriptionResponse;
             if (res.ok && data.ok && data.data)
                 return data.data;
-            return null;
+        return null;
         }
         catch {
-            return null;
-        }
+        return null;
+      }
     }, []);
-    useEffect(() => {
+  useEffect(() => {
         if (!user?.uid)
             return;
-        let cancelled = false;
-        void (async () => {
-            const data = await fetchSubscription(user.uid);
+    let cancelled = false;
+    void (async () => {
+      const data = await fetchSubscription(user.uid);
             if (!cancelled)
                 setSubscription(data);
-        })();
-        return () => {
-            cancelled = true;
-        };
-    }, [user?.uid, fetchSubscription]);
-    useEffect(() => {
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.uid, fetchSubscription]);
+  useEffect(() => {
         if (!user?.uid)
             return;
-        let cancelled = false;
-        const loadProfile = async () => {
-            try {
+    let cancelled = false;
+    const loadProfile = async () => {
+      try {
                 const res = await fetch(`/api/business-profile?firebase_uid=${encodeURIComponent(user.uid)}`, { cache: "no-store" });
                 if (!res.ok)
                     return;
-                const data = await res.json();
+        const data = await res.json();
                 if (cancelled)
                     return;
-                if (data?.ok && data.data) {
-                    setProfile(data.data as ProfileData);
-                }
+        if (data?.ok && data.data) {
+          setProfile(data.data as ProfileData);
+        }
             }
             catch {
-            }
-        };
-        void loadProfile();
-        return () => {
-            cancelled = true;
-        };
-    }, [user?.uid]);
-    const hasActiveSubscription = subscription?.status === "active";
-    const subscribedPlanLabel = useMemo(() => {
+      }
+    };
+    void loadProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.uid]);
+  const hasActiveSubscription = subscription?.status === "active";
+  const subscribedPlanLabel = useMemo(() => {
         if (!subscription)
             return null;
-        const days = subscription.planDays;
-        const matched = plans.find((p) => p.days === days);
-        return matched ? `${matched.name} (${matched.label})` : null;
-    }, [subscription]);
+    const days = subscription.planDays;
+    const matched = plans.find((p) => p.days === days);
+    return matched ? `${matched.name} (${matched.label})` : null;
+  }, [subscription]);
     const planBuilderPath = useMemo(() => (isNewMode ? "/marketing-plan?mode=new" : "/marketing-plan"), [isNewMode]);
     const subscriptionSuccessStage = useCallback((planDays: number | null | undefined) => {
         if (planDays === 14)
@@ -560,30 +560,30 @@ export default function SelectPlanPage() {
             returnFlowLockRef.current = null;
         };
     }, [authLoading, user?.uid, searchParams, isNewMode, finalizePaidCheckout]);
-    const bindPayHereHandlers = useCallback(() => {
+  const bindPayHereHandlers = useCallback(() => {
         if (typeof window === "undefined" || !window.payhere)
             return;
         if (handlersBoundRef.current)
             return;
-        handlersBoundRef.current = true;
-        window.payhere.onCompleted = (orderId: string) => {
-            void handleCompleted(orderId);
-        };
-        window.payhere.onDismissed = () => {
+    handlersBoundRef.current = true;
+    window.payhere.onCompleted = (orderId: string) => {
+      void handleCompleted(orderId);
+    };
+    window.payhere.onDismissed = () => {
             clearPendingPaidPlan();
             setStage((current) => current.kind === "opening" || current.kind === "preparing"
-                ? { kind: "cancelled" }
+          ? { kind: "cancelled" }
                 : current);
-        };
-        window.payhere.onError = (error: string) => {
+    };
+    window.payhere.onError = (error: string) => {
             clearPendingPaidPlan();
-            setStage({ kind: "error", message: error || "PayHere reported an error." });
-        };
-    }, [handleCompleted]);
-    useEffect(() => {
+      setStage({ kind: "error", message: error || "PayHere reported an error." });
+    };
+  }, [handleCompleted]);
+  useEffect(() => {
         if (sdkReady)
             bindPayHereHandlers();
-    }, [sdkReady, bindPayHereHandlers]);
+  }, [sdkReady, bindPayHereHandlers]);
     const startFreePlan = useCallback(async () => {
         if (!user?.uid || selected !== FREE_STARTER_DAYS)
             return;
@@ -634,7 +634,7 @@ export default function SelectPlanPage() {
             setStage({ kind: "error", message: text });
         }
     }, [user, selected, stage.kind, clearPaymentPoll, fetchSubscription]);
-    const startCheckout = useCallback(async () => {
+  const startCheckout = useCallback(async () => {
         if (!user?.uid || selected === null)
             return;
         if (selected === FREE_STARTER_DAYS)
@@ -644,47 +644,47 @@ export default function SelectPlanPage() {
             stage.kind === "activating" ||
             stage.kind === "activating_plan" ||
             stage.kind === "activating_free") {
-            return;
-        }
-        if (!sdkReady || typeof window === "undefined" || !window.payhere) {
-            setStage({
-                kind: "error",
-                message: "PayHere is still loading. Please try again in a moment.",
-            });
-            return;
-        }
+      return;
+    }
+    if (!sdkReady || typeof window === "undefined" || !window.payhere) {
+      setStage({
+        kind: "error",
+        message: "PayHere is still loading. Please try again in a moment.",
+      });
+      return;
+    }
         clearPaymentPoll();
-        setStage({ kind: "preparing" });
-        bindPayHereHandlers();
-        try {
-            const displayName = user.displayName ?? "";
-            const [firstName, ...rest] = displayName.split(" ").filter(Boolean);
-            const lastName = rest.join(" ");
-            const profileFirstName = profile?.ownerOrManagerName?.split(" ")[0];
-            const profileLastName = profile?.ownerOrManagerName?.split(" ").slice(1).join(" ");
-            const customerPayload = {
-                first_name: firstName || profileFirstName || "Customer",
-                last_name: lastName || profileLastName || "User",
-                email: user.email || profile?.contactEmail || "",
-                phone: "0770000000",
-                address: profile?.businessName || "Address",
-                city: profile?.city || "Colombo",
-                country: profile?.country || "Sri Lanka",
-            };
-            const res = await fetch("/api/payhere/initiate", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    firebase_uid: user.uid,
-                    planDays: selected,
-                    customer: customerPayload,
+    setStage({ kind: "preparing" });
+    bindPayHereHandlers();
+    try {
+      const displayName = user.displayName ?? "";
+      const [firstName, ...rest] = displayName.split(" ").filter(Boolean);
+      const lastName = rest.join(" ");
+      const profileFirstName = profile?.ownerOrManagerName?.split(" ")[0];
+      const profileLastName = profile?.ownerOrManagerName?.split(" ").slice(1).join(" ");
+      const customerPayload = {
+        first_name: firstName || profileFirstName || "Customer",
+        last_name: lastName || profileLastName || "User",
+        email: user.email || profile?.contactEmail || "",
+        phone: "0770000000",
+        address: profile?.businessName || "Address",
+        city: profile?.city || "Colombo",
+        country: profile?.country || "Sri Lanka",
+      };
+      const res = await fetch("/api/payhere/initiate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          firebase_uid: user.uid,
+          planDays: selected,
+          customer: customerPayload,
                     ...(isNewMode ? { select_plan_mode: "new" } : {}),
-                }),
-            });
-            const data = (await res.json()) as InitiateResponse;
-            if (!res.ok || !data.ok || !data.data) {
-                throw new Error(data.error || "Failed to start PayHere checkout");
-            }
+        }),
+      });
+      const data = (await res.json()) as InitiateResponse;
+      if (!res.ok || !data.ok || !data.data) {
+        throw new Error(data.error || "Failed to start PayHere checkout");
+      }
             const planRow = plans.find((p) => p.days === selected);
             const amountStr = data.data.plan?.price != null
                 ? String(data.data.plan.price)
@@ -698,14 +698,14 @@ export default function SelectPlanPage() {
                 amount: amountStr,
                 firebaseUid: user.uid,
             });
-            setStage({ kind: "opening" });
-            window.payhere.startPayment(data.data.popupConfig);
+      setStage({ kind: "opening" });
+      window.payhere.startPayment(data.data.popupConfig);
         }
         catch (error: unknown) {
             clearPendingPaidPlan();
-            const text = error instanceof Error ? error.message : "Failed to start checkout";
-            setStage({ kind: "error", message: text });
-        }
+      const text = error instanceof Error ? error.message : "Failed to start checkout";
+      setStage({ kind: "error", message: text });
+    }
     }, [
         user,
         selected,
@@ -743,26 +743,75 @@ export default function SelectPlanPage() {
             return "Start for Free";
         if (hasActiveSubscription)
             return "Switch plan & Pay";
-        return "Subscribe & Pay";
+    return "Subscribe & Pay";
     }, [stage.kind, selected, hasActiveSubscription]);
     return (<div className="bb-page">
       <Script src="https://www.payhere.lk/lib/payhere.js" strategy="afterInteractive" onLoad={() => setSdkReady(true)} onReady={() => setSdkReady(true)}/>
 
       <section className="bb-hero-dark">
         <div className="bb-hero-dark-inner bb-hero-centered bb-hero-selectPlan mx-auto w-full max-w-3xl px-4 text-center sm:px-6">
-          <p className="bb-eyebrow-dark">Plan Selection</p>
-          <h1 className="bb-title-dark">Select Plan</h1>
+          <p className="bb-eyebrow-dark">{isSuccessStage(stage) ? "All set" : "Plan Selection"}</p>
+          <h1 className="bb-title-dark">{isSuccessStage(stage) ? "Plan activated" : "Select Plan"}</h1>
           <p className="bb-lead-dark">
-            {isNewMode
-            ? "Pick a new duration for your next fresh plan."
-            : "Pick the right duration for your marketing plan. Starter is free for 7 days; Pro and Premium are flexible subscriptions you can manage anytime."}
+            {isSuccessStage(stage)
+            ? "Your subscription is ready. Open the Plan Builder to create or review your growth and marketing plan."
+            : isNewMode
+              ? "Pick a new duration for your next fresh plan."
+                : "Pick the right duration for your marketing plan. Starter is free for 7 days; Pro and Premium are flexible subscriptions you can manage anytime."}
           </p>
         </div>
       </section>
 
-      <section className="bb-band-light">
+      <section className="bb-band-light bb-app-canvas">
         <div className="bb-shell">
           <div className="selectPlanContent">
+            {isSuccessStage(stage) ? (<section className="selectPlanSuccess" aria-labelledby="selectPlanSuccessTitle">
+                <div className="selectPlanSuccessCard">
+                  <div className="selectPlanSuccessIconWrap">
+                    <SuccessModalIconSmall variant={stage.kind === "success_starter"
+                    ? "starter"
+                    : stage.kind === "success_pro"
+                        ? "pro"
+                        : "premium"}/>
+                  </div>
+                  <p className="selectPlanSuccessKicker">Payment complete</p>
+                  {stage.kind === "success_starter" && (<>
+                      <h2 id="selectPlanSuccessTitle" className="selectPlanSuccessTitle">
+                        Congratulations, you&apos;re on Starter
+                      </h2>
+                      <p className="selectPlanSuccessLead">
+                        Your free 7-day BizBoost AI plan is now active.
+                      </p>
+                    </>)}
+                  {stage.kind === "success_pro" && (<>
+                      <h2 id="selectPlanSuccessTitle" className="selectPlanSuccessTitle">
+                        Congratulations, you&apos;re on Pro
+                      </h2>
+                      <p className="selectPlanSuccessLead">
+                        Your 14-day BizBoost AI Pro plan is now active.
+                      </p>
+                    </>)}
+                  {stage.kind === "success_premium" && (<>
+                      <h2 id="selectPlanSuccessTitle" className="selectPlanSuccessTitle">
+                        Congratulations, you&apos;re on Premium
+                      </h2>
+                      <p className="selectPlanSuccessLead">
+                        Your 30-day BizBoost AI Premium plan is now active.
+                      </p>
+                    </>)}
+                  <p className="selectPlanSuccessBody">
+                    You can now start building your personalized business growth and marketing plan.
+                  </p>
+                  <div className="selectPlanSuccessActions">
+                    <Link href={planBuilderPath} className="nextBtn selectPlanSuccessCta">
+                      Open Plan Builder
+                    </Link>
+                    <Link href="/dashboard/profile" className="backBtn selectPlanSuccessSecondary">
+                      View business profile
+                    </Link>
+                  </div>
+                </div>
+              </section>) : (<>
             {stage.kind === "activating_plan" && (<section className="notice noticeActivating">
                 <p>Activating your plan...</p>
               </section>)}
@@ -796,30 +845,30 @@ export default function SelectPlanPage() {
             {!isSuccessStage(stage) && stage.kind !== "activating_plan" && (<>
                 <section className="planGrid">
                   {plans.map((plan) => {
-                const isSelected = selected === plan.days;
-                const isFeatured = plan.days === 14;
+                    const isSelected = selected === plan.days;
+                    const isFeatured = plan.days === 14;
                 const isFreeStarter = plan.days === FREE_STARTER_DAYS;
                 const isBusy = authLoading || !planHydrated || checkoutBusy || isSuccessStage(stage);
                 return (<button key={plan.days} type="button" onClick={() => {
                         setStage((current) => current.kind === "error" || current.kind === "cancelled"
-                            ? { kind: "idle" }
+                              ? { kind: "idle" }
                             : current);
-                        setSelected(plan.days);
+                          setSelected(plan.days);
                     }} disabled={isBusy} className={`planCard ${isFeatured ? "planCardFeatured" : ""} ${isSelected ? "isSelected" : ""} ${isBusy ? "isDisabled" : ""}`}>
                     <div className="planCardGlow"/>
-                    <div className="planTop">
-                      <div>
+                        <div className="planTop">
+                          <div>
                         {isFeatured ? (<span className="popularTag">Recommended</span>) : null}
-                        <div className="planLabel">{plan.label}</div>
-                        <h3>{plan.name}</h3>
-                        <p className="planDays">{plan.days} day plan</p>
-                      </div>
-                      <div className={`checkCircle ${isSelected ? "active" : ""}`}>
-                        {isSelected ? "✓" : "○"}
-                      </div>
-                    </div>
+                            <div className="planLabel">{plan.label}</div>
+                            <h3>{plan.name}</h3>
+                            <p className="planDays">{plan.days} day plan</p>
+                          </div>
+                          <div className={`checkCircle ${isSelected ? "active" : ""}`}>
+                            {isSelected ? "✓" : "○"}
+                          </div>
+                        </div>
 
-                    <div className="priceRow">
+                        <div className="priceRow">
                       {isFreeStarter ? (<>
                           <span className="priceAmount priceFree">Free</span>
                           <span className="priceCadence priceCadenceFree">{plan.cadence}</span>
@@ -829,21 +878,21 @@ export default function SelectPlanPage() {
                           </span>
                           <span className="priceCadence">{plan.cadence}</span>
                         </>)}
-                    </div>
+                        </div>
 
-                    <div className={`cardCta ${isSelected ? "active" : ""}`}>
+                        <div className={`cardCta ${isSelected ? "active" : ""}`}>
                       {isFreeStarter ? "Start for Free" : isSelected ? "Selected" : "Choose this plan"}
-                    </div>
-                    <p className="included">What&apos;s included:</p>
+                        </div>
+                        <p className="included">What&apos;s included:</p>
 
-                    <ul>
+                        <ul>
                       {plan.bullets.map((bullet) => (<li key={bullet}>
-                          <span>✓</span>
-                          {bullet}
+                              <span>✓</span>
+                              {bullet}
                         </li>))}
-                    </ul>
+                        </ul>
                   </button>);
-            })}
+                  })}
                 </section>
 
                 <div className="actions">
@@ -852,8 +901,8 @@ export default function SelectPlanPage() {
                   </button>
 
                   <button type="button" disabled={selected === null ||
-                authLoading ||
-                !planHydrated ||
+                      authLoading ||
+                      !planHydrated ||
                 checkoutBusy ||
                 (needsPayHere && !sdkReady)} onClick={() => void handlePrimaryCta()} className="nextBtn">
                     {checkoutButtonLabel}
@@ -866,51 +915,10 @@ export default function SelectPlanPage() {
                 : "Payments open in a secure PayHere popup. You can cancel or change your plan anytime."}
                 </p>
               </>)}
+            </>)}
           </div>
         </div>
       </section>
-
-      {isSuccessStage(stage) && (<div className="successModalRoot">
-          <div className="successModalBackdrop" aria-hidden/>
-          <div className="successModalCard" role="dialog" aria-modal="true" aria-labelledby="successModalTitle">
-            <SuccessModalIconSmall variant={stage.kind === "success_starter"
-                ? "starter"
-                : stage.kind === "success_pro"
-                    ? "pro"
-                    : "premium"}/>
-            {stage.kind === "success_starter" && (<>
-                <h2 id="successModalTitle" className="successModalTitle">
-                  Congratulations, you&apos;re in Starter!
-                </h2>
-                <p className="successModalSubtitle">
-                  Your free 7-day BizBoost AI plan is now active.
-                </p>
-              </>)}
-            {stage.kind === "success_pro" && (<>
-                <h2 id="successModalTitle" className="successModalTitle">
-                  Congratulations, you&apos;re in Pro!
-                </h2>
-                <p className="successModalSubtitle">
-                  Your 14-day BizBoost AI Pro plan is now active.
-                </p>
-              </>)}
-            {stage.kind === "success_premium" && (<>
-                <h2 id="successModalTitle" className="successModalTitle">
-                  Congratulations, you&apos;re in Premium!
-                </h2>
-                <p className="successModalSubtitle">
-                  Your 30-day BizBoost AI Premium plan is now active.
-                </p>
-              </>)}
-            <p className="successModalText">
-              You can now start building your personalized business growth and marketing plan.
-            </p>
-            <Link href={planBuilderPath} className="successModalBtn">
-              Open Plan Builder
-            </Link>
-          </div>
-        </div>)}
-
       <style jsx>{`
         .selectPlanContent {
           display: grid;
@@ -979,38 +987,138 @@ export default function SelectPlanPage() {
           cursor: pointer;
         }
 
-        .successModalRoot {
-          position: fixed;
-          inset: 0;
-          z-index: 200;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 20px 16px;
-          pointer-events: auto;
+        .selectPlanSuccess {
+          width: 100%;
+          max-width: 640px;
+          margin: 0 auto;
         }
 
-        .successModalBackdrop {
+        .selectPlanSuccessCard {
+          position: relative;
+          overflow: hidden;
+          border-radius: 24px;
+          border: 1px solid rgba(148, 163, 184, 0.28);
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.94) 100%);
+          box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.9) inset,
+            0 20px 50px rgba(15, 23, 42, 0.1),
+            0 8px 24px rgba(15, 23, 42, 0.06);
+          padding: clamp(26px, 4vw, 36px) clamp(22px, 4vw, 32px);
+          text-align: center;
+        }
+
+        .selectPlanSuccessCard::before {
+          content: "";
           position: absolute;
-          inset: 0;
-          background: rgba(15, 23, 42, 0.42);
-          backdrop-filter: blur(5px);
-          -webkit-backdrop-filter: blur(5px);
+          inset: -40% -20% auto;
+          height: 55%;
+          background: radial-gradient(ellipse 70% 55% at 50% 0%, rgba(99, 102, 241, 0.09), transparent 70%);
+          pointer-events: none;
         }
 
-        .successModalCard {
+        .selectPlanSuccessIconWrap {
           position: relative;
           z-index: 1;
+          display: flex;
+          justify-content: center;
+          margin-bottom: 14px;
+        }
+
+        .selectPlanSuccessIconWrap :global(.successModalIcon) {
+          width: 48px;
+          height: 48px;
+          margin: 0;
+        }
+
+        .selectPlanSuccessKicker {
+          position: relative;
+          z-index: 1;
+          margin: 0 0 10px;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+          color: #64748b;
+        }
+
+        .selectPlanSuccessTitle {
+          position: relative;
+          z-index: 1;
+          margin: 0 0 10px;
+          font-size: clamp(22px, 3.2vw, 28px);
+          font-weight: 800;
+          letter-spacing: -0.03em;
+          line-height: 1.2;
+          color: #0f172a;
+        }
+
+        .selectPlanSuccessLead {
+          position: relative;
+          z-index: 1;
+          margin: 0 0 12px;
+          font-size: 15px;
+          font-weight: 600;
+          color: #334155;
+          line-height: 1.5;
+        }
+
+        .selectPlanSuccessBody {
+          position: relative;
+          z-index: 1;
+          margin: 0 0 22px;
+          font-size: 14px;
+          color: #64748b;
+          line-height: 1.6;
+          max-width: 42ch;
+          margin-left: auto;
+          margin-right: auto;
+        }
+
+        .selectPlanSuccessActions {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: stretch;
+          gap: 10px;
           width: 100%;
-          max-width: 400px;
-          padding: 26px 24px 24px;
-          border-radius: 18px;
-          text-align: center;
-          background: rgba(255, 255, 255, 0.97);
-          border: 1px solid rgba(226, 232, 240, 0.95);
-          box-shadow:
-            0 24px 48px rgba(15, 23, 42, 0.18),
-            0 0 0 1px rgba(255, 255, 255, 0.8) inset;
+          max-width: 420px;
+          margin: 0 auto;
+        }
+
+        a.nextBtn,
+        a.backBtn {
+          text-decoration: none;
+          box-sizing: border-box;
+        }
+
+        .selectPlanSuccessCta {
+          width: 100%;
+          justify-content: center;
+        }
+
+        .selectPlanSuccessSecondary {
+          width: 100%;
+          justify-content: center;
+        }
+
+        @media (min-width: 520px) {
+          .selectPlanSuccessActions {
+            flex-direction: row;
+          flex-wrap: wrap;
+            justify-content: center;
+          }
+
+          .selectPlanSuccessCta {
+            width: auto;
+            min-width: 200px;
+            flex: 1 1 auto;
+          }
+
+          .selectPlanSuccessSecondary {
+            width: auto;
+            flex: 0 1 auto;
+          }
         }
 
         .successModalIcon {
@@ -1023,73 +1131,6 @@ export default function SelectPlanPage() {
           border-radius: 50%;
           background: #f8fafc;
           box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
-        }
-
-        .successModalTitle {
-          margin: 0 0 8px;
-          font-size: 1.25rem;
-          font-weight: 700;
-          color: #0f172a;
-          letter-spacing: -0.02em;
-          line-height: 1.3;
-        }
-
-        .successModalSubtitle {
-          margin: 0 0 12px;
-          font-size: 0.9375rem;
-          color: #475569;
-          line-height: 1.5;
-        }
-
-        .successModalText {
-          margin: 0 0 20px;
-          font-size: 0.875rem;
-          color: #64748b;
-          line-height: 1.55;
-        }
-
-        .successModalBtn {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 100%;
-          padding: 14px 20px;
-          border-radius: 12px;
-          font-size: 0.9375rem;
-          font-weight: 700;
-          text-decoration: none;
-          cursor: pointer;
-          color: #ffffff;
-          background: #000000;
-          border: 2px solid #000000;
-          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
-          transition:
-            background 0.18s ease,
-            color 0.18s ease,
-            transform 0.18s ease,
-            box-shadow 0.18s ease,
-            border-color 0.18s ease;
-        }
-
-        .successModalBtn:hover {
-          background: #1a1a1a;
-          border-color: #1a1a1a;
-          color: #ffffff;
-          transform: translateY(-1px);
-          box-shadow: 0 8px 22px rgba(0, 0, 0, 0.32);
-        }
-
-        .successModalBtn:active {
-          transform: translateY(0);
-          box-shadow: 0 3px 10px rgba(0, 0, 0, 0.28);
-        }
-
-        .successModalBtn:focus-visible {
-          outline: none;
-          box-shadow:
-            0 0 0 3px #ffffff,
-            0 0 0 6px rgba(0, 0, 0, 0.45),
-            0 8px 22px rgba(0, 0, 0, 0.32);
         }
 
         .priceFree {

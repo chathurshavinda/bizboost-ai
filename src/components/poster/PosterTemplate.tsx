@@ -1,5 +1,7 @@
 "use client";
-import { CSSProperties } from "react";
+import { createContext, useContext, type CSSProperties, type ReactNode } from "react";
+import { getPosterAccentTokens, parseHex6, posterAccentCssVars } from "@/src/lib/posterAccent";
+import { computePosterSlotColors, posterSlotCssVars, type PosterSlotColors } from "@/src/lib/posterSlotColors";
 export const POSTER_STYLES = [
     "bold-statement",
     "landscape-action",
@@ -26,7 +28,24 @@ export type PosterDesign = {
     accentColor: string;
     textColor: string;
     overlay: "light" | "dark" | "none";
+    /** Empty = template default */
+    brandNameColor?: string;
+    headlineColor?: string;
+    subheadlineColor?: string;
+    offerBadgeColor?: string;
+    ctaColor?: string;
 };
+/** Stable CTA layout for raster export (html-to-image / html2canvas). */
+const PE_CTA = "posterExportCta";
+const PE_TXT = "posterExportCtaText";
+const PE_ARR = "posterExportCtaArrow";
+
+const PosterSlotsContext = createContext<PosterSlotColors | null>(null);
+
+function SubLine({ children }: { children: ReactNode }) {
+    const slots = useContext(PosterSlotsContext);
+    return (<p className="sub" style={{ color: slots?.sub }}>{children}</p>);
+}
 export const DEFAULT_POSTER_DESIGN: PosterDesign = {
     style: "bold-statement",
     brandName: "Your Business",
@@ -146,19 +165,33 @@ function titleCaseFromUpper(input: string): string {
         .map((w) => (w ? `${w[0]!.toUpperCase()}${w.slice(1)}` : w))
         .join(" ");
 }
+function optHex(v: unknown): string {
+    if (typeof v !== "string")
+        return "";
+    const t = v.trim();
+    return parseHex6(t) ? t : "";
+}
 function normalizePosterDesign(raw: PosterDesign): PosterDesign {
     const headline = clampWords(raw.headline, 8, 58).toUpperCase();
     const subheadline = titleCaseFromUpper(clampWords(raw.subheadline, 20, 110));
     const offerBadge = clampWords(raw.offerBadge, 5, 28).toUpperCase();
     const ctaLabel = clampWords(raw.ctaLabel, 4, 24).toUpperCase();
     const brandName = clampWords(raw.brandName, 5, 32);
+    const accentTrim = (raw.accentColor || "").trim();
+    const accentColor = parseHex6(accentTrim) ? accentTrim : DEFAULT_POSTER_DESIGN.accentColor;
     return {
         ...raw,
+        accentColor,
         brandName: brandName || DEFAULT_POSTER_DESIGN.brandName,
         headline: headline || DEFAULT_POSTER_DESIGN.headline,
         subheadline,
         offerBadge,
         ctaLabel: ctaLabel || DEFAULT_POSTER_DESIGN.ctaLabel,
+        brandNameColor: optHex(raw.brandNameColor),
+        headlineColor: optHex(raw.headlineColor),
+        subheadlineColor: optHex(raw.subheadlineColor),
+        offerBadgeColor: optHex(raw.offerBadgeColor),
+        ctaColor: optHex(raw.ctaColor),
     };
 }
 export type PosterTemplateProps = {
@@ -167,7 +200,10 @@ export type PosterTemplateProps = {
 };
 export function PosterTemplate({ imageUrl, design }: PosterTemplateProps) {
     const normalizedDesign = normalizePosterDesign(design);
-    return (<div className="posterWrap" aria-label={`Poster preview - ${normalizedDesign.style}`}>
+    const accentUi = getPosterAccentTokens(normalizedDesign.accentColor || DEFAULT_POSTER_DESIGN.accentColor);
+    const slotUi = computePosterSlotColors(normalizedDesign, accentUi);
+    return (<PosterSlotsContext.Provider value={slotUi}>
+      <div className="posterWrap" aria-label={`Poster preview - ${normalizedDesign.style}`} style={{ ...posterAccentCssVars(accentUi), ...posterSlotCssVars(slotUi, normalizedDesign.accentColor) }}>
       <div className="posterImg">
         {imageUrl ? (<img src={imageUrl} alt="Poster background" crossOrigin="anonymous"/>) : (<div className="posterPlaceholder">Upload a photo to see poster</div>)}
         <div className="posterOverlay" style={overlayStyle(normalizedDesign.overlay)}/>
@@ -231,7 +267,30 @@ export function PosterTemplate({ imageUrl, design }: PosterTemplateProps) {
           pointer-events: none;
         }
       `}</style>
-    </div>);
+      <style jsx global>{`
+        .posterWrap .${PE_CTA} {
+          box-sizing: border-box;
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          line-height: 1 !important;
+        }
+        .posterWrap .${PE_TXT} {
+          box-sizing: border-box;
+          display: inline-block;
+          line-height: 1 !important;
+        }
+        .posterWrap .${PE_ARR} {
+          box-sizing: border-box;
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          line-height: 1 !important;
+          flex-shrink: 0;
+        }
+      `}</style>
+    </div>
+    </PosterSlotsContext.Provider>);
 }
 export function PosterStyleSwatch({ style, active, onClick, }: {
     style: PosterStyle;
@@ -761,16 +820,19 @@ function BoldStatementLayout({ design }: {
           <span className="lead">{leadWords}</span>
           {accentWord && <span className="accentWord"> {accentWord}.</span>}
         </h1>
-        {design.subheadline && <p className="sub">{design.subheadline}</p>}
+        {design.subheadline && <SubLine>{design.subheadline}</SubLine>}
         <div className="rule" aria-hidden/>
-        <div className="cta">{design.ctaLabel} <span className="arrow" aria-hidden>→</span></div>
+        <div className={`cta ${PE_CTA}`}>
+          <span className={PE_TXT}>{design.ctaLabel}</span>
+          <span className={`arrow ${PE_ARR}`} aria-hidden>→</span>
+        </div>
       </div>
       <style jsx>{`
         .layer {
           position: absolute;
           inset: 0;
           padding: 7% 6% 7%;
-          color: ${design.textColor};
+          color: var(--p-slot-headline);
           display: flex;
           flex-direction: column;
           justify-content: space-between;
@@ -790,6 +852,7 @@ function BoldStatementLayout({ design }: {
           align-items: center;
           gap: 9px;
           opacity: 0.95;
+          color: var(--p-slot-brand);
         }
         .dot {
           width: 9px;
@@ -799,8 +862,9 @@ function BoldStatementLayout({ design }: {
           box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.18);
         }
         .badge {
-          background: ${design.accentColor};
-          color: #0f172a;
+          background: var(--p-slot-offer-bg);
+          color: var(--p-slot-offer-text);
+          border: 1px solid var(--p-slot-offer-border);
           padding: 7px 14px;
           border-radius: 6px;
           letter-spacing: 0.18em;
@@ -823,12 +887,13 @@ function BoldStatementLayout({ design }: {
           letter-spacing: -0.015em;
           text-transform: uppercase;
           text-shadow: 0 2px 24px rgba(0, 0, 0, 0.35);
+          color: var(--p-slot-headline);
         }
         .lead {
           display: block;
         }
         .accentWord {
-          color: ${design.accentColor};
+          color: var(--p-slot-headline);
         }
         .sub {
           margin: 4px 0 0;
@@ -837,6 +902,7 @@ function BoldStatementLayout({ design }: {
           max-width: 78%;
           opacity: 0.94;
           line-height: 1.35;
+          color: var(--p-slot-sub);
         }
         .rule {
           width: 56px;
@@ -849,20 +915,28 @@ function BoldStatementLayout({ design }: {
           align-self: flex-start;
           display: inline-flex;
           align-items: center;
+          justify-content: center;
           gap: 10px;
           padding: 14px 24px;
           border-radius: 999px;
-          background: ${design.accentColor};
-          color: #0f172a;
+          background: var(--p-slot-cta-bg);
+          color: var(--p-slot-cta-text);
+          border: 1px solid var(--p-slot-cta-bd35);
           font-weight: 900;
           letter-spacing: 0.18em;
           text-transform: uppercase;
           font-size: clamp(11px, 1.45vw, 14px);
-          box-shadow: 0 18px 36px rgba(0, 0, 0, 0.32);
+          box-shadow:
+            0 18px 36px rgba(0, 0, 0, 0.32),
+            0 0 0 1px rgba(var(--p-accent-rgb), 0.22);
+          line-height: 1;
         }
         .arrow {
           font-size: 1.15em;
           line-height: 1;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
         }
       `}</style>
     </div>);
@@ -878,12 +952,12 @@ function LandscapeActionLayout({ design }: {
           <span className="brand">{design.brandName}</span>
         </div>
         <h1 className="headline">{design.headline}</h1>
-        {design.subheadline && <p className="sub">{design.subheadline}</p>}
+        {design.subheadline && <SubLine>{design.subheadline}</SubLine>}
         <div className="row">
           {design.offerBadge && <span className="badge">{design.offerBadge}</span>}
-          <span className="cta">
-            {design.ctaLabel}
-            <span className="arrow" aria-hidden>→</span>
+          <span className={`cta ${PE_CTA}`}>
+            <span className={PE_TXT}>{design.ctaLabel}</span>
+            <span className={`arrow ${PE_ARR}`} aria-hidden>→</span>
           </span>
         </div>
       </div>
@@ -894,7 +968,7 @@ function LandscapeActionLayout({ design }: {
           display: flex;
           align-items: center;
           padding: 7% 7% 7% 9%;
-          color: ${design.textColor};
+          color: var(--p-slot-headline);
           font-family: var(--font-sans), system-ui;
         }
         .accentRule {
@@ -929,6 +1003,7 @@ function LandscapeActionLayout({ design }: {
           text-transform: uppercase;
           font-weight: 800;
           opacity: 0.95;
+          color: var(--p-slot-brand);
         }
         .headline {
           margin: 0;
@@ -938,6 +1013,7 @@ function LandscapeActionLayout({ design }: {
           letter-spacing: -0.02em;
           text-transform: uppercase;
           text-shadow: 0 2px 22px rgba(0, 0, 0, 0.3);
+          color: var(--p-slot-headline);
         }
         .sub {
           margin: 0;
@@ -946,6 +1022,7 @@ function LandscapeActionLayout({ design }: {
           max-width: 95%;
           opacity: 0.94;
           line-height: 1.45;
+          color: var(--p-slot-sub);
         }
         .row {
           display: flex;
@@ -955,8 +1032,9 @@ function LandscapeActionLayout({ design }: {
           margin-top: 6px;
         }
         .badge {
-          background: ${design.accentColor};
-          color: #0f172a;
+          background: var(--p-slot-offer-bg);
+          color: var(--p-slot-offer-text);
+          border: 1px solid var(--p-slot-offer-border);
           padding: 8px 14px;
           border-radius: 6px;
           font-weight: 900;
@@ -968,19 +1046,25 @@ function LandscapeActionLayout({ design }: {
         .cta {
           display: inline-flex;
           align-items: center;
+          justify-content: center;
           gap: 10px;
-          background: #0b1220;
-          color: #fff;
+          line-height: 1;
+          background: var(--p-slot-cta-bg);
+          color: var(--p-slot-cta-text);
+          border: 1px solid var(--p-slot-cta-bd55);
           border-radius: 12px;
           padding: 14px 22px;
           font-weight: 900;
           letter-spacing: 0.18em;
           text-transform: uppercase;
           font-size: clamp(11px, 1.45vw, 14px);
-          box-shadow: 0 16px 34px rgba(0, 0, 0, 0.35);
+          box-shadow:
+            0 16px 34px rgba(0, 0, 0, 0.35),
+            0 0 0 1px rgba(var(--p-accent-rgb), 0.35),
+            0 0 28px rgba(var(--p-accent-rgb), 0.22);
         }
         .arrow {
-          color: ${design.accentColor};
+          color: var(--p-accent);
           font-size: 1.2em;
           line-height: 1;
         }
@@ -1000,11 +1084,12 @@ function HeroProductLayout({ design }: {
       </div>
       <div className="middle">
         <h1 className="headline">{design.headline}</h1>
-        {design.subheadline && <p className="sub">{design.subheadline}</p>}
+        {design.subheadline && <SubLine>{design.subheadline}</SubLine>}
       </div>
       <div className="bottom">
-        <span className="cta">
-          {design.ctaLabel} <span className="arrow" aria-hidden>→</span>
+        <span className={`cta ${PE_CTA}`}>
+          <span className={PE_TXT}>{design.ctaLabel}</span>
+          <span className={`arrow ${PE_ARR}`} aria-hidden>→</span>
         </span>
       </div>
       <style jsx>{`
@@ -1012,7 +1097,7 @@ function HeroProductLayout({ design }: {
           position: absolute;
           inset: 0;
           padding: 7% 6%;
-          color: ${design.textColor};
+          color: var(--p-slot-headline);
           display: flex;
           flex-direction: column;
           align-items: center;
@@ -1033,7 +1118,7 @@ function HeroProductLayout({ design }: {
           gap: 6px;
         }
         .brandMark {
-          color: ${design.accentColor};
+          color: var(--p-slot-brand);
           font-size: clamp(14px, 1.8vw, 18px);
           line-height: 1;
         }
@@ -1043,10 +1128,12 @@ function HeroProductLayout({ design }: {
           text-transform: uppercase;
           font-weight: 700;
           opacity: 0.95;
+          color: var(--p-slot-brand);
         }
         .label {
-          background: ${design.accentColor};
-          color: #0f172a;
+          background: var(--p-slot-offer-bg);
+          color: var(--p-slot-offer-text);
+          border: 1px solid var(--p-slot-offer-border);
           padding: 6px 14px;
           border-radius: 999px;
           font-weight: 900;
@@ -1070,6 +1157,7 @@ function HeroProductLayout({ design }: {
           letter-spacing: -0.02em;
           text-transform: uppercase;
           text-shadow: 0 2px 22px rgba(0, 0, 0, 0.35);
+          color: var(--p-slot-headline);
         }
         .sub {
           margin: 0;
@@ -1078,23 +1166,30 @@ function HeroProductLayout({ design }: {
           opacity: 0.94;
           max-width: 78%;
           line-height: 1.4;
+          color: var(--p-slot-sub);
         }
         .cta {
           display: inline-flex;
           align-items: center;
+          justify-content: center;
           gap: 10px;
+          line-height: 1;
           font-size: clamp(11px, 1.5vw, 14px);
           font-weight: 900;
           letter-spacing: 0.3em;
           text-transform: uppercase;
           padding: 12px 22px;
-          border: 1px solid ${design.accentColor};
+          border: 1px solid var(--p-slot-cta-bd65);
           border-radius: 999px;
-          background: rgba(255, 255, 255, 0.06);
+          background: var(--p-slot-cta-bg);
+          color: var(--p-slot-cta-text);
           backdrop-filter: blur(4px);
+          box-shadow:
+            0 12px 28px rgba(0, 0, 0, 0.28),
+            0 0 26px rgba(var(--p-accent-rgb), 0.22);
         }
         .arrow {
-          color: ${design.accentColor};
+          color: var(--p-slot-cta-text);
           font-size: 1.15em;
           line-height: 1;
         }
@@ -1112,7 +1207,7 @@ function EditorialLayout({ design }: {
       </div>
       <div className="mid">
         <h1 className="headline">{design.headline}</h1>
-        {design.subheadline && <p className="sub">{design.subheadline}</p>}
+        {design.subheadline && <SubLine>{design.subheadline}</SubLine>}
       </div>
       <div className="footer">
         {design.offerBadge ? (<div className="cell">
@@ -1124,7 +1219,10 @@ function EditorialLayout({ design }: {
           </div>)}
         <div className="cellRight">
           <span className="k">Tap</span>
-          <span className="v cta">{design.ctaLabel} →</span>
+          <span className={`v cta ${PE_CTA}`}>
+            <span className={PE_TXT}>{design.ctaLabel}</span>
+            <span className={PE_ARR} aria-hidden>→</span>
+          </span>
         </div>
       </div>
       <style jsx>{`
@@ -1132,7 +1230,7 @@ function EditorialLayout({ design }: {
           position: absolute;
           inset: 0;
           padding: 7% 6%;
-          color: ${design.textColor};
+          color: var(--p-slot-headline);
           display: flex;
           flex-direction: column;
           justify-content: space-between;
@@ -1154,7 +1252,7 @@ function EditorialLayout({ design }: {
           letter-spacing: 0.46em;
           text-transform: uppercase;
           font-weight: 700;
-          color: ${design.accentColor};
+          color: var(--p-slot-brand);
         }
         .mid {
           max-width: 92%;
@@ -1168,6 +1266,7 @@ function EditorialLayout({ design }: {
           font-style: italic;
           font-weight: 700;
           text-shadow: 0 4px 28px rgba(0, 0, 0, 0.35);
+          color: var(--p-slot-headline);
         }
         .sub {
           margin: 14px 0 0;
@@ -1176,6 +1275,7 @@ function EditorialLayout({ design }: {
           opacity: 0.94;
           line-height: 1.55;
           max-width: 78%;
+          color: var(--p-slot-sub);
         }
         .footer {
           display: flex;
@@ -1207,12 +1307,13 @@ function EditorialLayout({ design }: {
           letter-spacing: 0.04em;
         }
         .accent {
-          color: ${design.accentColor};
+          color: var(--p-slot-offer-text);
         }
         .cta {
-          color: ${design.accentColor};
+          color: var(--p-slot-cta-text);
           letter-spacing: 0.18em;
           text-transform: uppercase;
+          gap: 10px;
         }
       `}</style>
     </div>);
@@ -1231,12 +1332,12 @@ function MinimalCleanLayout({ design }: {
       <div className="mid">
         <span className="rule" aria-hidden/>
         <h1 className="headline">{design.headline}</h1>
-        {design.subheadline && <p className="sub">{design.subheadline}</p>}
+        {design.subheadline && <SubLine>{design.subheadline}</SubLine>}
       </div>
       <div className="bottom">
-        <span className="cta">
-          {design.ctaLabel}
-          <span className="arrow" aria-hidden>→</span>
+        <span className={`cta ${PE_CTA}`}>
+          <span className={PE_TXT}>{design.ctaLabel}</span>
+          <span className={`arrow ${PE_ARR}`} aria-hidden>→</span>
         </span>
       </div>
       <style jsx>{`
@@ -1244,7 +1345,7 @@ function MinimalCleanLayout({ design }: {
           position: absolute;
           inset: 0;
           padding: 9% 8%;
-          color: #0f172a;
+          color: var(--p-slot-headline);
           display: flex;
           flex-direction: column;
           justify-content: space-between;
@@ -1273,17 +1374,18 @@ function MinimalCleanLayout({ design }: {
           letter-spacing: 0.36em;
           text-transform: uppercase;
           font-weight: 700;
-          color: #334155;
+          color: var(--p-slot-brand);
         }
         .badge {
           font-size: clamp(10px, 1.3vw, 12px);
           font-weight: 900;
           letter-spacing: 0.2em;
-          color: ${design.accentColor};
+          color: var(--p-slot-offer-text);
           text-transform: uppercase;
           padding: 6px 12px;
-          border: 1px solid ${design.accentColor};
+          border: 1px solid var(--p-slot-offer-border);
           border-radius: 999px;
+          background: var(--p-slot-offer-bg);
         }
         .mid {
           max-width: 88%;
@@ -1304,12 +1406,12 @@ function MinimalCleanLayout({ design }: {
           line-height: 0.98;
           letter-spacing: -0.022em;
           font-weight: 600;
-          color: #0f172a;
+          color: var(--p-slot-headline);
         }
         .sub {
           margin: 0;
           font-size: clamp(12px, 1.6vw, 16px);
-          color: #475569;
+          color: var(--p-slot-sub);
           line-height: 1.55;
           max-width: 80%;
         }
@@ -1319,17 +1421,19 @@ function MinimalCleanLayout({ design }: {
         .cta {
           display: inline-flex;
           align-items: center;
+          justify-content: center;
           gap: 12px;
+          line-height: 1;
           font-size: clamp(11px, 1.45vw, 14px);
           font-weight: 800;
           letter-spacing: 0.24em;
           text-transform: uppercase;
-          color: #0f172a;
+          color: var(--p-slot-cta-text);
           padding: 12px 0;
-          border-bottom: 2px solid ${design.accentColor};
+          border-bottom: 2px solid var(--p-slot-cta-border);
         }
         .arrow {
-          color: ${design.accentColor};
+          color: var(--p-slot-offer-text);
           font-size: 1.15em;
           line-height: 1;
         }
@@ -1339,7 +1443,6 @@ function MinimalCleanLayout({ design }: {
 function LuxuryDarkLayout({ design }: {
     design: PosterDesign;
 }) {
-    const gold = "#D4AF37";
     return (<div className="layer">
       <div className="top">
         <div className="brandBlock">
@@ -1351,12 +1454,13 @@ function LuxuryDarkLayout({ design }: {
       </div>
       <div className="mid">
         <h1 className="headline">{design.headline}</h1>
-        {design.subheadline && <p className="sub">{design.subheadline}</p>}
+        {design.subheadline && <SubLine>{design.subheadline}</SubLine>}
         {design.offerBadge && <div className="badge">{design.offerBadge}</div>}
       </div>
       <div className="bottom">
-        <span className="cta">
-          {design.ctaLabel} <span className="arrow" aria-hidden>→</span>
+        <span className={`cta ${PE_CTA}`}>
+          <span className={PE_TXT}>{design.ctaLabel}</span>
+          <span className={`arrow ${PE_ARR}`} aria-hidden>→</span>
         </span>
       </div>
       <style jsx>{`
@@ -1364,7 +1468,7 @@ function LuxuryDarkLayout({ design }: {
           position: absolute;
           inset: 0;
           padding: 9% 8%;
-          color: #f5f5f4;
+          color: var(--p-slot-headline);
           background: linear-gradient(180deg, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.82) 100%);
           display: flex;
           flex-direction: column;
@@ -1388,16 +1492,16 @@ function LuxuryDarkLayout({ design }: {
         .rule {
           flex: 1;
           height: 1px;
-          background: ${gold};
-          opacity: 0.7;
+          background: linear-gradient(90deg, transparent, rgba(var(--p-accent-rgb), 0.75), transparent);
+          opacity: 0.85;
         }
         .mark {
-          color: ${gold};
+          color: var(--p-fg-on-dark);
           font-size: clamp(14px, 1.8vw, 18px);
           line-height: 1;
         }
         .brand {
-          color: ${gold};
+          color: var(--p-slot-brand);
           letter-spacing: 0.46em;
           text-transform: uppercase;
           font-size: clamp(11px, 1.3vw, 13px);
@@ -1413,14 +1517,14 @@ function LuxuryDarkLayout({ design }: {
           line-height: 0.98;
           letter-spacing: 0.03em;
           font-weight: 700;
-          color: ${gold};
+          color: var(--p-slot-headline);
           text-transform: uppercase;
           text-shadow: 0 4px 28px rgba(0, 0, 0, 0.55);
         }
         .sub {
           margin: 16px 0 0;
           font-size: clamp(12px, 1.6vw, 15px);
-          color: #f1f0eb;
+          color: var(--p-slot-sub);
           letter-spacing: 0.1em;
           opacity: 0.92;
           line-height: 1.5;
@@ -1430,12 +1534,13 @@ function LuxuryDarkLayout({ design }: {
           display: inline-block;
           margin-top: 16px;
           padding: 7px 18px;
-          border: 1px solid ${gold};
-          color: ${gold};
+          border: 1px solid var(--p-slot-offer-border);
+          color: var(--p-slot-offer-text);
           font-size: clamp(10px, 1.3vw, 12px);
           letter-spacing: 0.32em;
           text-transform: uppercase;
           font-weight: 700;
+          background: var(--p-slot-offer-bg);
         }
         .bottom {
           display: flex;
@@ -1444,15 +1549,20 @@ function LuxuryDarkLayout({ design }: {
         .cta {
           display: inline-flex;
           align-items: center;
+          justify-content: center;
           gap: 10px;
-          color: ${gold};
+          line-height: 1;
+          color: var(--p-slot-cta-text);
           font-size: clamp(11px, 1.4vw, 13px);
           letter-spacing: 0.4em;
           font-weight: 900;
           text-transform: uppercase;
           padding: 12px 22px;
-          border: 1px solid ${gold};
-          background: rgba(212, 175, 55, 0.05);
+          border: 1px solid var(--p-slot-cta-bd55);
+          background: var(--p-slot-cta-bg);
+          box-shadow:
+            0 12px 32px rgba(0, 0, 0, 0.35),
+            0 0 28px rgba(var(--p-accent-rgb), 0.25);
         }
         .arrow {
           font-size: 1.15em;
@@ -1476,12 +1586,12 @@ function NeonTechLayout({ design }: {
           {design.headline.split(/\s+/).slice(0, -1).join(" ") || design.headline}
           <span className="neon"> {design.headline.split(/\s+/).slice(-1)[0] || ""}</span>
         </h1>
-        {design.subheadline && <p className="sub">{design.subheadline}</p>}
+        {design.subheadline && <SubLine>{design.subheadline}</SubLine>}
       </div>
       <div className="bottom">
-        <span className="cta">
-          <span className="arrow" aria-hidden>→</span>
-          {design.ctaLabel}
+        <span className={`cta ${PE_CTA}`}>
+          <span className={PE_TXT}>{design.ctaLabel}</span>
+          <span className={`arrow ${PE_ARR}`} aria-hidden>→</span>
         </span>
       </div>
       <style jsx>{`
@@ -1489,7 +1599,7 @@ function NeonTechLayout({ design }: {
           position: absolute;
           inset: 0;
           padding: 7% 6%;
-          color: ${design.textColor};
+          color: var(--p-slot-headline);
           display: flex;
           flex-direction: column;
           justify-content: space-between;
@@ -1514,7 +1624,7 @@ function NeonTechLayout({ design }: {
         .tag {
           font-family: var(--font-mono), monospace;
           font-size: clamp(10px, 1.3vw, 13px);
-          color: ${neon};
+          color: var(--p-slot-brand);
           letter-spacing: 0.18em;
           text-transform: uppercase;
           font-weight: 700;
@@ -1525,18 +1635,19 @@ function NeonTechLayout({ design }: {
           gap: 8px;
           font-family: var(--font-mono), monospace;
           font-size: clamp(10px, 1.3vw, 13px);
-          color: ${neon};
+          color: var(--p-slot-offer-text);
           letter-spacing: 0.18em;
           padding: 5px 10px;
-          border: 1px solid ${neon}55;
+          border: 1px solid var(--p-slot-offer-bd33);
           border-radius: 2px;
+          background: var(--p-slot-offer-bg);
         }
         .dot {
           width: 7px;
           height: 7px;
           border-radius: 999px;
-          background: ${neon};
-          box-shadow: 0 0 10px ${neon};
+          background: var(--p-slot-offer-border);
+          box-shadow: 0 0 10px var(--p-slot-offer-border);
         }
         .mid {
           position: relative;
@@ -1549,16 +1660,17 @@ function NeonTechLayout({ design }: {
           letter-spacing: -0.02em;
           text-transform: uppercase;
           text-shadow: 0 2px 22px rgba(0, 0, 0, 0.45);
+          color: var(--p-slot-headline);
         }
         .neon {
-          color: ${neon};
+          color: var(--p-slot-headline);
           text-shadow: 0 0 18px ${neon}80, 0 0 40px ${neon}50;
         }
         .sub {
           margin: 16px 0 0;
           font-family: var(--font-mono), monospace;
           font-size: clamp(11px, 1.5vw, 14px);
-          color: ${neon};
+          color: var(--p-slot-sub);
           letter-spacing: 0.08em;
           opacity: 0.95;
           line-height: 1.45;
@@ -1572,17 +1684,22 @@ function NeonTechLayout({ design }: {
         .cta {
           display: inline-flex;
           align-items: center;
+          justify-content: center;
           gap: 10px;
+          line-height: 1;
           font-family: var(--font-mono), monospace;
-          color: #0f172a;
-          background: ${neon};
+          color: var(--p-slot-cta-text);
+          background: var(--p-slot-cta-bg);
+          border: 1px solid var(--p-slot-cta-bd45);
           font-size: clamp(12px, 1.5vw, 15px);
           letter-spacing: 0.22em;
           padding: 12px 18px;
           border-radius: 4px;
           text-transform: uppercase;
           font-weight: 800;
-          box-shadow: 0 0 24px ${neon}66;
+          box-shadow:
+            0 0 24px ${neon}66,
+            0 0 0 1px rgba(var(--p-accent-rgb), 0.35);
         }
         .arrow {
           font-size: 1.2em;
@@ -1608,17 +1725,20 @@ function FestivalVibrantLayout({ design }: {
       </div>
       <div className="block">
         <h1 className="headline">{design.headline}</h1>
-        {design.subheadline && <p className="sub">{design.subheadline}</p>}
+        {design.subheadline && <SubLine>{design.subheadline}</SubLine>}
       </div>
       <div className="bottom">
-        <span className="cta">{design.ctaLabel} <span className="arrow" aria-hidden>→</span></span>
+        <span className={`cta ${PE_CTA}`}>
+          <span className={PE_TXT}>{design.ctaLabel}</span>
+          <span className={`arrow ${PE_ARR}`} aria-hidden>→</span>
+        </span>
       </div>
       <style jsx>{`
         .layer {
           position: absolute;
           inset: 0;
           padding: 7% 6%;
-          color: ${design.textColor};
+          color: var(--p-slot-headline);
           display: flex;
           flex-direction: column;
           justify-content: space-between;
@@ -1640,7 +1760,7 @@ function FestivalVibrantLayout({ design }: {
           opacity: 0.85;
         }
         .c1 { top: 12%; left: 14%; background: ${design.accentColor}; transform: rotate(15deg); }
-        .c2 { top: 22%; right: 22%; background: #f87171; transform: rotate(-12deg); width: 8px; height: 8px; }
+        .c2 { top: 22%; right: 22%; background: #fb7185; transform: rotate(-12deg); width: 8px; height: 8px; }
         .c3 { bottom: 28%; left: 8%; background: #fde047; transform: rotate(30deg); width: 6px; height: 6px; border-radius: 999px; }
         .c4 { bottom: 18%; right: 14%; background: #f472b6; transform: rotate(-22deg); width: 12px; height: 4px; }
         .c5 { top: 55%; left: 6%; background: #34d399; border-radius: 999px; width: 5px; height: 5px; }
@@ -1655,10 +1775,12 @@ function FestivalVibrantLayout({ design }: {
           letter-spacing: 0.26em;
           text-transform: uppercase;
           font-weight: 800;
+          color: var(--p-slot-brand);
         }
         .sunburst {
-          background: ${design.accentColor};
-          color: #0f172a;
+          background: var(--p-slot-offer-bg);
+          color: var(--p-slot-offer-text);
+          border: 1px solid var(--p-slot-offer-border);
           padding: 7px 16px;
           border-radius: 999px;
           font-size: clamp(10px, 1.3vw, 12px);
@@ -1678,6 +1800,7 @@ function FestivalVibrantLayout({ design }: {
           text-transform: uppercase;
           letter-spacing: -0.012em;
           text-shadow: 0 4px 26px rgba(0, 0, 0, 0.42);
+          color: var(--p-slot-headline);
         }
         .sub {
           margin: 14px 0 0;
@@ -1686,6 +1809,7 @@ function FestivalVibrantLayout({ design }: {
           max-width: 80%;
           opacity: 0.96;
           line-height: 1.4;
+          color: var(--p-slot-sub);
         }
         .bottom {
           display: flex;
@@ -1694,16 +1818,21 @@ function FestivalVibrantLayout({ design }: {
         .cta {
           display: inline-flex;
           align-items: center;
+          justify-content: center;
           gap: 10px;
+          line-height: 1;
           padding: 14px 26px;
-          background: ${design.accentColor};
-          color: #0f172a;
+          background: var(--p-slot-cta-bg);
+          color: var(--p-slot-cta-text);
+          border: 1px solid var(--p-slot-cta-bd35);
           border-radius: 999px;
           font-weight: 900;
           letter-spacing: 0.2em;
           text-transform: uppercase;
           font-size: clamp(11px, 1.45vw, 14px);
-          box-shadow: 0 18px 36px rgba(0, 0, 0, 0.3);
+          box-shadow:
+            0 18px 36px rgba(0, 0, 0, 0.3),
+            0 0 0 1px rgba(var(--p-accent-rgb), 0.25);
         }
         .arrow {
           font-size: 1.15em;
@@ -1725,18 +1854,21 @@ function TestimonialQuoteLayout({ design }: {
       <div className="quoteBlock">
         <span className="mark" aria-hidden>"</span>
         <h1 className="headline">{design.headline}</h1>
-        {design.subheadline && <p className="sub">— {design.subheadline}</p>}
+        {design.subheadline && <SubLine>— {design.subheadline}</SubLine>}
         {design.offerBadge && <span className="pill">{design.offerBadge}</span>}
       </div>
       <div className="bottom">
-        <span className="cta">{design.ctaLabel} <span className="arrow" aria-hidden>→</span></span>
+        <span className={`cta ${PE_CTA}`}>
+          <span className={PE_TXT}>{design.ctaLabel}</span>
+          <span className={`arrow ${PE_ARR}`} aria-hidden>→</span>
+        </span>
       </div>
       <style jsx>{`
         .layer {
           position: absolute;
           inset: 0;
           padding: 8% 7%;
-          color: ${design.textColor};
+          color: var(--p-slot-headline);
           display: flex;
           flex-direction: column;
           justify-content: space-between;
@@ -1762,12 +1894,13 @@ function TestimonialQuoteLayout({ design }: {
           text-transform: uppercase;
           font-weight: 700;
           opacity: 0.95;
+          color: var(--p-slot-brand);
         }
         .stars {
           font-size: clamp(14px, 2vw, 18px);
           letter-spacing: 0.18em;
-          color: ${a};
-          text-shadow: 0 0 12px ${a}55;
+          color: var(--p-fg-on-dark);
+          text-shadow: 0 0 12px rgba(var(--p-accent-rgb), 0.45);
         }
         .quoteBlock {
           position: relative;
@@ -1784,8 +1917,8 @@ function TestimonialQuoteLayout({ design }: {
           font-family: var(--font-playfair), Georgia, serif;
           font-size: clamp(96px, 22vw, 200px);
           line-height: 0.55;
-          color: ${a};
-          opacity: 0.32;
+          color: rgba(var(--p-accent-rgb), 0.38);
+          opacity: 0.55;
           user-select: none;
           margin-bottom: -22px;
         }
@@ -1798,6 +1931,7 @@ function TestimonialQuoteLayout({ design }: {
           line-height: 1.04;
           letter-spacing: -0.005em;
           text-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+          color: var(--p-slot-headline);
         }
         .sub {
           margin: 0;
@@ -1807,6 +1941,7 @@ function TestimonialQuoteLayout({ design }: {
           opacity: 0.92;
           line-height: 1.45;
           letter-spacing: 0.04em;
+          color: var(--p-slot-sub);
         }
         .pill {
           margin-top: 4px;
@@ -1814,8 +1949,9 @@ function TestimonialQuoteLayout({ design }: {
           font-weight: 900;
           padding: 7px 16px;
           border-radius: 999px;
-          background: ${a};
-          color: #0f172a;
+          background: var(--p-slot-offer-bg);
+          color: var(--p-slot-offer-text);
+          border: 1px solid var(--p-slot-offer-border);
           letter-spacing: 0.2em;
           text-transform: uppercase;
         }
@@ -1828,20 +1964,22 @@ function TestimonialQuoteLayout({ design }: {
         .cta {
           display: inline-flex;
           align-items: center;
+          justify-content: center;
           gap: 10px;
+          line-height: 1;
           padding: 14px 28px;
           border-radius: 999px;
           font-weight: 800;
           letter-spacing: 0.26em;
           text-transform: uppercase;
           font-size: clamp(10px, 1.35vw, 13px);
-          background: rgba(255, 255, 255, 0.1);
-          border: 2px solid ${a};
-          color: ${design.textColor};
+          background: var(--p-slot-cta-bg);
+          border: 2px solid var(--p-slot-cta-border);
+          color: var(--p-slot-cta-text);
           box-shadow: 0 14px 32px rgba(0, 0, 0, 0.32);
         }
         .arrow {
-          color: ${a};
+          color: var(--p-slot-cta-text);
           font-size: 1.15em;
           line-height: 1;
         }
@@ -1864,11 +2002,11 @@ function ImageFirstLayout({ design }: {
             {design.offerBadge && <span className="badge">{design.offerBadge}</span>}
           </div>
           <h1 className="headline">{design.headline}</h1>
-          {design.subheadline && <p className="sub">{design.subheadline}</p>}
+          {design.subheadline && <SubLine>{design.subheadline}</SubLine>}
         </div>
-        <span className="cta">
-          {design.ctaLabel}
-          <span className="arrow" aria-hidden>→</span>
+        <span className={`cta ${PE_CTA}`}>
+          <span className={PE_TXT}>{design.ctaLabel}</span>
+          <span className={`arrow ${PE_ARR}`} aria-hidden>→</span>
         </span>
       </div>
       <style jsx>{`
@@ -1878,7 +2016,7 @@ function ImageFirstLayout({ design }: {
           display: flex;
           flex-direction: column;
           justify-content: flex-end;
-          color: ${design.textColor};
+          color: var(--p-slot-headline);
           font-family: var(--font-sans), system-ui;
         }
         .dock {
@@ -1919,6 +2057,7 @@ function ImageFirstLayout({ design }: {
           text-transform: uppercase;
           font-weight: 700;
           opacity: 0.95;
+          color: var(--p-slot-brand);
         }
         .brandDot {
           width: 7px;
@@ -1929,8 +2068,9 @@ function ImageFirstLayout({ design }: {
         .badge {
           font-size: clamp(10px, 1.2vw, 12px);
           font-weight: 900;
-          background: ${a};
-          color: #0f172a;
+          background: var(--p-slot-offer-bg);
+          color: var(--p-slot-offer-text);
+          border: 1px solid var(--p-slot-offer-border);
           padding: 6px 12px;
           border-radius: 6px;
           letter-spacing: 0.16em;
@@ -1944,6 +2084,7 @@ function ImageFirstLayout({ design }: {
           text-transform: uppercase;
           letter-spacing: -0.022em;
           text-shadow: 0 2px 20px rgba(0, 0, 0, 0.45);
+          color: var(--p-slot-headline);
         }
         .sub {
           margin: 10px 0 0;
@@ -1951,21 +2092,27 @@ function ImageFirstLayout({ design }: {
           opacity: 0.9;
           line-height: 1.4;
           max-width: 95%;
+          color: var(--p-slot-sub);
         }
         .cta {
           align-self: end;
           display: inline-flex;
           align-items: center;
+          justify-content: center;
           gap: 8px;
+          line-height: 1;
           padding: 14px 18px;
           border-radius: 14px;
           font-weight: 900;
           letter-spacing: 0.16em;
           text-transform: uppercase;
           font-size: clamp(9px, 1.3vw, 12px);
-          background: ${a};
-          color: #0f172a;
-          box-shadow: 0 16px 30px rgba(0, 0, 0, 0.4);
+          background: var(--p-slot-cta-bg);
+          color: var(--p-slot-cta-text);
+          border: 1px solid var(--p-slot-cta-bd35);
+          box-shadow:
+            0 16px 30px rgba(0, 0, 0, 0.4),
+            0 0 0 1px rgba(var(--p-accent-rgb), 0.28);
           white-space: nowrap;
           max-width: 34vw;
         }
@@ -1989,10 +2136,10 @@ function OfferCardLayout({ design }: {
         <span className="brand">{design.brandName}</span>
         <span className="hairline" aria-hidden/>
         <h1 className="headline">{design.headline}</h1>
-        {design.subheadline && <p className="sub">{design.subheadline}</p>}
-        <span className="cta">
-          {design.ctaLabel}
-          <span className="arrow" aria-hidden>→</span>
+        {design.subheadline && <SubLine>{design.subheadline}</SubLine>}
+        <span className={`cta ${PE_CTA}`}>
+          <span className={PE_TXT}>{design.ctaLabel}</span>
+          <span className={`arrow ${PE_ARR}`} aria-hidden>→</span>
         </span>
       </div>
       <style jsx>{`
@@ -2003,7 +2150,7 @@ function OfferCardLayout({ design }: {
           justify-content: center;
           align-items: center;
           padding: 5%;
-          color: ${design.textColor};
+          color: var(--p-slot-headline);
           font-family: var(--font-sans), system-ui;
         }
         .backdrop {
@@ -2042,8 +2189,9 @@ function OfferCardLayout({ design }: {
           font-weight: 900;
           letter-spacing: 0.22em;
           font-size: clamp(10px, 1.35vw, 13px);
-          background: ${a};
-          color: #0f172a;
+          background: var(--p-slot-offer-bg);
+          color: var(--p-slot-offer-text);
+          border: 1px solid var(--p-slot-offer-border);
           padding: 9px 22px;
           border-radius: 6px;
           text-transform: uppercase;
@@ -2055,6 +2203,7 @@ function OfferCardLayout({ design }: {
           text-transform: uppercase;
           font-weight: 700;
           opacity: 0.95;
+          color: var(--p-slot-brand);
         }
         .hairline {
           width: 42px;
@@ -2070,6 +2219,7 @@ function OfferCardLayout({ design }: {
           text-transform: uppercase;
           letter-spacing: -0.012em;
           text-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+          color: var(--p-slot-headline);
         }
         .sub {
           margin: 0;
@@ -2077,22 +2227,27 @@ function OfferCardLayout({ design }: {
           max-width: 92%;
           line-height: 1.45;
           opacity: 0.94;
+          color: var(--p-slot-sub);
         }
         .cta {
           margin-top: 6px;
           display: inline-flex;
           align-items: center;
+          justify-content: center;
           gap: 10px;
+          line-height: 1;
           padding: 15px 30px;
           border-radius: 14px;
           font-weight: 900;
           letter-spacing: 0.26em;
           text-transform: uppercase;
           font-size: clamp(10px, 1.4vw, 13px);
-          background: ${a};
-          color: #0f172a;
-          box-shadow: 0 18px 36px rgba(0, 0, 0, 0.34);
-          border: none;
+          background: var(--p-slot-cta-bg);
+          color: var(--p-slot-cta-text);
+          border: 1px solid var(--p-slot-cta-bd35);
+          box-shadow:
+            0 18px 36px rgba(0, 0, 0, 0.34),
+            0 0 0 1px rgba(var(--p-accent-rgb), 0.28);
         }
         .arrow {
           font-size: 1.18em;
@@ -2120,12 +2275,12 @@ function SocialStackLayout({ design }: {
         </div>
         <div className="bubble">
           <h1 className="headline">{design.headline}</h1>
-          {design.subheadline && <p className="sub">{design.subheadline}</p>}
+          {design.subheadline && <SubLine>{design.subheadline}</SubLine>}
         </div>
         <div className="dock">
-          <span className="sticker">
-            {design.ctaLabel}
-            <span className="arrow" aria-hidden>→</span>
+          <span className={`sticker ${PE_CTA}`}>
+            <span className={PE_TXT}>{design.ctaLabel}</span>
+            <span className={`arrow ${PE_ARR}`} aria-hidden>→</span>
           </span>
         </div>
       </div>
@@ -2133,7 +2288,7 @@ function SocialStackLayout({ design }: {
         .layer {
           position: absolute;
           inset: 0;
-          color: ${design.textColor};
+          color: var(--p-slot-headline);
           font-family: var(--font-sans), system-ui;
           padding: 0;
           overflow: hidden;
@@ -2144,7 +2299,7 @@ function SocialStackLayout({ design }: {
           top: 0;
           bottom: 0;
           width: 9%;
-          background: linear-gradient(180deg, ${a}, rgba(139, 92, 246, 0.85));
+          background: linear-gradient(180deg, var(--p-accent), var(--p-accent-rail-end));
           box-shadow: 8px 0 36px rgba(0, 0, 0, 0.3);
           z-index: 0;
         }
@@ -2172,6 +2327,7 @@ function SocialStackLayout({ design }: {
           font-size: clamp(12px, 1.65vw, 15px);
           font-weight: 700;
           letter-spacing: -0.01em;
+          color: var(--p-slot-brand);
         }
         .ringDot {
           width: 10px;
@@ -2188,8 +2344,9 @@ function SocialStackLayout({ design }: {
           gap: 6px;
           padding: 6px 12px;
           border-radius: 999px;
-          background: rgba(255, 255, 255, 0.14);
-          border: 1px solid rgba(255, 255, 255, 0.3);
+          background: var(--p-slot-offer-bg);
+          border: 1px solid var(--p-slot-offer-border);
+          color: var(--p-slot-offer-text);
           letter-spacing: 0.14em;
           text-transform: uppercase;
         }
@@ -2221,6 +2378,7 @@ function SocialStackLayout({ design }: {
           text-transform: uppercase;
           letter-spacing: -0.022em;
           text-shadow: 0 2px 22px rgba(0, 0, 0, 0.4);
+          color: var(--p-slot-headline);
         }
         .sub {
           margin: 0;
@@ -2228,6 +2386,7 @@ function SocialStackLayout({ design }: {
           line-height: 1.45;
           opacity: 0.92;
           max-width: 95%;
+          color: var(--p-slot-sub);
         }
         .dock {
           padding-top: 6%;
@@ -2237,22 +2396,25 @@ function SocialStackLayout({ design }: {
         .sticker {
           display: inline-flex;
           align-items: center;
+          justify-content: center;
           gap: 12px;
+          line-height: 1;
           padding: 15px clamp(26px, 8vw, 44px);
           border-radius: 999px;
           font-weight: 900;
           letter-spacing: 0.32em;
           text-transform: uppercase;
           font-size: clamp(9px, 1.4vw, 12px);
-          background: #fff;
-          color: #1e1b4b;
+          background: linear-gradient(135deg, var(--p-slot-cta-bg-hi), var(--p-slot-cta-bg));
+          color: var(--p-slot-cta-text);
           box-shadow: 0 22px 44px rgba(0, 0, 0, 0.4);
-          border: 2px solid ${a};
+          border: 2px solid var(--p-slot-cta-border);
         }
         .arrow {
-          color: ${a};
+          color: var(--p-slot-cta-text);
           font-size: 1.25em;
           line-height: 1;
+          opacity: 0.92;
         }
       `}</style>
     </div>);

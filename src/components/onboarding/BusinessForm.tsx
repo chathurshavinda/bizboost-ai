@@ -4,6 +4,54 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "../../lib/useAuth";
 import { auth } from "../../lib/firebase";
 import type { StepId } from "./StepSidebar";
+/** Flatten API social links (handles legacy entries with commas inside one string). */
+function flattenSocialLinkStrings(links: string[]): string[] {
+    const out: string[] = [];
+    for (const item of links) {
+        if (typeof item !== "string")
+            continue;
+        for (const part of item.split(/,/g)) {
+            const t = part.trim();
+            if (t)
+                out.push(t);
+        }
+    }
+    return out;
+}
+function splitSocialLinksIntoChannels(flat: string[]): {
+    instagram: string;
+    facebook: string;
+} {
+    let instagram = "";
+    let facebook = "";
+    const overflow: string[] = [];
+    for (const raw of flat) {
+        const s = raw.trim();
+        if (!s)
+            continue;
+        const lower = s.toLowerCase();
+        const isInstagram = /instagram\.com|(^|[/.])instagr\.am\//i.test(lower);
+        const isFacebook = /facebook\.com|(^|[/.])fb\.com\//i.test(lower);
+        if (isInstagram && !isFacebook) {
+            if (!instagram)
+                instagram = s;
+            else
+                overflow.push(s);
+        }
+        else if (isFacebook) {
+            if (!facebook)
+                facebook = s;
+            else
+                overflow.push(s);
+        }
+        else {
+            overflow.push(s);
+        }
+    }
+    if (overflow.length > 0)
+        instagram = [instagram, ...overflow].filter(Boolean).join(", ");
+    return { instagram, facebook };
+}
 type BusinessProfilePayload = {
     firebase_uid: string;
     businessName: string;
@@ -73,7 +121,8 @@ export default function BusinessForm({ registerSectionRef, onModeChange, embedde
     const [productsOrServices, setProductsOrServices] = useState("");
     const [targetCustomers, setTargetCustomers] = useState("");
     const [businessGoals, setBusinessGoals] = useState("");
-    const [socialLinks, setSocialLinks] = useState("");
+    const [instagramLink, setInstagramLink] = useState("");
+    const [facebookLink, setFacebookLink] = useState("");
     const [ownerOrManagerName, setOwnerOrManagerName] = useState("");
     const [teamSize, setTeamSize] = useState("");
     const [contactEmail, setContactEmail] = useState("");
@@ -143,8 +192,16 @@ export default function BusinessForm({ registerSectionRef, onModeChange, embedde
                         setTargetCustomers(d.targetCustomers);
                     if (typeof d.businessGoals === "string")
                         setBusinessGoals(d.businessGoals);
-                    if (Array.isArray(d.socialLinks))
-                        setSocialLinks(d.socialLinks.join(", "));
+                    if (Array.isArray(d.socialLinks)) {
+                        const { instagram, facebook } = splitSocialLinksIntoChannels(flattenSocialLinkStrings(d.socialLinks));
+                        setInstagramLink(instagram);
+                        setFacebookLink(facebook);
+                    }
+                    else if (typeof d.socialLinks === "string" && d.socialLinks.trim()) {
+                        const { instagram, facebook } = splitSocialLinksIntoChannels(flattenSocialLinkStrings([d.socialLinks]));
+                        setInstagramLink(instagram);
+                        setFacebookLink(facebook);
+                    }
                     if (typeof d.ownerOrManagerName === "string")
                         setOwnerOrManagerName(d.ownerOrManagerName);
                     if (typeof d.teamSize === "string")
@@ -204,6 +261,9 @@ export default function BusinessForm({ registerSectionRef, onModeChange, embedde
             .split(/\r?\n|,/g)
             .map((item) => item.trim())
             .filter(Boolean);
+        const socialLinksPayload = [instagramLink, facebookLink]
+            .map((s) => s.trim())
+            .filter(Boolean);
         const payload: BusinessProfilePayload = {
             firebase_uid: firebaseUid,
             businessName: businessName.trim(),
@@ -214,7 +274,7 @@ export default function BusinessForm({ registerSectionRef, onModeChange, embedde
             productsOrServices: toArray(productsOrServices.trim()),
             targetCustomers: targetCustomers.trim(),
             businessGoals: businessGoals.trim(),
-            socialLinks: toArray(socialLinks.trim()),
+            socialLinks: socialLinksPayload,
             ownerOrManagerName: ownerOrManagerName.trim(),
             teamSize: teamSize.trim(),
             contactEmail: contactEmail.trim(),
@@ -292,7 +352,7 @@ export default function BusinessForm({ registerSectionRef, onModeChange, embedde
             <div className="onboardingFieldGroup">
               <label className="onboardingLabel">
                 <span>Business name</span>
-                <input type="text" className={"onboardingInput" + (errors.businessName ? " onboardingInput--error" : "")} placeholder="e.g. Stellar Studio" value={businessName} onChange={(e) => setBusinessName(e.target.value)}/>
+                <input type="text" className={"onboardingInput" + (errors.businessName ? " onboardingInput--error" : "")} placeholder="e.g. Ceylon Treats Cafe" value={businessName} onChange={(e) => setBusinessName(e.target.value)}/>
                 {errors.businessName ? <span className="onboardingError">{errors.businessName}</span> : null}
               </label>
             </div>
@@ -300,7 +360,7 @@ export default function BusinessForm({ registerSectionRef, onModeChange, embedde
             <div className="onboardingFieldGroup">
               <label className="onboardingLabel">
                 <span>Business type</span>
-                <input type="text" className={"onboardingInput" + (errors.businessType ? " onboardingInput--error" : "")} placeholder="e.g. Local restaurant, retail, consulting" value={businessType} onChange={(e) => setBusinessType(e.target.value)}/>
+                <input type="text" className={"onboardingInput" + (errors.businessType ? " onboardingInput--error" : "")} placeholder="e.g. Cafe, bakery, clothing store, salon, tuition class" value={businessType} onChange={(e) => setBusinessType(e.target.value)}/>
                 {errors.businessType ? <span className="onboardingError">{errors.businessType}</span> : null}
               </label>
             </div>
@@ -320,7 +380,7 @@ export default function BusinessForm({ registerSectionRef, onModeChange, embedde
             <div className="onboardingFieldGroup">
               <label className="onboardingLabel">
                 <span>City / location</span>
-                <input type="text" className={"onboardingInput" + (errors.city ? " onboardingInput--error" : "")} placeholder="e.g. Colombo" value={city} onChange={(e) => setCity(e.target.value)}/>
+                <input type="text" className={"onboardingInput" + (errors.city ? " onboardingInput--error" : "")} placeholder="e.g. Colombo, Negombo, Kandy" value={city} onChange={(e) => setCity(e.target.value)}/>
                 {errors.city ? <span className="onboardingError">{errors.city}</span> : null}
               </label>
             </div>
@@ -349,7 +409,7 @@ export default function BusinessForm({ registerSectionRef, onModeChange, embedde
           <div className="onboardingFieldGroup">
             <label className="onboardingLabel">
               <span>Main products or services</span>
-              <textarea className={"onboardingInput onboardingInput--multiline" + (errors.productsOrServices ? " onboardingInput--error" : "")} rows={3} placeholder="e.g. Catering packages, lunch combos, weekend tasting menus" value={productsOrServices} onChange={(e) => setProductsOrServices(e.target.value)}/>
+              <textarea className={"onboardingInput onboardingInput--multiline" + (errors.productsOrServices ? " onboardingInput--error" : "")} rows={3} placeholder="e.g. Coffee, cakes, short eats, lunch packs, birthday cake orders" value={productsOrServices} onChange={(e) => setProductsOrServices(e.target.value)}/>
               {errors.productsOrServices ? <span className="onboardingError">{errors.productsOrServices}</span> : null}
             </label>
           </div>
@@ -358,29 +418,37 @@ export default function BusinessForm({ registerSectionRef, onModeChange, embedde
             <div className="onboardingFieldGroup">
               <label className="onboardingLabel">
                 <span>Target customers</span>
-                <input type="text" className="onboardingInput" placeholder="e.g. Office workers within 2 km, families on weekends" value={targetCustomers} onChange={(e) => setTargetCustomers(e.target.value)}/>
+                <input type="text" className="onboardingInput" placeholder="e.g. Students, office workers, families, and nearby residents" value={targetCustomers} onChange={(e) => setTargetCustomers(e.target.value)}/>
               </label>
             </div>
 
             <div className="onboardingFieldGroup">
               <label className="onboardingLabel">
                 <span>Business goals</span>
-                <input type="text" className="onboardingInput" placeholder="e.g. More weekday orders and repeat visits" value={businessGoals} onChange={(e) => setBusinessGoals(e.target.value)}/>
+                <input type="text" className="onboardingInput" placeholder="e.g. Increase daily orders, get more repeat customers, and grow Instagram sales" value={businessGoals} onChange={(e) => setBusinessGoals(e.target.value)}/>
+              </label>
+            </div>
+          </div>
+
+          <div className="bb-form-field-grid bb-form-field-grid--2">
+            <div className="onboardingFieldGroup">
+              <label className="onboardingLabel">
+                <span>Instagram link</span>
+                <input type="text" className="onboardingInput" placeholder="e.g. instagram.com/ceylontreats" value={instagramLink} onChange={(e) => setInstagramLink(e.target.value)} autoComplete="url"/>
+              </label>
+            </div>
+            <div className="onboardingFieldGroup">
+              <label className="onboardingLabel">
+                <span>Facebook link</span>
+                <input type="text" className="onboardingInput" placeholder="e.g. facebook.com/ceylontreats" value={facebookLink} onChange={(e) => setFacebookLink(e.target.value)} autoComplete="url"/>
               </label>
             </div>
           </div>
 
           <div className="onboardingFieldGroup">
             <label className="onboardingLabel">
-              <span>Social links (comma separated)</span>
-              <input type="text" className="onboardingInput" placeholder="instagram.com/yourbrand, facebook.com/yourbrand" value={socialLinks} onChange={(e) => setSocialLinks(e.target.value)}/>
-            </label>
-          </div>
-
-          <div className="onboardingFieldGroup">
-            <label className="onboardingLabel">
               <span>Typical price range</span>
-              <input type="text" className="onboardingInput" placeholder="e.g. LKR 5,000 – 50,000 per package"/>
+              <input type="text" className="onboardingInput" placeholder="e.g. LKR 300 – 5,000 per order"/>
             </label>
           </div>
         </section>

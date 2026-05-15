@@ -146,6 +146,7 @@ function mergePosterWithBrandLocks(style: PosterStyle, accentHex: string, ai: Po
         return { ...base, style, accentColor: accentHex };
     }
     return {
+        ...fallback,
         ...ai,
         style,
         accentColor: accentHex,
@@ -910,7 +911,7 @@ export default function BizEditorPage() {
         </div>
       </section>
 
-      <section className="bb-band-light">
+      <section className="bb-band-light bb-app-canvas">
         <div className="bb-shell">
           <div className="editorShell">
         <section className="editorGrid">
@@ -1011,31 +1012,75 @@ export default function BizEditorPage() {
             <div className="tuningBodyWrap">
               <div className="tuningGrid">
               <label className="tuneField">
-                <span>Brand name</span>
+                <span className="tuneLabelRow">
+                  <span>Brand name</span>
+                  <span className="tuneColorMeta">
+                    <input type="color" className="tuneColorSwatch" aria-label="Brand name color" title="Brand name color"
+                      value={posterDesign.brandNameColor || posterDesign.textColor}
+                      onChange={(e) => setPosterDesign((prev) => ({ ...prev, brandNameColor: e.target.value }))}/>
+                    {posterDesign.brandNameColor ? (<button type="button" className="tuneColorAuto" onClick={() => setPosterDesign((prev) => ({ ...prev, brandNameColor: "" }))}>
+                        Auto
+                      </button>) : null}
+                  </span>
+                </span>
                 <input value={posterDesign.brandName} onChange={(e) => setPosterDesign((prev) => ({ ...prev, brandName: e.target.value }))}/>
               </label>
               <label className="tuneField">
                 <span className="tuneLabelRow">
                   <span>Headline</span>
-                  <em>{posterDesign.headline.length}</em>
+                  <span className="tuneColorMeta">
+                    <em>{posterDesign.headline.length}</em>
+                    <input type="color" className="tuneColorSwatch" aria-label="Headline color" title="Headline color"
+                      value={posterDesign.headlineColor || posterDesign.textColor}
+                      onChange={(e) => setPosterDesign((prev) => ({ ...prev, headlineColor: e.target.value }))}/>
+                    {posterDesign.headlineColor ? (<button type="button" className="tuneColorAuto" onClick={() => setPosterDesign((prev) => ({ ...prev, headlineColor: "" }))}>
+                        Auto
+                      </button>) : null}
+                  </span>
                 </span>
                 <input value={posterDesign.headline} onChange={(e) => setPosterDesign((prev) => ({ ...prev, headline: e.target.value }))}/>
               </label>
               <label className="tuneField">
                 <span className="tuneLabelRow">
                   <span>Subheadline</span>
-                  <em>{posterDesign.subheadline.length}</em>
+                  <span className="tuneColorMeta">
+                    <em>{posterDesign.subheadline.length}</em>
+                    <input type="color" className="tuneColorSwatch" aria-label="Subheadline color" title="Subheadline color"
+                      value={posterDesign.subheadlineColor || posterDesign.textColor}
+                      onChange={(e) => setPosterDesign((prev) => ({ ...prev, subheadlineColor: e.target.value }))}/>
+                    {posterDesign.subheadlineColor ? (<button type="button" className="tuneColorAuto" onClick={() => setPosterDesign((prev) => ({ ...prev, subheadlineColor: "" }))}>
+                        Auto
+                      </button>) : null}
+                  </span>
                 </span>
                 <input value={posterDesign.subheadline} onChange={(e) => setPosterDesign((prev) => ({ ...prev, subheadline: e.target.value }))}/>
               </label>
               <label className="tuneField">
-                <span>Offer badge</span>
+                <span className="tuneLabelRow">
+                  <span>Offer badge</span>
+                  <span className="tuneColorMeta">
+                    <input type="color" className="tuneColorSwatch" aria-label="Offer badge color" title="Offer badge color"
+                      value={posterDesign.offerBadgeColor || posterDesign.accentColor}
+                      onChange={(e) => setPosterDesign((prev) => ({ ...prev, offerBadgeColor: e.target.value }))}/>
+                    {posterDesign.offerBadgeColor ? (<button type="button" className="tuneColorAuto" onClick={() => setPosterDesign((prev) => ({ ...prev, offerBadgeColor: "" }))}>
+                        Auto
+                      </button>) : null}
+                  </span>
+                </span>
                 <input value={posterDesign.offerBadge} onChange={(e) => setPosterDesign((prev) => ({ ...prev, offerBadge: e.target.value }))}/>
               </label>
               <label className="tuneField">
                 <span className="tuneLabelRow">
                   <span>CTA label</span>
-                  <em>{posterDesign.ctaLabel.length}</em>
+                  <span className="tuneColorMeta">
+                    <em>{posterDesign.ctaLabel.length}</em>
+                    <input type="color" className="tuneColorSwatch" aria-label="CTA / button color" title="CTA / button color"
+                      value={posterDesign.ctaColor || (posterDesign.style === "landscape-action" ? "#0b1220" : posterDesign.accentColor)}
+                      onChange={(e) => setPosterDesign((prev) => ({ ...prev, ctaColor: e.target.value }))}/>
+                    {posterDesign.ctaColor ? (<button type="button" className="tuneColorAuto" onClick={() => setPosterDesign((prev) => ({ ...prev, ctaColor: "" }))}>
+                        Auto
+                      </button>) : null}
+                  </span>
                 </span>
                 <input value={posterDesign.ctaLabel} onChange={(e) => setPosterDesign((prev) => ({ ...prev, ctaLabel: e.target.value }))}/>
               </label>
@@ -1420,6 +1465,45 @@ export default function BizEditorPage() {
           text-transform: none;
           color: #94a3b8;
           font-weight: 700;
+        }
+        .tuneColorMeta {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          flex-shrink: 0;
+        }
+        .tuneColorSwatch {
+          width: 32px;
+          height: 28px;
+          padding: 0;
+          border: 1px solid rgba(148, 163, 184, 0.5);
+          border-radius: 6px;
+          cursor: pointer;
+          background: #fff;
+          flex-shrink: 0;
+        }
+        .tuneColorSwatch::-webkit-color-swatch-wrapper {
+          padding: 2px;
+        }
+        .tuneColorSwatch::-webkit-color-swatch {
+          border-radius: 4px;
+          border: none;
+        }
+        .tuneColorAuto {
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          color: #64748b;
+          background: transparent;
+          border: none;
+          cursor: pointer;
+          padding: 2px 4px;
+          border-radius: 4px;
+        }
+        .tuneColorAuto:hover {
+          color: #0f172a;
+          background: rgba(148, 163, 184, 0.2);
         }
         .tuneField input {
           border: 1px solid rgba(148, 163, 184, 0.42);

@@ -33,6 +33,12 @@ export type AiDailyTask = {
     growthAction: string;
     executionSteps: string[];
     marketingAction: string;
+    marketingObjective?: string;
+    recommendedPlatform?: string;
+    postFormat?: string;
+    bestPostingTime?: string;
+    whatToCreate?: string;
+    posterVideoIdea?: string;
     postIdea: string;
     caption: string;
     hashtags: string[];
@@ -141,6 +147,12 @@ export function buildAiBusinessPlanPrompt(input: AiPlanInput): string {
       "growthAction": "one concrete operations / sales / retention / partnership move tied to this business",
       "executionSteps": ["3-5 short, owner-doable steps. No fluff. Reference real ${input.businessName} products where natural."],
       "marketingAction": "one matching marketing activation that supports today's growth move",
+      "marketingObjective": "what business result this activation drives today (orders/bookings/leads/footfall)",
+      "recommendedPlatform": "specific platform destination, e.g. 'Instagram Reel + Facebook Reel' (never 'Both')",
+      "postFormat": "specific format, e.g. Reel / Story / Carousel / Feed Post",
+      "bestPostingTime": "specific time in local business timezone, e.g. '7:30 PM'",
+      "whatToCreate": "clear creation instruction for owner: what asset to produce today",
+      "posterVideoIdea": "specific visual angle that can be executed with phone camera + simple editing",
       "postIdea": "what the post visual + concept actually is (no captions here)",
       "caption": "ready-to-post caption: hook -> value -> specific detail (price/offer/process/proof) -> CTA. Max 3 emojis. Match ${input.language}.",
       "hashtags": ["6-10 hashtags. Mix business-type, city, product, audience, and 1-2 SriLanka tags. No spam/follow-back tags."],
@@ -218,6 +230,8 @@ ${dailyTemplate}
 QUALITY CHECKS BEFORE YOU RESPOND
 - dailyTasks.length MUST equal ${input.planDuration}.
 - Every dailyTasks entry must have non-empty title, growthAction, executionSteps (3-5), marketingAction, postIdea, caption, hashtags (6+).
+- Every dailyTasks entry must include marketingObjective, recommendedPlatform, postFormat, bestPostingTime, whatToCreate, and posterVideoIdea.
+- Never output recommendedPlatform as "Both" or "Instagram/Facebook". Use explicit combined naming such as "Instagram Reel + Facebook Reel".
 - No two days share the same title.
 - Captions must read like a real human, not a template. They must include a clear CTA line.
 - Hashtags must not include #followforfollow, #f4f, #l4l, #like4like, #growthhack or similar spam.
@@ -267,6 +281,12 @@ function normaliseDailyTask(raw: unknown, dayNumber: number): AiDailyTask {
         growthAction: safeString(r.growthAction ?? r.businessGrowthAction ?? r.businessAction),
         executionSteps: toStringArray(r.executionSteps ?? r.steps, 6),
         marketingAction: safeString(r.marketingAction ?? r.marketingActivation),
+        marketingObjective: safeString(r.marketingObjective) || undefined,
+        recommendedPlatform: safeString(r.recommendedPlatform ?? r.platform) || undefined,
+        postFormat: safeString(r.postFormat ?? r.format) || undefined,
+        bestPostingTime: safeString(r.bestPostingTime ?? r.bestTime ?? r.postingTime) || undefined,
+        whatToCreate: safeString(r.whatToCreate ?? r.whatToPost) || undefined,
+        posterVideoIdea: safeString(r.posterVideoIdea ?? r.visualIdea) || undefined,
         postIdea: safeString(r.postIdea),
         caption: safeString(r.caption),
         hashtags: toStringArray(r.hashtags, 15),
@@ -593,6 +613,39 @@ export function enrichPlanDaysWithAi<T extends DayLike>(planDays: T[], ai: AiBus
             nextActivation.postBrief = aiDay.marketingAction;
             nextActivation.whatToPost = aiDay.marketingAction;
             nextActivation.contentBrief = aiDay.marketingAction;
+        }
+        if (aiDay.marketingObjective) {
+            nextActivation.matchNote = aiDay.marketingObjective;
+        }
+        if (aiDay.recommendedPlatform) {
+            nextActivation.platform = aiDay.recommendedPlatform;
+        }
+        if (aiDay.postFormat) {
+            const lc = aiDay.postFormat.toLowerCase();
+            nextActivation.format = lc.includes("reel")
+                ? "Reel"
+                : lc.includes("story")
+                    ? "Story"
+                    : lc.includes("carousel")
+                        ? "Carousel"
+                        : "Feed";
+        }
+        if (aiDay.bestPostingTime) {
+            nextActivation.bestTime = aiDay.bestPostingTime;
+            nextActivation.postingTime = aiDay.bestPostingTime;
+        }
+        if (aiDay.whatToCreate) {
+            nextActivation.whatToPost = aiDay.whatToCreate;
+            nextActivation.contentBrief = aiDay.whatToCreate;
+        }
+        if (aiDay.posterVideoIdea) {
+            nextActivation.visualGuide = [
+                aiDay.posterVideoIdea,
+                ...toStringArray(nextActivation.visualGuide ?? [], 3),
+            ]
+                .map((x) => x.trim())
+                .filter(Boolean)
+                .slice(0, 3);
         }
         if (aiDay.promotionIdea) {
             nextActivation.promotionIdea = aiDay.promotionIdea;

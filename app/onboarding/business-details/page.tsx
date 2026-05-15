@@ -67,7 +67,7 @@ export default function BusinessDetailsPage() {
         </div>
       </section>
 
-      <section className="bb-band-light" aria-label="Business details form">
+      <section className="bb-band-light bb-app-canvas" aria-label="Business details form">
         <div className="bb-shell">
           <div className="onboardingCard onboardingCard--light">
             <StepSidebar currentStep={activeStep} onStepClick={handleStepClick}/>

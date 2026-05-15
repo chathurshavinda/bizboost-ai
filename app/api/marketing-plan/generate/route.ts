@@ -15,10 +15,11 @@ type DayPlan = {
     mainActionTitle: string;
     businessGrowthAction: string;
     marketingActivation?: {
-        platform?: "Instagram" | "Facebook" | "Both";
+        platform?: string;
         format?: "Reel" | "Story" | "Feed" | "Carousel";
         bestTime?: string;
         goal?: "DMs" | "Orders" | "Bookings" | "Footfall" | "Leads";
+        marketingObjective?: string;
         postBrief?: string;
         whatToPost?: string;
         hook?: string;
@@ -77,6 +78,44 @@ type TemplateContext = {
 const PLAN_TEMPLATE_VERSION = "growth-action-cycle-v12-ai-business-plan";
 const SPAM_HASHTAG = /like4like|follow4follow|followforfollow|f4f|l4l|followers|growthhack/i;
 const baseHashtags = ["#BizBoostAI"];
+const GENERIC_ACTIVATION_RE = /\b(post on social media|share your product|use instagram or facebook|use instagram\/facebook|post something|generic post|instagram or facebook)\b/i;
+function normalizedFormatLabel(format: string): string {
+    const clean = String(format || "Feed").trim().toLowerCase();
+    if (clean === "reel")
+        return "Reel";
+    if (clean === "story")
+        return "Story";
+    if (clean === "carousel")
+        return "Carousel";
+    return "Feed Post";
+}
+function platformLabelFromChannel(channelRaw: unknown, formatRaw: unknown): string {
+    const channel = String(channelRaw ?? "both").toLowerCase().trim();
+    const formatLabel = normalizedFormatLabel(String(formatRaw ?? "Feed"));
+    if (channel === "instagram")
+        return `Instagram ${formatLabel}`;
+    if (channel === "facebook")
+        return `Facebook ${formatLabel}`;
+    return `Instagram ${formatLabel} + Facebook ${formatLabel}`;
+}
+function marketingObjectiveFromGoal(goalRaw: unknown): string {
+    const g = String(goalRaw ?? "").toLowerCase();
+    if (g === "orders")
+        return "Convert qualified viewers into today's paid orders.";
+    if (g === "bookings")
+        return "Turn interest into confirmed booking slots for today's offer.";
+    if (g === "footfall")
+        return "Drive nearby customers to visit today and act on the offer.";
+    if (g === "dms")
+        return "Generate high-intent DM conversations that can close today.";
+    return "Capture qualified leads for follow-up and same-week conversion.";
+}
+function activationLooksGeneric(value: string): boolean {
+    const clean = String(value ?? "").replace(/\s+/g, " ").trim();
+    if (!clean)
+        return true;
+    return GENERIC_ACTIVATION_RE.test(clean);
+}
 function resolveBusinessCategory(...parts: string[]): BusinessCategoryKey {
     const value = parts
         .join(" ")
@@ -574,7 +613,7 @@ const categoryStrategyPools: Record<CategoryKey, CategoryStrategyPool> = {
             retention: ["Send repeat-customer reminder via WhatsApp list.", "Print a loyalty card explanation at billing desk.", "Post a customer thank-you with a return CTA."],
             lead_capture: ["Offer a quick opt-in message for menu updates.", "Use QR prompt to capture contact + preferred order time.", "Run comment-to-WhatsApp lead capture on offer post."],
             operations: ["Show one behind-the-scenes quality checkpoint.", "Pin updated service timing commitment on socials + counter.", "Share SOP-based quality promise in a short story."],
-            trust_proof: ["Post one real review screenshot with permission.", "Request Google reviews via receipt/QR and follow-up text.", "Use before/after quality shot of {product}."],
+            trust_proof: ["Customer quote tile with one specific outcome from {product}.", "Request Google reviews via receipt/QR and same-day follow-up text.", "Before/after quality post of {product} with one trust line."],
             partnership: ["Cross-tag partner and share joint benefit offer.", "Place co-branded flyer at both counters.", "Publish partner bundle details in status/story."],
             review_optimize: ["Share weekly best-seller + limited offer adjustment.", "Post ‘what customers asked for’ and updated menu note.", "Publish mini KPI win with next action CTA."],
         },
@@ -613,7 +652,7 @@ const categoryStrategyPools: Record<CategoryKey, CategoryStrategyPool> = {
             retention: ["Post-purchase DM script with repeat incentive.", "VIP buyer status list update + reminder message.", "Short story/post: returning-customer bonus."],
             lead_capture: ["Abandoned cart follow-up script via WhatsApp.", "Waitlist form/status update for {product}.", "Comment/DM prompt for product restock alerts."],
             operations: ["Delivery policy highlight card for customer trust.", "Packaging quality check story post.", "FAQ post reducing wrong-order expectations."],
-            trust_proof: ["Before/after buyer content + testimonial post.", "Review screenshot carousel.", "Delivery success proof in daily status."],
+            trust_proof: ["Before/after buyer content + testimonial post.", "Customer quote carousel with specific result.", "Delivery success proof in daily status."],
             partnership: ["Cross-promo post with partner handle.", "Joint giveaway or referral code announcement.", "Bundle flyer for both partner audiences."],
             review_optimize: ["Share top SKU insight + revised offer.", "KPI summary story with updated CTA.", "Post next-week offer based on customer data."],
         },
@@ -730,7 +769,7 @@ const categoryStrategyPools: Record<CategoryKey, CategoryStrategyPool> = {
             retention: ["Rebooking reminder template after service.", "Loyalty update card at reception.", "Client reactivation message with slot options."],
             lead_capture: ["Consultation booking post with direct WhatsApp CTA.", "Before/after teaser with slot booking link.", "Status update: available chairs/times today."],
             operations: ["Service standards post for confidence.", "Timeliness promise update in status.", "Behind-the-scenes hygiene checklist snippet."],
-            trust_proof: ["Before/after collage with permission.", "Review screenshot story.", "Testimonial short-form post for new leads."],
+            trust_proof: ["Before/after collage with customer consent.", "Review quote story with trust cue.", "Testimonial short-form post for new leads."],
             partnership: ["Collab announcement with partner business.", "Joint referral code/status push.", "Mini-event booking announcement."],
             review_optimize: ["Weekly booking KPI snapshot post.", "Data-backed offer adjustment update.", "Channel-specific CTA refinement post."],
         },
@@ -765,13 +804,13 @@ const categoryStrategyPools: Record<CategoryKey, CategoryStrategyPool> = {
             review_optimize: ["Measure what worked for {product} and optimize next actions.", "Use weekly data to remove low-value tasks.", "Refocus on highest impact growth activities."],
         },
         activations: {
-            sales_offer: ["One concise offer post + direct CTA.", "WhatsApp broadcast to warm contacts.", "In-store/online banner with conversion CTA."],
-            retention: ["Follow-up message template for returning customers.", "Referral prompt in thank-you message.", "Status/story update for repeat-customer benefit."],
-            lead_capture: ["Lead capture prompt on key channel.", "Simple form/DM CTA for quick inquiry.", "Post with direct WhatsApp contact intent."],
-            operations: ["Process transparency message for trust.", "Service quality update to customers.", "SOP-based confidence message in channel."],
-            trust_proof: ["Review/testimonial card post.", "Customer success mini-story.", "Trust badge/highlight in profile/status."],
-            partnership: ["Partner mention + shared offer post.", "Cross-channel referral announcement.", "Joint flyer/digital promo for both audiences."],
-            review_optimize: ["Weekly KPI summary with next action.", "Post what changed based on customer feedback.", "Data-backed offer update message."],
+            sales_offer: ["Offer post naming {product}, exact price/deadline, and one clear order CTA.", "WhatsApp warm-list push with {product} stock/slot count and confirmation flow.", "Counter + feed creative for {product} with payment/delivery details."],
+            retention: ["Returning-customer message for {product} with a time-bound loyalty perk.", "Thank-you story with referral keyword tied to {product}.", "Repeat-buyer post showing what's new in {product} this week."],
+            lead_capture: ["Lead magnet post around {product} with DM keyword and follow-up promise.", "Short inquiry form + story CTA for people comparing {product} options.", "Comment-to-WhatsApp post that captures intent for {product}."],
+            operations: ["Behind-the-scenes post proving the quality process for {product}.", "Service timing update post with the exact customer commitment for {product}.", "Ops transparency post showing how {product} is delivered consistently."],
+            trust_proof: ["Customer quote card tied to a real outcome from {product}.", "Before/after or result story for {product} with one proof point.", "Review-highlight post that reduces hesitation around {product}."],
+            partnership: ["Co-branded post with local partner showing the shared benefit for {product}.", "Partner referral announcement with the exact redemption steps for {product}.", "Joint offer post tagging both businesses and one CTA to claim {product}."],
+            review_optimize: ["Weekly KPI snapshot post: what improved for {product} and next action.", "Customer-feedback update post explaining one real change to {product}.", "Offer-tuning post with the new {product} angle and CTA."],
         },
         metrics: {
             sales_offer: ["Offer conversion rate", "Average transaction value", "Revenue from core offer"],
@@ -792,7 +831,7 @@ type BusinessGrowthAction = {
 };
 type SocialMediaActivation = {
     actionType: ActionType;
-    platform: "Instagram" | "Facebook" | "Both";
+    platform: string;
     format: "Feed" | "Story" | "Reel" | "Carousel";
     whatToPost: string;
     visualGuide: string[];
@@ -945,7 +984,7 @@ function buildCategoryActionLibrary(category: CategoryKey): CategoryActionLibrar
             const theme = actionTypeThemes[actionType];
             return {
                 actionType,
-                platform: "Both" as const,
+                platform: platformLabelFromChannel("both", format),
                 format,
                 whatToPost: activationSeed,
                 visualGuide: [
@@ -1027,7 +1066,59 @@ function hasTargetMetric(successMetric: string): boolean {
 }
 function isMissingActivationField(day: DayBuilderOutput): boolean {
     const activation = day.marketingActivation;
-    return !activation?.cta || !activation?.format || !activation?.postIdea || !activation?.caption;
+    const coreMissing = !activation?.cta ||
+        !activation?.format ||
+        !activation?.postIdea ||
+        !activation?.caption ||
+        !activation?.bestTime ||
+        !activation?.platform ||
+        !(activation?.whatToPost || activation?.postBrief);
+    if (coreMissing)
+        return true;
+    const genericFields = [activation.postIdea, activation.postBrief, activation.whatToPost, activation.caption];
+    return genericFields.some((field) => activationLooksGeneric(String(field ?? "")));
+}
+function extractSignalTerms(text: string): string[] {
+    const stop = new Set([
+        "with",
+        "from",
+        "this",
+        "that",
+        "today",
+        "your",
+        "about",
+        "into",
+        "will",
+        "have",
+        "more",
+        "using",
+        "for",
+        "and",
+        "the",
+        "our",
+        "you",
+        "are",
+        "show",
+        "post",
+        "story",
+        "reel",
+        "feed",
+        "carousel",
+    ]);
+    return String(text ?? "")
+        .toLowerCase()
+        .split(/[^a-z0-9]+/g)
+        .map((w) => w.trim())
+        .filter((w) => w.length >= 4 && !stop.has(w))
+        .slice(0, 16);
+}
+function activationConnectedToGrowth(growthAction: string, activationText: string, product: string): boolean {
+    const growthTerms = extractSignalTerms(growthAction);
+    const activationTerms = new Set(extractSignalTerms(activationText));
+    const overlap = growthTerms.filter((term) => activationTerms.has(term));
+    const productWords = extractSignalTerms(product);
+    const mentionsProduct = productWords.some((pw) => activationTerms.has(pw));
+    return overlap.length >= 1 || mentionsProduct;
 }
 function productForDay(ctx: TemplateContext, index: number): string {
     const products = ctx.productsOrServices.length ? ctx.productsOrServices : [ctx.productLine];
@@ -1057,10 +1148,11 @@ function normalizeDayOutput(output: DayBuilderOutput): DayBuilderOutput {
         hashtags: Array.isArray(output.hashtags) ? output.hashtags : [],
         posterHint: typeof output.posterHint === "string" ? output.posterHint : "",
         marketingActivation: {
-            platform: output.marketingActivation?.platform ?? "Both",
+            platform: output.marketingActivation?.platform ?? platformLabelFromChannel(output.marketingActivation?.channel ?? "both", output.marketingActivation?.format ?? "Feed"),
             format: output.marketingActivation?.format ?? "Feed",
             bestTime: String(output.marketingActivation?.bestTime ?? "7:30 PM"),
             goal: output.marketingActivation?.goal ?? "Leads",
+            marketingObjective: String(output.marketingActivation?.marketingObjective ?? marketingObjectiveFromGoal(output.marketingActivation?.goal ?? "Leads")),
             postBrief: String(output.marketingActivation?.postBrief ?? output.postIdea ?? ""),
             hook: String(output.marketingActivation?.hook ?? `Need better ${output.postIdea || "results"}?`),
             visualGuide: Array.isArray(output.marketingActivation?.visualGuide)
@@ -1795,7 +1887,7 @@ function buildActivationHashtags(args: {
 }
 function buildCaptionFromActivation(args: {
     format: CaptionFormatKey;
-    platform: "Instagram" | "Facebook" | "Both";
+    platform: string;
     bestTime: string;
     hookLine: string;
     postIdea: string;
@@ -1838,7 +1930,7 @@ function buildActivationMatchedPostBundle(args: {
     ctx: TemplateContext;
     product: string;
     format: CaptionFormatKey;
-    platform: "Instagram" | "Facebook" | "Both";
+    platform: string;
     bestTime: string;
     hookLine: string;
     whatToPost: string;
@@ -2416,7 +2508,7 @@ function buildDayOutput(theme: ThemeKey, input: DayBuilderInput): DayBuilderOutp
             : input.ctx.preferredChannels.some((c) => /facebook/i.test(c))
                 ? "facebook"
                 : "both";
-    const platformValue: "Instagram" | "Facebook" | "Both" = socialChannel === "instagram" ? "Instagram" : socialChannel === "facebook" ? "Facebook" : "Both";
+    const platformValue = platformLabelFromChannel(socialChannel, primaryFormat);
     const bestTime = input.weekend ? "11:00 AM" : "7:30 PM";
     const reviewSubtype = theme === "review_collection" ? reviewPostFormat(input) : "";
     const concisePostBrief = activationToPostBrief(marketingActivation, product, input.ctx.businessName);
@@ -2594,12 +2686,30 @@ function buildPlan(planDays: number, context: TemplateContext, startDate: Date):
         const mergedVisualGuide = mergedVisualGuideRaw.length
             ? mergedVisualGuideRaw
             : themeVisualGuide(theme, product, context, normalized.postIdea).slice(0, 3);
-        const finalWhatToPost = normalized.marketingActivation?.whatToPost ??
+        const rawWhatToPost = normalized.marketingActivation?.whatToPost ??
             normalized.marketingActivation?.postIdea ??
             normalized.postIdea;
-        const finalPlatform = normalized.marketingActivation?.platform ?? "Both";
+        const activationContextText = [
+            rawWhatToPost,
+            normalized.marketingActivation?.postBrief,
+            normalized.marketingActivation?.postIdea,
+            normalized.postIdea,
+            normalized.caption,
+        ]
+            .filter(Boolean)
+            .join(" ");
+        const connectedToGrowth = activationConnectedToGrowth(normalized.businessGrowthAction ?? "", activationContextText, product);
+        const goalForFallback = normalized.marketingActivation?.goal ?? "Leads";
+        const finalWhatToPost = !connectedToGrowth || activationLooksGeneric(rawWhatToPost)
+            ? `Promote today's ${product} action directly: ${normalized.businessGrowthAction}. Show the exact customer-facing offer/process and ask for ${String(goalForFallback).toLowerCase()} in this same post.`
+            : rawWhatToPost;
+        const rawPlatform = String(normalized.marketingActivation?.platform ?? "").trim();
+        const finalPlatform = !rawPlatform || /^both$/i.test(rawPlatform)
+            ? platformLabelFromChannel(normalized.marketingActivation?.channel ?? "both", formatValue)
+            : rawPlatform;
         const finalBestTime = normalized.marketingActivation?.bestTime ?? normalized.marketingActivation?.postingTime ?? "7:30 PM";
         const offerHint = String(normalized.marketingActivation?.offerDeadlineHint ?? "").trim();
+        const finalMarketingObjective = String(normalized.marketingActivation?.marketingObjective ?? "").trim() || marketingObjectiveFromGoal(goalForFallback);
         const copyPackFinal = buildMarketingActivationCopyPack({
             rawActivation: finalWhatToPost,
             product,
@@ -2609,7 +2719,7 @@ function buildPlan(planDays: number, context: TemplateContext, startDate: Date):
             format: formatValue,
             theme,
             weekend,
-            goal: normalized.marketingActivation?.goal ?? "Leads",
+            goal: goalForFallback,
             visualGuide: mergedVisualGuide,
             offerDeadlineHint: offerHint,
         });
@@ -2642,7 +2752,8 @@ function buildPlan(planDays: number, context: TemplateContext, startDate: Date):
                 platform: finalPlatform,
                 format: formatValue,
                 bestTime: finalBestTime,
-                goal: normalized.marketingActivation?.goal ?? "Leads",
+                goal: goalForFallback,
+                marketingObjective: finalMarketingObjective,
                 whatToPost: copyPackFinal.whatToPostInstruction,
                 postBrief: copyPackFinal.postIdeaCreative,
                 hook: copyPackFinal.hookLine,

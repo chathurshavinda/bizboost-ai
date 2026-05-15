@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
@@ -10,6 +10,7 @@ import { BackgroundPaths } from "@/components/ui/background-paths";
 import SplitText from "@/components/ui/SplitText";
 import { useAuth } from "../src/lib/useAuth";
 import { getNextIncompleteDay, getTodayPlanDay, isPlanFullyCompleted } from "../src/lib/taskCardState";
+import BizBoostWordmark from "@/src/components/brand/BizBoostWordmark";
 const HOW_STEPS = [
     {
         n: "01",
@@ -100,10 +101,6 @@ const WHAT_YOU_GET = [
         title: "Calendar view",
         desc: "See your full timeline and daily focus in Biz Calendar at a glance.",
     },
-    {
-        title: "Save & resume",
-        desc: "Plans and progress stay in your account—pick up where you left off anytime.",
-    },
 ];
 const PREVIEW_ROWS = [
     { date: "Apr 21", title: "Bundle promo launch" },
@@ -167,81 +164,6 @@ const WHY_BULLETS = [
     "Simple templates now, AI later",
     "Works even with minimal marketing knowledge",
 ];
-type HomeShowcaseGalleryImage = {
-    id: string;
-    src: string;
-    alt: string;
-    category: "profile" | "poster" | "social";
-    size: "sm" | "md" | "lg";
-    row: 0 | 1 | 2;
-    objectPosition?: string;
-    objectFit?: "cover" | "contain";
-};
-const HOME_SHOWCASE_GALLERY_IMAGES: HomeShowcaseGalleryImage[] = [
-    { id: "g01", src: "/auth-growth-hero.jpg", alt: "Sample business profile workspace in BizBoost", category: "profile", size: "lg", row: 0, objectPosition: "12% 28%" },
-    { id: "g02", src: "https://picsum.photos/id/292/540/720", alt: "Placeholder poster preview — replace with your export", category: "poster", size: "md", row: 0 },
-    { id: "g03", src: "/auth-growth-hero.jpg", alt: "Sample plan and profile context", category: "profile", size: "sm", row: 0, objectPosition: "72% 40%" },
-    { id: "g04", src: "https://picsum.photos/id/429/480/640", alt: "Placeholder social-style visual — replace with your post mockup", category: "social", size: "md", row: 0 },
-    { id: "g05", src: "/bizboost-mark.png", alt: "BizBoost brand mark placeholder tile", category: "poster", size: "sm", row: 0, objectPosition: "center", objectFit: "contain" },
-    { id: "g06", src: "https://picsum.photos/id/431/520/700", alt: "Placeholder campaign poster tile", category: "poster", size: "lg", row: 0 },
-    { id: "g07", src: "https://picsum.photos/id/866/500/660", alt: "Placeholder feed-style preview", category: "social", size: "md", row: 1 },
-    { id: "g08", src: "/auth-growth-hero.jpg", alt: "Sample profile detail view", category: "profile", size: "md", row: 1, objectPosition: "45% 55%" },
-    { id: "g09", src: "https://picsum.photos/id/225/560/740", alt: "Placeholder poster artwork", category: "poster", size: "lg", row: 1 },
-    { id: "g10", src: "https://picsum.photos/id/364/420/560", alt: "Placeholder story-format preview", category: "social", size: "sm", row: 1 },
-    { id: "g11", src: "/auth-growth-hero.jpg", alt: "Sample dashboard-style crop", category: "profile", size: "sm", row: 1, objectPosition: "30% 70%" },
-    { id: "g12", src: "https://picsum.photos/id/326/500/680", alt: "Placeholder promotional tile", category: "poster", size: "md", row: 1 },
-    { id: "g13", src: "https://picsum.photos/id/628/540/720", alt: "Placeholder social post visual", category: "social", size: "md", row: 2 },
-    { id: "g14", src: "/auth-growth-hero.jpg", alt: "Sample BizBoost output crop", category: "profile", size: "lg", row: 2, objectPosition: "55% 22%" },
-    { id: "g15", src: "https://picsum.photos/id/668/480/640", alt: "Placeholder square poster", category: "poster", size: "sm", row: 2 },
-    { id: "g16", src: "https://picsum.photos/id/237/520/700", alt: "Placeholder marketing still", category: "social", size: "lg", row: 2 },
-    { id: "g17", src: "/auth-growth-hero.jpg", alt: "Sample profile hero crop", category: "profile", size: "md", row: 2, objectPosition: "80% 45%" },
-    { id: "g18", src: "https://picsum.photos/id/180/500/660", alt: "Placeholder print-style poster", category: "poster", size: "md", row: 2 },
-];
-const HOME_GALLERY_ROW_0 = HOME_SHOWCASE_GALLERY_IMAGES.filter((img) => img.row === 0);
-const HOME_GALLERY_ROW_1 = HOME_SHOWCASE_GALLERY_IMAGES.filter((img) => img.row === 1);
-const HOME_GALLERY_ROW_2 = HOME_SHOWCASE_GALLERY_IMAGES.filter((img) => img.row === 2);
-function GalleryMarqueeChunk({ items, floatSeed, chunkSuffix, }: {
-    items: HomeShowcaseGalleryImage[];
-    floatSeed: number;
-    chunkSuffix: string;
-}) {
-    return (<>
-      {items.map((item, i) => {
-            const delay = (floatSeed + i * 0.42) % 5;
-            const imgStyle: CSSProperties = {
-                objectFit: item.objectFit ?? "cover",
-                ...(item.objectPosition ? { objectPosition: item.objectPosition } : {}),
-            };
-            return (<div key={`${chunkSuffix}-${item.id}`} className={`galleryTileWrap galleryTileWrap--${item.size}`} style={{ animationDelay: `${delay}s` }}>
-              <figure className={`galleryTileFrame${item.objectFit === "contain" ? " galleryTileFrame--contain" : ""}`}>
-                <img src={item.src} alt={item.alt} className="galleryTileImg" loading="lazy" decoding="async" sizes="(max-width: 520px) 42vw, 280px" style={imgStyle}/>
-                <figcaption className="galleryTileCaption">
-                  {item.category === "profile" ? "Profile" : item.category === "poster" ? "Poster" : "Social"}
-                </figcaption>
-              </figure>
-            </div>);
-        })}
-    </>);
-}
-function HomeShowcaseGalleryRow({ direction, durationSec, items, floatSeed, }: {
-    direction: "toRight" | "toLeft";
-    durationSec: number;
-    items: HomeShowcaseGalleryImage[];
-    floatSeed: number;
-}) {
-    return (<div className={`galleryMarqueeRow galleryMarqueeRow--${direction}`}>
-      <div className="galleryMarqueeViewport">
-        <div className="galleryMarqueeTrack" style={{ animationDuration: `${durationSec}s` }}>
-          <div className="galleryMarqueeChunk">
-            <GalleryMarqueeChunk items={items} floatSeed={floatSeed} chunkSuffix="a"/>
-          </div>
-          <div className="galleryMarqueeChunk" aria-hidden="true">
-            <GalleryMarqueeChunk items={items} floatSeed={floatSeed + 1.2} chunkSuffix="b"/>
-          </div>
-        </div>
-      </div>
-    </div>);
-}
 const SUPPORT_MAILTO = "mailto:hello@bizboost.ai?subject=BizBoost%20support";
 function cleanTitle(title: string): string {
     return title.replace(/^Week\s*\d+\s*/i, "").replace(/^Day\s*\d+\s*/i, "").trim();
@@ -413,13 +335,11 @@ export default function Home() {
           <SplitText tag="p" text="Daily action plans, campaign-ready content, and clear progress tracking - all in one calm, focused workspace built for modern SMEs." className="heroSubtitle" delay={16} duration={0.6} ease="power3.out" splitType="chars" from={{ opacity: 0, y: 24 }} to={{ opacity: 1, y: 0 }} threshold={0.12} rootMargin="-80px" textAlign="center"/>
 
           <div className="heroActions">
-            {!loading && !user && (<Link className="heroBtn heroBtnPrimary" href="/login">
-                Start growing today
-                <FaChevronRight size={12} aria-hidden/>
-              </Link>)}
             <Link className="heroTextLink" href="#how-it-works">
-              See how it works
-              <FaChevronRight size={11} aria-hidden/>
+              <span className="heroTextLinkRow">
+                See how it works
+                <FaChevronRight size={11} aria-hidden/>
+              </span>
             </Link>
           </div>
 
@@ -764,35 +684,23 @@ export default function Home() {
             <h2 className="landingCtaTitle">Ready to build your plan?</h2>
             <Link href="/select-plan" className="landingCtaBtn">
               Build your plan
-              <FaChevronRight size={12} aria-hidden/>
+              <span className="landingCtaBtnIcon" aria-hidden>
+                <FaChevronRight size={12}/>
+              </span>
             </Link>
           </div>
         </section>
 
-        <section ref={revealShowcase} id="showcase" className="landingSection landingSection--light landingSection--showcase landingReveal" aria-labelledby="home-showcase-title">
-          <div className="landingSectionInner showcaseSectionInner">
-            <h2 id="home-showcase-title" className="sectionTitle">
-              See BizBoost in Action
-            </h2>
-            <p className="sectionLead showcaseSectionLead">
-              Explore sample business profiles, generated posters, captions, and campaign previews created inside BizBoost.
-            </p>
-          </div>
-          <div className="galleryFullBleed">
-            <div className="galleryMarqueeStack" aria-label="Animated product image gallery">
-              <HomeShowcaseGalleryRow direction="toRight" durationSec={105} items={HOME_GALLERY_ROW_0} floatSeed={0}/>
-              <HomeShowcaseGalleryRow direction="toLeft" durationSec={118} items={HOME_GALLERY_ROW_1} floatSeed={0.5}/>
-              <HomeShowcaseGalleryRow direction="toRight" durationSec={112} items={HOME_GALLERY_ROW_2} floatSeed={1}/>
-            </div>
-          </div>
-        </section>
+        <section ref={revealShowcase} id="showcase" className="landingSection landingSection--showcase landingSection--showcaseEmpty landingReveal" aria-hidden="true"/>
       </div>
 
       <footer className="homeFooter">
         <div className="homeFooterInner">
           <div className="homeFooterTop">
             <div className="homeFooterBrand">
-              <p className="homeFooterBrandName">BizBoost</p>
+              <p className="homeFooterBrandName">
+                <BizBoostWordmark size="footer"/>
+              </p>
               <p className="homeFooterTagline">
                 Daily growth plans, campaign-ready posters, and progress tracking—built so modern SMEs can execute with confidence.
               </p>
@@ -872,7 +780,7 @@ export default function Home() {
           align-items: center;
           justify-content: center;
           text-align: center;
-          min-height: calc(100vh - 52px);
+          min-height: calc(100vh - 48px);
         }
 
         .heroGradientBase {
@@ -965,36 +873,10 @@ export default function Home() {
           flex-wrap: wrap;
         }
 
-        .heroBtn {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          gap: 10px;
-          border-radius: 999px;
-          padding: 15px 28px;
-          font-size: 14px;
-          font-weight: 600;
-          letter-spacing: -0.005em;
-          text-decoration: none;
-          cursor: pointer;
-          transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
-        }
-
-        .heroBtnPrimary {
-          background: #0f172a;
-          color: #ffffff;
-          border: 1px solid #0f172a;
-        }
-
-        .heroBtnPrimary:hover {
-          background: #111827;
-        }
-
         .heroTextLink {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          gap: 0.5rem;
           color: #111111;
           font-size: 14px;
           font-weight: 500;
@@ -1003,7 +885,15 @@ export default function Home() {
           transition: color 0.12s ease;
         }
 
-        .heroTextLink :global(svg) {
+        .heroTextLinkRow {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.4rem;
+          white-space: nowrap;
+        }
+
+        .heroTextLinkRow :global(svg) {
+          flex-shrink: 0;
           color: #111111;
           transition: transform 0.12s ease, color 0.12s ease;
         }
@@ -1014,7 +904,7 @@ export default function Home() {
           text-underline-offset: 3px;
         }
 
-        .heroTextLink:hover :global(svg) {
+        .heroTextLink:hover .heroTextLinkRow :global(svg) {
           color: #000000;
           transform: translateX(1px);
         }
@@ -1228,7 +1118,7 @@ export default function Home() {
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          gap: 22px;
+          gap: 18px;
           text-align: center;
         }
 
@@ -1251,17 +1141,29 @@ export default function Home() {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          gap: 10px;
-          padding: 16px 34px;
+          gap: 8px;
+          padding: 14px 30px;
           border-radius: 999px;
           font-weight: 600;
           font-size: 15px;
           letter-spacing: -0.005em;
+          line-height: 1.2;
           text-decoration: none;
           color: #0f172a;
           background: #ffffff;
-          border: 1px solid #ffffff;
-          transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+          border: 1px solid rgba(255, 255, 255, 0.95);
+          box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.9) inset,
+            0 14px 32px rgba(0, 0, 0, 0.18);
+          transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+        }
+
+        .landingCtaBtnIcon {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          line-height: 0;
+          transform: translateY(-2px);
         }
 
         .landingCtaBtn:hover {
@@ -1270,185 +1172,17 @@ export default function Home() {
           transform: translateY(-2px);
         }
 
-        .landingSection--showcase {
-          position: relative;
-          overflow-x: clip;
-          overflow-y: visible;
-          padding-bottom: clamp(40px, 7vw, 72px);
-        }
-
-        .landingSection--showcase::before {
-          content: "";
-          position: absolute;
-          inset: 0;
-          pointer-events: none;
-          z-index: 0;
-          background:
-            radial-gradient(ellipse 90% 55% at 50% -32%, rgba(99, 102, 241, 0.08), transparent 56%),
-            radial-gradient(ellipse 55% 42% at 100% 100%, rgba(16, 185, 129, 0.06), transparent 48%);
-        }
-
-        .showcaseSectionInner {
-          position: relative;
-          z-index: 1;
-          text-align: center;
-        }
-
-        .landingSection--showcase .showcaseSectionInner .sectionTitle {
-          margin-left: auto;
-          margin-right: auto;
-        }
-
-        .showcaseSectionLead {
-          max-width: 38rem;
-          margin-left: auto;
-          margin-right: auto;
-        }
-
-        .galleryFullBleed {
-          position: relative;
-          z-index: 1;
-          width: 100vw;
-          max-width: 100%;
-          margin-left: calc(50% - 50vw);
-          margin-right: calc(50% - 50vw);
-          margin-top: clamp(24px, 4vw, 40px);
-          overflow-x: clip;
-          overflow-y: visible;
-        }
-
-        .galleryMarqueeStack {
-          display: grid;
-          gap: clamp(14px, 2.5vw, 22px);
-        }
-
-        .galleryMarqueeRow {
-          position: relative;
-          width: 100%;
-        }
-
-        .galleryMarqueeViewport {
-          overflow: hidden;
-          width: 100%;
-          mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
-          -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
-        }
-
-        .galleryMarqueeTrack {
-          display: flex;
-          flex-direction: row;
-          width: max-content;
-          animation: galleryScrollToRight 105s linear infinite;
-          will-change: transform;
-        }
-
-        .galleryMarqueeRow--toLeft .galleryMarqueeTrack {
-          animation-name: galleryScrollToLeft;
-        }
-
-        .galleryMarqueeRow:hover .galleryMarqueeTrack {
-          animation-play-state: paused;
-        }
-
-        .galleryMarqueeChunk {
-          display: flex;
-          flex-direction: row;
-          align-items: center;
-          gap: clamp(12px, 2vw, 20px);
-          flex-shrink: 0;
-          padding-inline: clamp(6px, 1vw, 10px);
-        }
-
-        @keyframes galleryScrollToRight {
-          from {
-            transform: translateX(-50%);
-          }
-          to {
-            transform: translateX(0);
-          }
-        }
-
-        @keyframes galleryScrollToLeft {
-          from {
-            transform: translateX(0);
-          }
-          to {
-            transform: translateX(-50%);
-          }
-        }
-
-        .galleryTileWrap {
-          flex: 0 0 auto;
-          animation: galleryTileFloat 7s ease-in-out infinite;
-        }
-
-        .galleryTileWrap--sm {
-          width: clamp(128px, 22vw, 168px);
-          height: clamp(148px, 26vw, 198px);
-        }
-
-        .galleryTileWrap--md {
-          width: clamp(158px, 28vw, 218px);
-          height: clamp(178px, 32vw, 248px);
-        }
-
-        .galleryTileWrap--lg {
-          width: clamp(188px, 34vw, 268px);
-          height: clamp(208px, 38vw, 298px);
-        }
-
-        @keyframes galleryTileFloat {
-          0%,
-          100% {
-            transform: translateY(0);
-          }
-          50% {
-            transform: translateY(-5px);
-          }
-        }
-
-        .galleryTileFrame {
-          position: relative;
+        .landingSection--showcase.landingSection--showcaseEmpty {
+          padding: 0;
           margin: 0;
-          width: 100%;
-          height: 100%;
-          border-radius: clamp(14px, 2vw, 20px);
+          border: none;
+          min-height: 0;
           overflow: hidden;
-          border: 1px solid rgba(15, 23, 42, 0.08);
-          box-shadow:
-            0 1px 0 rgba(255, 255, 255, 0.65) inset,
-            0 20px 40px rgba(15, 23, 42, 0.12),
-            0 6px 14px rgba(15, 23, 42, 0.06);
-          background: #e2e8f0;
+          background: transparent;
         }
 
-        .galleryTileFrame--contain {
-          background: linear-gradient(160deg, #f8fafc 0%, #eef2ff 100%);
-        }
-
-        .galleryTileImg {
-          display: block;
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-
-        .galleryTileCaption {
-          position: absolute;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          margin: 0;
-          padding: 18px 12px 10px;
-          font-size: 10px;
-          font-weight: 700;
-          letter-spacing: 0.14em;
-          text-transform: uppercase;
-          color: rgba(248, 250, 252, 0.92);
-          text-align: left;
-          line-height: 1.2;
-          background: linear-gradient(180deg, transparent, rgba(2, 6, 23, 0.72));
-          pointer-events: none;
+        .landingSection--showcase.landingSection--showcaseEmpty::before {
+          display: none;
         }
 
         .todayTaskWrap {
@@ -2810,11 +2544,12 @@ export default function Home() {
           max-width: 100%;
           margin: 0;
           margin-bottom: 0;
-          padding: clamp(52px, 7vw, 82px) max(20px, calc((100% - 1180px) / 2 + 20px)) clamp(24px, 4vw, 36px);
+          padding: clamp(44px, 6vw, 72px) max(20px, calc((100% - 1180px) / 2 + 20px)) clamp(28px, 4vw, 40px);
           border-radius: 0;
           border: 0;
-          background: #000000;
-          box-shadow: none;
+          border-top: 1px solid rgba(15, 23, 42, 0.08);
+          background: #ffffff;
+          box-shadow: 0 -10px 36px rgba(15, 23, 42, 0.06);
         }
 
         .homeFooterInner {
@@ -2839,16 +2574,20 @@ export default function Home() {
 
         .homeFooterBrandName {
           margin: 0;
-          color: #ffffff;
-          font-family: var(--font-playfair), Georgia, serif;
-          font-size: clamp(32px, 3.4vw, 46px);
-          font-weight: 600;
-          letter-spacing: -0.035em;
+          color: #0f172a;
+          font-size: inherit;
+          font-weight: inherit;
+          line-height: 1.05;
+          letter-spacing: inherit;
+        }
+
+        .homeFooterBrandName :global(.bb-logo-lockup) {
+          margin: 0;
         }
 
         .homeFooterTagline {
           margin: 0;
-          color: rgba(255, 255, 255, 0.62);
+          color: #475569;
           font-size: 14px;
           line-height: 1.7;
         }
@@ -2857,7 +2596,7 @@ export default function Home() {
           margin: 0;
           font-size: 12px;
           line-height: 1.65;
-          color: rgba(255, 255, 255, 0.42);
+          color: #64748b;
           font-weight: 500;
           letter-spacing: 0.01em;
         }
@@ -2869,10 +2608,12 @@ export default function Home() {
 
         .homeFooterColumnTitle {
           margin: 0;
-          color: #ffffff;
-          font-size: 14px;
+          color: #0f172a;
+          font-family: var(--font-brand), var(--font-sans), system-ui, sans-serif;
+          font-size: 13px;
           font-weight: 700;
-          letter-spacing: -0.01em;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
         }
 
         .homeFooterNav {
@@ -2884,7 +2625,7 @@ export default function Home() {
           display: inline-block;
           width: fit-content;
           max-width: 100%;
-          color: rgba(255, 255, 255, 0.72);
+          color: #334155;
           font-size: 13px;
           font-weight: 500;
           line-height: 1.45;
@@ -2898,7 +2639,7 @@ export default function Home() {
         }
 
         .homeFooterNav :global(a.homeFooterLink:hover) {
-          color: #ffffff;
+          color: #0f172a;
           transform: translateX(3px);
         }
 
@@ -2907,15 +2648,15 @@ export default function Home() {
         }
 
         .homeFooterNav :global(a.homeFooterLink:focus-visible) {
-          outline: 2px solid rgba(255, 255, 255, 0.45);
+          outline: 2px solid rgba(99, 102, 241, 0.45);
           outline-offset: 3px;
           border-radius: 2px;
         }
 
         .homeFooterBottom {
           margin-top: clamp(34px, 5vw, 52px);
-          padding-top: 24px;
-          border-top: 1px solid rgba(255, 255, 255, 0.1);
+          padding-top: 22px;
+          border-top: 1px solid rgba(15, 23, 42, 0.08);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -2925,7 +2666,7 @@ export default function Home() {
         .homeFooterCopy {
           margin: 0;
           font-size: 12px;
-          color: rgba(255, 255, 255, 0.46);
+          color: #64748b;
         }
 
         @keyframes fadeSlideIn {
@@ -3093,10 +2834,6 @@ export default function Home() {
             width: 100%;
             flex-direction: column;
             align-items: stretch;
-          }
-
-          .heroBtn {
-            width: 100%;
           }
 
           .heroTextLink {

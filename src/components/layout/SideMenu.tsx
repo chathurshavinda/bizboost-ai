@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { FaHome, FaIdBadge, FaUserCircle, FaGem, FaClipboardList, FaCalendarDay, FaEdit, FaImage, FaCog, FaSignOutAlt, } from "react-icons/fa";
+import BizBoostWordmark from "../brand/BizBoostWordmark";
 export type SideMenuProps = {
     open: boolean;
     onClose: () => void;
@@ -31,7 +32,7 @@ export default function SideMenu({ open, onClose, onRequestLogout }: SideMenuPro
       <aside className={`bbSideMenuPanel ${open ? "bbSideMenuPanel--open" : ""}`} role="dialog" aria-modal="true" aria-label="BizBoost navigation">
         <div className="bbSideBrand">
           <div className="bbBrandLeft">
-            <span className="bbBrandName">BizBoost</span>
+            <BizBoostWordmark size="drawer" className="bbBrandName"/>
           </div>
           <button type="button" className="bbSideClose" aria-label="Close menu" onClick={onClose}>
             <span aria-hidden>×</span>

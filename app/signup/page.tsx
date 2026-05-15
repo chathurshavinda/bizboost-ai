@@ -87,7 +87,7 @@ export default function SignupPage() {
           <Link href="/login" className="authRefFooterLink">Sign In</Link>
         </div>
         <div className="authRefTerms">
-          By continuing, you confirm that you&apos;ve read and agreed to the <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.
+          By continuing, you confirm that you&apos;ve read and agreed to the <Link href="/terms" className="authRefTermsLink">Terms of Service</Link> and <Link href="/privacy" className="authRefTermsLink">Privacy Policy</Link>.
         </div>
       </AuthCard>
     </AuthLayout>);

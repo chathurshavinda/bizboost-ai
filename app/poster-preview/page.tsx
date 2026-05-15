@@ -435,14 +435,14 @@ export default function PosterPreviewPage() {
         </div>
       </section>
 
-      <section className="bb-band-light">
+      <section className="bb-band-light bb-app-canvas">
         <div className="bb-shell">
       <div className="posterShell">
         <section className="posterCanvas">
           <div className="posterCanvasTop">
             <div>
               <p className="canvasEyebrow">Final creative</p>
-              <h2 className="canvasTitle">Review your square poster</h2>
+              <h2 className="canvasTitle">Review your poster</h2>
             </div>
             <span className="sizePill">1080 x 1080</span>
           </div>

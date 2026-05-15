@@ -654,7 +654,7 @@ export default function MarketingPlanPage() {
         </div>
       </section>
 
-      <section className="bb-band-light">
+      <section className="bb-band-light bb-app-canvas">
         <div className="bb-shell">
           <div className="planShell">
         <section className="topCard">
@@ -708,39 +708,65 @@ export default function MarketingPlanPage() {
                 <button type="button" className="downloadBtn" onClick={() => router.push("/select-plan?mode=new")}>Start New Plan</button>
               </div>
             </div>) : (<section className={`todayTaskCard taskCardInset ${isTodayTaskCompleted ? "todayTaskCelebration" : ""}`}>
-              <div className="todayTaskHead">
-                <h3>
-                  {isTodayTaskCompleted
-                ? "Today completed!"
+              <div className="todayTaskAccent" aria-hidden/>
+              <div className="todayTaskHeader">
+                <div className="todayTaskHeaderLeft">
+                  <h3 className="todayTaskHeading">
+                    {isTodayTaskCompleted
+                ? "Today completed"
                 : isFallbackTask
-                    ? "Next Task"
+                    ? "Next up"
                     : "Today’s Task"}
-                </h3>
+                  </h3>
+                </div>
+                {safePlan.length > 0 ? (<div className="todayTaskProgress" role="status" aria-label={`Plan progress ${progressPercent} percent, ${completedCount} of ${safePlan.length} days completed`}>
+                    <div className="todayTaskProgressMeta">
+                      <span className="todayTaskProgressPct">{progressPercent}%</span>
+                      <span className="todayTaskProgressSub">{completedCount}/{safePlan.length} days</span>
+                    </div>
+                    <div className="todayTaskProgressTrack" aria-hidden>
+                      <span className="todayTaskProgressFill" style={{ width: `${Math.min(100, Math.max(0, progressPercent))}%` }}/>
+                    </div>
+                  </div>) : null}
               </div>
-              {isLoading ? (<div className="todayTaskBody">
+
+              {isLoading ? (<div className="todayTaskContent todayTaskContent--solo">
                   <p className="todayTaskSub">Loading today&apos;s task…</p>
-                </div>) : taskDay ? (<div className="todayTaskBody">
-                  <span className="todayTaskDate">{taskDay.dateLabel || "Today"}</span>
-                  <p className="todayTaskTitle">
+                </div>) : taskDay ? (<div className="todayTaskContent">
+                  <div className="todayTaskMeta">
+                    {taskDay.dateISO ? (<time className="todayTaskDatePill" dateTime={taskDay.dateISO}>
+                      {taskDay.dateLabel || "Today"}
+                    </time>) : (<span className="todayTaskDatePill">
+                      {taskDay.dateLabel || "Today"}
+                    </span>)}
+                    <span className="todayTaskDayChip">Day {taskDay.dayNumber}</span>
+                    {isTodayTaskCompleted ? (<span className="todayTaskStatus todayTaskStatus--done">Done</span>) : (<span className="todayTaskStatus todayTaskStatus--active">Focus</span>)}
+                  </div>
+                  <p className="todayTaskTitle" title={taskDay.mainActionTitle || ""}>
                     {taskDay.mainActionTitle ? cleanTitle(taskDay.mainActionTitle) || taskDay.mainActionTitle : `Day ${taskDay.dayNumber} action`}
                   </p>
                   {isTodayTaskCompleted ? (<>
-                      <div className="todayTaskActionsRow">
-                        <button type="button" className="todayTaskBtn todayTaskBtnSecondary" disabled>
+                      <div className="todayTaskActions">
+                        <button type="button" className="todayTaskBtn todayTaskBtnGhost" disabled>
                           Completed
                         </button>
                         {fallbackDay && fallbackDay.dayNumber !== taskDay.dayNumber ? (<button type="button" className="todayTaskBtn todayTaskBtnPrimary" onClick={() => router.push(`/marketing-plan/day/${fallbackDay.dayNumber}`)}>
-                            View Tomorrow →
+                            <span>Continue to day {fallbackDay.dayNumber}</span>
+                            <span className="todayTaskBtnIcon" aria-hidden>→</span>
                           </button>) : null}
                       </div>
-                      <p className="todayTaskHint">Today is done. Keep the streak going!</p>
-                    </>) : (<button type="button" className="todayTaskBtn todayTaskBtnPrimary" onClick={() => router.push(`/marketing-plan/day/${taskDay.dayNumber}`)}>
-                      Open Day Detail
-                    </button>)}
-                </div>) : (<div className="todayTaskBody">
+                      <p className="todayTaskHint">Nice work — today&apos;s task is in the books. Keep the streak going.</p>
+                    </>) : (<div className="todayTaskActions">
+                      <button type="button" className="todayTaskBtn todayTaskBtnPrimary" onClick={() => router.push(`/marketing-plan/day/${taskDay.dayNumber}`)}>
+                        <span>Open Day Detail</span>
+                        <span className="todayTaskBtnIcon" aria-hidden>→</span>
+                      </button>
+                    </div>)}
+                </div>) : (<div className="todayTaskContent todayTaskContent--solo">
                   <p className="todayTaskSub">No task available yet.</p>
                 </div>)}
             </section>)}
+          <div className="growthPlanListStrip">
           <div className="listHead">
             <div>
               <h2>Your growth plan ({planDaysLabel} days)</h2>
@@ -762,7 +788,9 @@ export default function MarketingPlanPage() {
             </div>
           </div>
           {safePlan.length === 0 ? (<div className="emptyState">Generate your plan to see daily actions here.</div>) : (<div className="rows">
-              {safePlan.map((day) => (<div key={day.dayNumber} className={`dayRow ${completedMap[day.dayNumber] ? "dayRowCompleted" : ""}`} onClick={() => router.push(`/marketing-plan/day/${day.dayNumber}`)} role="button" tabIndex={0} onKeyDown={(event) => {
+              {safePlan.map((day) => {
+            const isCurrentPlanDay = taskDay != null && day.dayNumber === taskDay.dayNumber;
+            return (<div key={day.dayNumber} className={`dayRow ${completedMap[day.dayNumber] ? "dayRowCompleted" : "dayRowPending"}${isCurrentPlanDay ? " dayRowCurrent" : ""}`} onClick={() => router.push(`/marketing-plan/day/${day.dayNumber}`)} role="button" tabIndex={0} onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
                         event.preventDefault();
                         router.push(`/marketing-plan/day/${day.dayNumber}`);
@@ -801,8 +829,10 @@ export default function MarketingPlanPage() {
                     </div>
                     <span className="rowArrow" aria-hidden>→</span>
                   </div>
-                </div>))}
+                </div>);
+        })}
             </div>)}
+          </div>
         </section>
 
         {aiPlan && (<section className="strategyCard">
@@ -1165,6 +1195,17 @@ export default function MarketingPlanPage() {
           animation: spin 1s linear infinite;
         }
 
+        .growthPlanListStrip {
+          margin-top: 2px;
+          border-radius: 22px;
+          border: 1px solid rgba(255, 255, 255, 0.55);
+          background: linear-gradient(180deg, #eef2f7 0%, #dde5ef 100%);
+          box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.65) inset,
+            0 10px 28px rgba(15, 23, 42, 0.05);
+          padding: clamp(16px, 2.4vw, 22px);
+        }
+
         .listHead {
           display: flex;
           align-items: center;
@@ -1183,85 +1224,330 @@ export default function MarketingPlanPage() {
         }
 
         .taskCardInset {
-          margin-bottom: 14px;
+          margin-bottom: 12px;
         }
+
         .todayTaskCard {
-          border-radius: 22px;
-          border: 1px solid rgba(148, 163, 184, 0.28);
-          background: rgba(255, 255, 255, 0.8);
-          box-shadow: 0 16px 40px rgba(15, 23, 42, 0.1);
-          backdrop-filter: blur(12px);
-          padding: 14px 16px;
+          position: relative;
+          overflow: hidden;
+          border-radius: 18px;
+          border: 1px solid rgba(148, 163, 184, 0.22);
+          background:
+            linear-gradient(135deg, rgba(255, 255, 255, 0.92) 0%, rgba(248, 250, 252, 0.88) 45%, rgba(241, 245, 249, 0.9) 100%);
+          box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.95) inset,
+            0 12px 32px rgba(15, 23, 42, 0.06),
+            0 4px 14px rgba(15, 23, 42, 0.035);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
+          padding: clamp(10px, 1.35vw, 14px) clamp(12px, 1.8vw, 18px);
         }
+
+        .todayTaskAccent {
+          position: absolute;
+          left: 0;
+          right: 0;
+          top: 0;
+          height: 2px;
+          background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 40%, #a855f7 70%, #ec4899 100%);
+          opacity: 0.92;
+          pointer-events: none;
+        }
+
+        .todayTaskCelebration .todayTaskAccent {
+          background: linear-gradient(90deg, #059669 0%, #10b981 50%, #34d399 100%);
+        }
+
         .todayTaskCelebration {
-          border-color: #e5e5e5;
-          background: #f5f5f5;
-          box-shadow: none;
+          border-color: rgba(16, 185, 129, 0.28);
+          background:
+            linear-gradient(145deg, rgba(236, 253, 245, 0.95) 0%, rgba(240, 253, 250, 0.9) 50%, rgba(255, 255, 255, 0.92) 100%);
+          box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.9) inset,
+            0 11px 30px rgba(5, 150, 105, 0.08),
+            0 4px 14px rgba(15, 23, 42, 0.045);
         }
-        .todayTaskHead h3 {
+
+        .todayTaskHeader {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          flex-wrap: wrap;
+          padding-top: 0;
+          margin-bottom: 6px;
+        }
+
+        .todayTaskHeaderLeft {
+          min-width: 0;
+          flex: 1 1 180px;
+        }
+
+        .todayTaskHeading {
           margin: 0;
           color: #0f172a;
-          font-size: 17px;
+          font-size: clamp(16px, 1.85vw, 20px);
+          font-weight: 800;
+          letter-spacing: -0.03em;
+          line-height: 1.18;
         }
-        .todayTaskCelebration .todayTaskHead h3 {
-          color: #111111;
+
+        .todayTaskCelebration .todayTaskHeading {
+          color: #064e3b;
         }
-        .todayTaskBody {
-          margin-top: 10px;
-          border-radius: 14px;
-          border: 1px solid rgba(148, 163, 184, 0.24);
-          background: rgba(255, 255, 255, 0.75);
-          padding: 12px;
-          display: grid;
-          gap: 10px;
+
+        .todayTaskProgress {
+          flex: 0 1 120px;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: 4px;
+          text-align: right;
         }
-        .todayTaskDate {
-          width: fit-content;
+
+        .todayTaskProgressMeta {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: 2px;
+        }
+
+        .todayTaskProgressPct {
+          font-size: 15px;
+          font-weight: 800;
+          letter-spacing: -0.03em;
+          color: #0f172a;
+          line-height: 1;
+        }
+
+        .todayTaskProgressSub {
+          font-size: 9.5px;
+          font-weight: 700;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          color: #64748b;
+        }
+
+        .todayTaskProgressTrack {
+          width: 100%;
+          max-width: 112px;
+          height: 4px;
           border-radius: 999px;
-          border: 1px solid rgba(148, 163, 184, 0.35);
+          background: rgba(148, 163, 184, 0.22);
+          overflow: hidden;
+        }
+
+        .todayTaskProgressFill {
+          display: block;
+          height: 100%;
+          border-radius: 999px;
+          background: linear-gradient(90deg, #6366f1, #8b5cf6);
+          transition: width 0.35s ease;
+        }
+
+        .todayTaskCelebration .todayTaskProgressFill {
+          background: linear-gradient(90deg, #059669, #10b981);
+        }
+
+        .todayTaskContent {
+          position: relative;
+          border-radius: 12px;
+          border: 1px solid rgba(148, 163, 184, 0.18);
+          background: rgba(255, 255, 255, 0.55);
+          padding: clamp(8px, 1.15vw, 12px);
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+
+        .todayTaskContent--solo {
+          align-items: flex-start;
+        }
+
+        .todayTaskMeta {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 5px;
+        }
+
+        .todayTaskDatePill {
+          display: inline-flex;
+          align-items: center;
+          padding: 3px 9px;
+          border-radius: 999px;
+          border: 1px solid rgba(148, 163, 184, 0.28);
           background: rgba(255, 255, 255, 0.85);
           color: #334155;
-          font-size: 12px;
+          font-size: 10.5px;
           font-weight: 700;
-          padding: 5px 9px;
+          letter-spacing: 0.02em;
         }
+
+        .todayTaskDayChip {
+          display: inline-flex;
+          align-items: center;
+          padding: 3px 8px;
+          border-radius: 999px;
+          font-size: 10.5px;
+          font-weight: 800;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          color: #4338ca;
+          background: rgba(99, 102, 241, 0.1);
+          border: 1px solid rgba(99, 102, 241, 0.22);
+        }
+
+        .todayTaskStatus {
+          margin-left: auto;
+          padding: 3px 7px;
+          border-radius: 999px;
+          font-size: 9.5px;
+          font-weight: 800;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+        }
+
+        .todayTaskStatus--active {
+          color: #6d28d9;
+          background: rgba(139, 92, 246, 0.12);
+          border: 1px solid rgba(139, 92, 246, 0.25);
+        }
+
+        .todayTaskStatus--done {
+          color: #047857;
+          background: rgba(16, 185, 129, 0.12);
+          border: 1px solid rgba(16, 185, 129, 0.28);
+        }
+
         .todayTaskTitle {
           margin: 0;
           color: #0f172a;
-          font-size: 15px;
+          font-size: clamp(14px, 1.75vw, 17px);
           font-weight: 700;
+          line-height: 1.28;
+          letter-spacing: -0.02em;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
         }
+
+        .todayTaskCelebration .todayTaskTitle {
+          color: #064e3b;
+        }
+
         .todayTaskSub,
         .todayTaskHint {
           margin: 0;
           color: #64748b;
-          font-size: 13px;
+          font-size: 12.5px;
+          line-height: 1.42;
+          max-width: 52ch;
         }
-        .todayTaskActionsRow {
+
+        .todayTaskHint {
+          font-size: 11.5px;
+          color: #64748b;
+          margin-top: 1px;
+        }
+
+        .todayTaskActions {
           display: flex;
           flex-wrap: wrap;
           align-items: center;
-          gap: 10px;
+          gap: 6px;
         }
+
         .todayTaskBtn {
-          border-radius: 10px;
-          padding: 9px 12px;
-          font-size: 13px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          border-radius: 999px;
+          padding: 8px 14px;
+          font-size: 12.5px;
           font-weight: 700;
+          letter-spacing: 0.01em;
           cursor: pointer;
           border: 1px solid transparent;
-          width: fit-content;
+          line-height: 1;
+          transition:
+            transform 0.18s ease,
+            box-shadow 0.18s ease,
+            background 0.18s ease,
+            border-color 0.18s ease;
         }
+
+        .todayTaskBtnIcon {
+          font-size: 13px;
+          font-weight: 700;
+          opacity: 0.95;
+        }
+
         .todayTaskBtnPrimary {
-          background: #111111;
-          border-color: #111111;
+          background: #0f172a;
+          border-color: #0f172a;
           color: #ffffff;
+          box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.12) inset,
+            0 14px 32px rgba(15, 23, 42, 0.28);
         }
-        .todayTaskBtnSecondary {
-          background: #ffffff;
-          border-color: rgba(148, 163, 184, 0.4);
-          color: #334155;
+
+        .todayTaskBtnPrimary:hover {
+          transform: translateY(-1px);
+          box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.14) inset,
+            0 18px 40px rgba(15, 23, 42, 0.35);
+        }
+
+        .todayTaskBtnPrimary:active {
+          transform: translateY(0);
+        }
+
+        .todayTaskBtnGhost {
+          background: rgba(248, 250, 252, 0.9);
+          border-color: rgba(148, 163, 184, 0.35);
+          color: #64748b;
           cursor: default;
+          box-shadow: none;
+        }
+
+        @media (max-width: 560px) {
+          .todayTaskHeader {
+            flex-direction: column;
+            align-items: stretch;
+          }
+
+          .todayTaskProgress {
+            flex: 1 1 auto;
+            align-items: stretch;
+            text-align: left;
+          }
+
+          .todayTaskProgressMeta {
+            flex-direction: row;
+            align-items: baseline;
+            justify-content: space-between;
+            width: 100%;
+          }
+
+          .todayTaskProgressTrack {
+            max-width: none;
+          }
+
+          .todayTaskStatus {
+            margin-left: 0;
+          }
+
+          .todayTaskActions {
+            flex-direction: column;
+            align-items: stretch;
+          }
+
+          .todayTaskBtn {
+            width: 100%;
+          }
         }
 
         h2 {
@@ -1374,7 +1660,7 @@ export default function MarketingPlanPage() {
 
         .rows {
           display: grid;
-          gap: 14px;
+          gap: 16px;
         }
 
         .dayRow {
@@ -1384,24 +1670,109 @@ export default function MarketingPlanPage() {
           align-items: stretch;
           gap: 16px;
           border-radius: 22px;
-          border: 1px solid rgba(148, 163, 184, 0.28);
-          background: linear-gradient(160deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.84));
-          box-shadow: 0 18px 40px rgba(15, 23, 42, 0.1);
+          border: 1px solid rgba(226, 232, 240, 0.95);
+          background: linear-gradient(
+            148deg,
+            rgba(255, 255, 255, 0.94) 0%,
+            rgba(248, 250, 252, 0.88) 45%,
+            rgba(239, 246, 255, 0.52) 100%
+          );
+          box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.75) inset,
+            0 10px 28px rgba(15, 23, 42, 0.06),
+            0 2px 8px rgba(15, 23, 42, 0.03);
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
           padding: 18px 20px;
           text-align: left;
-          transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+          transition:
+            transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+            box-shadow 0.2s ease,
+            border-color 0.2s ease,
+            background 0.2s ease;
           min-height: 116px;
         }
 
-        .dayRow:hover {
+        .dayRowPending:hover {
           transform: translateY(-2px);
-          border-color: #111111;
-          box-shadow: 0 22px 44px rgba(0, 0, 0, 0.12);
+          border-color: rgba(186, 198, 224, 0.85);
+          box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.8) inset,
+            0 14px 36px rgba(15, 23, 42, 0.08),
+            0 4px 12px rgba(59, 130, 246, 0.06);
+        }
+
+        .dayRowCurrent {
+          border-color: rgba(165, 180, 252, 0.65);
+          background: linear-gradient(
+            148deg,
+            rgba(255, 255, 255, 0.96) 0%,
+            rgba(248, 250, 252, 0.9) 38%,
+            rgba(238, 242, 255, 0.72) 100%
+          );
+          box-shadow:
+            0 0 0 1px rgba(129, 140, 248, 0.22),
+            0 1px 0 rgba(255, 255, 255, 0.8) inset,
+            0 12px 34px rgba(99, 102, 241, 0.11),
+            0 6px 16px rgba(15, 23, 42, 0.05);
+        }
+
+        .dayRowCurrent.dayRowPending:hover {
+          transform: translateY(-2px);
+          border-color: rgba(129, 140, 248, 0.78);
+          box-shadow:
+            0 0 0 1px rgba(99, 102, 241, 0.28),
+            0 1px 0 rgba(255, 255, 255, 0.85) inset,
+            0 16px 40px rgba(99, 102, 241, 0.14),
+            0 6px 14px rgba(15, 23, 42, 0.06);
         }
 
         .dayRowCompleted {
-          border-color: #e5e5e5;
-          background: linear-gradient(160deg, rgba(245, 245, 245, 0.92), rgba(255, 255, 255, 0.85));
+          border-color: rgba(167, 243, 208, 0.75);
+          background: linear-gradient(
+            148deg,
+            rgba(236, 253, 245, 0.78) 0%,
+            rgba(255, 255, 255, 0.93) 52%,
+            rgba(240, 253, 250, 0.62) 100%
+          );
+          box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.75) inset,
+            0 10px 28px rgba(16, 185, 129, 0.07),
+            0 2px 8px rgba(15, 23, 42, 0.04);
+        }
+
+        .dayRowCompleted:hover {
+          transform: translateY(-2px);
+          border-color: rgba(134, 239, 172, 0.9);
+          box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.8) inset,
+            0 14px 36px rgba(16, 185, 129, 0.1),
+            0 4px 12px rgba(15, 23, 42, 0.05);
+        }
+
+        .dayRowCompleted.dayRowCurrent {
+          border-color: rgba(110, 231, 183, 0.85);
+          background: linear-gradient(
+            148deg,
+            rgba(220, 252, 231, 0.82) 0%,
+            rgba(255, 255, 255, 0.94) 48%,
+            rgba(237, 233, 254, 0.55) 100%
+          );
+          box-shadow:
+            0 0 0 1px rgba(129, 140, 248, 0.2),
+            0 1px 0 rgba(255, 255, 255, 0.82) inset,
+            0 12px 34px rgba(16, 185, 129, 0.1),
+            0 8px 20px rgba(99, 102, 241, 0.08);
+        }
+
+        .dayRowCompleted.dayRowCurrent:hover {
+          transform: translateY(-2px);
+          border-color: rgba(52, 211, 153, 0.88);
+          box-shadow:
+            0 0 0 1px rgba(99, 102, 241, 0.26),
+            0 1px 0 rgba(255, 255, 255, 0.88) inset,
+            0 16px 40px rgba(16, 185, 129, 0.12),
+            0 6px 16px rgba(99, 102, 241, 0.08);
         }
 
         .dayCheckWrap {
@@ -1472,24 +1843,33 @@ export default function MarketingPlanPage() {
 
         .miniChip {
           border-radius: 999px;
-          font-size: 10.5px;
+          font-size: 10px;
           font-weight: 800;
-          letter-spacing: 0.08em;
+          letter-spacing: 0.1em;
           text-transform: uppercase;
-          padding: 5px 10px;
+          padding: 6px 11px;
           border: 1px solid transparent;
           flex-shrink: 0;
           line-height: 1.2;
+          box-shadow: 0 1px 0 rgba(255, 255, 255, 0.65) inset;
         }
         .miniChip.business {
-          color: #111111;
-          background: #f5f5f5;
-          border-color: #e5e5e5;
+          color: #334155;
+          background: linear-gradient(
+            165deg,
+            rgba(248, 250, 252, 0.98) 0%,
+            rgba(226, 232, 240, 0.55) 100%
+          );
+          border-color: rgba(148, 163, 184, 0.38);
         }
         .miniChip.marketing {
-          color: #1d4ed8;
-          background: rgba(59, 130, 246, 0.14);
-          border-color: rgba(59, 130, 246, 0.3);
+          color: #1e40af;
+          background: linear-gradient(
+            165deg,
+            rgba(239, 246, 255, 0.95) 0%,
+            rgba(219, 234, 254, 0.55) 100%
+          );
+          border-color: rgba(147, 197, 253, 0.65);
         }
         .chipText {
           min-width: 0;
@@ -1512,9 +1892,14 @@ export default function MarketingPlanPage() {
           gap: 4px;
           padding: 10px 12px;
           border-radius: 14px;
-          border: 1px solid rgba(148, 163, 184, 0.28);
-          background: rgba(255, 255, 255, 0.78);
+          border: 1px solid rgba(226, 232, 240, 0.95);
+          background: linear-gradient(
+            160deg,
+            rgba(255, 255, 255, 0.82) 0%,
+            rgba(241, 245, 249, 0.45) 100%
+          );
           min-width: 116px;
+          transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
         }
 
         .dateBlockMain {
@@ -1532,9 +1917,32 @@ export default function MarketingPlanPage() {
           text-transform: uppercase;
         }
 
+        .dayRowCurrent .dateBlock {
+          border-color: rgba(199, 210, 254, 0.85);
+          background: linear-gradient(
+            160deg,
+            rgba(255, 255, 255, 0.9) 0%,
+            rgba(238, 242, 255, 0.65) 100%
+          );
+          box-shadow: 0 1px 0 rgba(255, 255, 255, 0.75) inset;
+        }
+
         .dayRowCompleted .dateBlock {
-          background: #f5f5f5;
-          border-color: #e5e5e5;
+          border-color: rgba(167, 243, 208, 0.65);
+          background: linear-gradient(
+            160deg,
+            rgba(255, 255, 255, 0.88) 0%,
+            rgba(209, 250, 229, 0.42) 100%
+          );
+        }
+
+        .dayRowCompleted.dayRowCurrent .dateBlock {
+          border-color: rgba(134, 239, 172, 0.75);
+          background: linear-gradient(
+            160deg,
+            rgba(240, 253, 244, 0.92) 0%,
+            rgba(237, 233, 254, 0.38) 100%
+          );
         }
 
         .rowTitle {
@@ -1550,22 +1958,46 @@ export default function MarketingPlanPage() {
         }
 
         .rowArrow {
-          width: 36px;
-          height: 36px;
+          width: 38px;
+          height: 38px;
           display: grid;
           place-items: center;
           border-radius: 999px;
-          border: 1px solid rgba(148, 163, 184, 0.35);
-          background: #ffffff;
-          color: #475569;
+          border: 1px solid rgba(226, 232, 240, 0.95);
+          background: linear-gradient(
+            165deg,
+            rgba(255, 255, 255, 0.95) 0%,
+            rgba(241, 245, 249, 0.75) 100%
+          );
+          color: #64748b;
           font-weight: 700;
-          font-size: 16px;
+          font-size: 15px;
           flex-shrink: 0;
+          box-shadow: 0 1px 0 rgba(255, 255, 255, 0.85) inset, 0 4px 12px rgba(15, 23, 42, 0.05);
+          transition: border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
         }
 
-        .dayRow:hover .rowArrow {
-          border-color: #111111;
-          color: #111111;
+        .dayRowPending:hover .rowArrow {
+          border-color: rgba(186, 198, 224, 0.9);
+          color: #3b82f6;
+          box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 6px 16px rgba(59, 130, 246, 0.12);
+        }
+
+        .dayRowCurrent.dayRowPending:hover .rowArrow {
+          border-color: rgba(165, 180, 252, 0.95);
+          color: #4f46e5;
+          box-shadow: 0 1px 0 rgba(255, 255, 255, 0.92) inset, 0 6px 18px rgba(99, 102, 241, 0.18);
+        }
+
+        .dayRowCompleted:hover .rowArrow {
+          border-color: rgba(134, 239, 172, 0.85);
+          color: #047857;
+          box-shadow: 0 1px 0 rgba(255, 255, 255, 0.88) inset, 0 6px 16px rgba(16, 185, 129, 0.12);
+        }
+
+        .dayRowCompleted.dayRowCurrent:hover .rowArrow {
+          border-color: rgba(110, 231, 183, 0.95);
+          color: #059669;
         }
 
         .modalOverlay {

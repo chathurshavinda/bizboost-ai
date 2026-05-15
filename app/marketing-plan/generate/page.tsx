@@ -132,7 +132,7 @@ export default function GenerateMarketingPlanPage() {
         }
         return null;
     }, [errorCode, router]);
-    return (<div className="min-h-screen px-4 py-8 text-black sm:px-6 sm:py-10">
+    return (<div className="bb-workspace-canvas min-h-screen px-4 py-8 text-black sm:px-6 sm:py-10">
       <div className="mx-auto w-full max-w-6xl space-y-6 sm:space-y-8">
         <section className="rounded-3xl border border-black/15 bg-black/10 p-5 shadow-[0_16px_50px_rgba(0,0,0,0.08)] backdrop-blur-xl transition-all duration-300 sm:p-8">
           <div className="mb-4 flex items-center justify-between">

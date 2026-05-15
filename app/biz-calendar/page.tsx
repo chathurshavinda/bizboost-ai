@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FaCheck, FaRegCopy, FaTimes } from "react-icons/fa";
+import { FaCheck, FaCheckCircle, FaClock, FaRegCopy, FaTimes } from "react-icons/fa";
 import { useAuth } from "@/src/lib/useAuth";
 type GeneratedDay = {
     dayNumber: number;
@@ -290,22 +290,35 @@ export default function BizCalendarPage() {
     return (<div className="calPage">
       <div className="calShell">
         <header className="calHero">
-          <div>
-            <p className="eyebrow">Smart Calendar</p>
-            <h1>Biz Calendar</h1>
-            <p className="heroText">
+          <div className="calHeroMain">
+            <p className="eyebrow calHeroEyebrow">Smart Calendar</p>
+            <h1 className="calHeroTitle">Biz Calendar</h1>
+            <p className="heroText calHeroLead">
               Track your latest {planDays || planData.length || ""}-day growth plan, open day tasks, and see which days already have posters.
             </p>
           </div>
-          <div className="progressPanel">
-            <span className="progressNumber">{progressPercent}%</span>
-            <span className="progressText">{completedCount}/{planData.length || 0} completed</span>
-          </div>
+          {!isLoading && planData.length > 0 ? (<div className="progressPanel" role="status" aria-live="polite" aria-label={`Plan progress ${progressPercent} percent, ${completedCount} of ${planData.length} days completed`}>
+              <div className="progressDonut" style={{ background: `conic-gradient(from -90deg, #34d399 ${progressPercent}%, rgba(148, 163, 184, 0.22) ${progressPercent}%)` }}>
+                <div className="progressDonutInner">
+                  <span className="progressDonutValue">{progressPercent}<span className="progressDonutPct">%</span></span>
+                </div>
+              </div>
+              <div className="progressCopy">
+                <p className="progressStat">
+                  <strong>{completedCount}</strong>
+                  <span className="progressStatOf"> / {planData.length}</span>
+                </p>
+                <p className="progressSub">days completed</p>
+              </div>
+            </div>) : null}
         </header>
 
         <section className="calendarCard">
           <div className="weekdayGrid" aria-hidden>
-            {weekdays.map((day) => (<span key={day}>{day}</span>))}
+            {weekdays.map((day) => (<span key={day} className="weekdayCell">{day}</span>))}
+          </div>
+          <div className="weekdayStripMobile" aria-hidden>
+            {weekdays.map((day) => (<span key={`mob-${day}`}>{day}</span>))}
           </div>
 
           {isLoading ? (<div className="calendarGrid" aria-busy="true" aria-label="Loading calendar">
@@ -319,19 +332,35 @@ export default function BizCalendarPage() {
                 const posterUrl = posterMap[cell.day.dayNumber];
                 const todayMatch = isSameDay(cell.date, today);
                 const title = cleanTitle(cell.day.mainActionTitle || "") || cell.day.mainActionTitle || `Day ${cell.day.dayNumber}`;
+                const weekdayShort = cell.date.toLocaleDateString("en-US", { weekday: "short" });
                 return (<button key={cell.key} type="button" className={`dayCell ${completed ? "completed" : ""} ${todayMatch ? "today" : ""}`} onClick={() => {
                         setCopied(false);
                         setSelectedDayNumber(cell.day?.dayNumber ?? null);
                     }}>
-                    {completed ? <span className="completedWatermark">COMPLETED</span> : null}
                     <span className="cellTop">
-                      <span className="dateText">{dateLabel(cell.date)}</span>
-                      {todayMatch ? <span className="todayBadge">Today</span> : null}
+                      <span className="dateBlock">
+                        <span className="dateWeekday">{weekdayShort}</span>
+                        <span className="dateText">{dateLabel(cell.date)}</span>
+                      </span>
+                      <span className="cellBadgeGroup">
+                        {todayMatch ? <span className="todayBadge">Today</span> : null}
+                        {completed ? (<span className="cellDonePill">
+                            <FaCheckCircle className="cellDonePillIcon" size={12} aria-hidden/>
+                            Done
+                          </span>) : null}
+                      </span>
                     </span>
+                    <span className="cellDayNum">Day {cell.day.dayNumber}</span>
                     <span className="cellTitle" title={title}>{title}</span>
                     <span className="cellBottom">
-                      <span className={`statusBadge ${completed ? "done" : "pending"}`}>
-                        {completed ? "✅ Completed" : "⏳ Pending"}
+                      <span className={`statusPill ${completed ? "statusPill--done" : "statusPill--pending"}`}>
+                        {completed ? (<>
+                              <FaCheckCircle size={12} aria-hidden/>
+                              Completed
+                            </>) : (<>
+                              <FaClock size={12} aria-hidden/>
+                              Pending
+                            </>)}
                       </span>
                       {posterUrl ? (<span className="posterMini" aria-label="Poster available">
                           <img src={posterUrl} alt=""/>
@@ -350,10 +379,18 @@ export default function BizCalendarPage() {
             </button>
             <div className="drawerHeader">
               <p className="eyebrow">{selectedDay.dateLabel || `Day ${selectedDay.dayNumber}`}</p>
-              <h2 id="day-drawer-title">{selectedDay.mainActionTitle || `Day ${selectedDay.dayNumber}`}</h2>
-              <span className={`statusBadge ${completedMap[selectedDay.dayNumber] ? "done" : "pending"}`}>
-                {completedMap[selectedDay.dayNumber] ? "✅ Completed" : "⏳ Pending"}
-              </span>
+              <div className="drawerTitleRow">
+                <h2 id="day-drawer-title">{selectedDay.mainActionTitle || `Day ${selectedDay.dayNumber}`}</h2>
+                <span className={`statusPill statusPill--drawer ${completedMap[selectedDay.dayNumber] ? "statusPill--done" : "statusPill--pending"}`}>
+                  {completedMap[selectedDay.dayNumber] ? (<>
+                      <FaCheckCircle size={13} aria-hidden/>
+                      Completed
+                    </>) : (<>
+                      <FaClock size={13} aria-hidden/>
+                      Pending
+                    </>)}
+                </span>
+              </div>
             </div>
 
             {posterMap[selectedDay.dayNumber] ? (<div className="posterPreview">
@@ -439,152 +476,332 @@ export default function BizCalendarPage() {
       <style jsx>{`
         .calPage {
           min-height: 100vh;
-          padding: 28px 16px 16px;
-          background: var(--page-bg);
+          padding: 28px 16px 40px;
+          background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+          color: #e4e4e7;
         }
 
         .calShell {
-          max-width: 1180px;
+          max-width: 1200px;
           margin: 0 auto;
           display: grid;
-          gap: 16px;
+          gap: 22px;
         }
 
         .calHero,
         .calendarCard {
-          border: 1px solid rgba(255, 255, 255, 0.24);
-          background: rgba(255, 255, 255, 0.78);
-          box-shadow: 0 24px 70px rgba(0, 0, 0, 0.2);
-          backdrop-filter: blur(18px);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          background: linear-gradient(165deg, rgba(28, 28, 32, 0.96) 0%, rgba(12, 12, 14, 0.98) 100%);
+          box-shadow:
+            0 0 0 1px rgba(255, 255, 255, 0.03) inset,
+            0 24px 56px rgba(0, 0, 0, 0.5),
+            0 8px 20px rgba(0, 0, 0, 0.35);
+          backdrop-filter: blur(22px);
         }
 
         .calHero {
-          border-radius: 30px;
-          padding: 24px;
+          border-radius: 20px;
+          padding: clamp(24px, 3.5vw, 40px);
           display: flex;
           justify-content: space-between;
-          align-items: flex-end;
-          gap: 18px;
+          align-items: flex-start;
+          gap: clamp(20px, 3vw, 36px);
+          flex-wrap: wrap;
+        }
+
+        .calHeroMain {
+          flex: 1 1 280px;
+          min-width: 0;
+          max-width: min(100%, 52rem);
+          padding-right: clamp(0px, 2vw, 20px);
+        }
+
+        .calHeroEyebrow {
+          margin: 0 !important;
+          font-size: 11px !important;
+          letter-spacing: 0.2em !important;
+          text-transform: uppercase !important;
+          color: #a1a1aa !important;
+          font-weight: 700 !important;
+          line-height: 1.4 !important;
+        }
+
+        .calHeroTitle {
+          margin: 14px 0 0 !important;
+          padding: 0 !important;
+          color: #fafafa !important;
+          font-size: clamp(30px, 4.2vw, 44px) !important;
+          line-height: 1.12 !important;
+          letter-spacing: -0.03em !important;
+          font-weight: 600 !important;
+          max-width: 100%;
+          overflow-wrap: break-word;
+          word-wrap: break-word;
+        }
+
+        .calHeroLead {
+          margin: 16px 0 0 !important;
+          padding: 0 !important;
+          max-width: 100% !important;
+          width: 100%;
+          color: #d4d4d8 !important;
+          line-height: 1.65 !important;
+          font-size: clamp(14px, 1.65vw, 16px) !important;
+          font-weight: 400 !important;
+          overflow-wrap: break-word;
+          word-wrap: break-word;
+          text-wrap: pretty;
         }
 
         .eyebrow {
           margin: 0;
           font-size: 11px;
-          letter-spacing: 0.2em;
+          letter-spacing: 0.18em;
           text-transform: uppercase;
-          color: #64748b;
-          font-weight: 800;
-        }
-
-        h1 {
-          margin: 8px 0 0;
-          color: #0f172a;
-          font-size: clamp(34px, 5vw, 56px);
-          line-height: 1;
-          letter-spacing: -0.04em;
-        }
-
-        .heroText {
-          margin: 10px 0 0;
-          max-width: 680px;
-          color: #475569;
-          line-height: 1.6;
-        }
-
-        .progressPanel {
-          min-width: 150px;
-          border-radius: 22px;
-          border: 1px solid rgba(15, 23, 42, 0.1);
-          background: rgba(15, 23, 42, 0.92);
-          color: #fff;
-          padding: 16px;
-          display: grid;
-          gap: 4px;
-          text-align: right;
-        }
-
-        .progressNumber {
-          font-size: 30px;
-          font-weight: 900;
-          letter-spacing: -0.04em;
-        }
-
-        .progressText {
-          font-size: 12px;
-          color: rgba(255, 255, 255, 0.7);
+          color: #71717a;
           font-weight: 700;
         }
 
+        h1 {
+          margin: 10px 0 0;
+          color: #fafafa;
+          font-size: clamp(32px, 4.6vw, 46px);
+          line-height: 1.05;
+          letter-spacing: -0.038em;
+          font-weight: 600;
+        }
+
+        .heroText {
+          margin: 12px 0 0;
+          max-width: 36rem;
+          color: #a1a1aa;
+          line-height: 1.65;
+          font-size: 15px;
+        }
+
+        .progressPanel {
+          display: flex;
+          align-items: center;
+          gap: 20px;
+          padding: 18px 22px;
+          border-radius: 16px;
+          background: linear-gradient(145deg, rgba(9, 9, 11, 0.95) 0%, rgba(24, 24, 27, 0.92) 100%);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          box-shadow:
+            0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+            0 16px 40px rgba(0, 0, 0, 0.4);
+          color: #fafafa;
+          flex-shrink: 0;
+          align-self: center;
+        }
+
+        .progressStat {
+          margin: 0 !important;
+          font-size: 18px !important;
+          font-weight: 700 !important;
+          letter-spacing: -0.02em !important;
+          color: #fafafa !important;
+          line-height: 1.25 !important;
+        }
+
+        .progressStat strong {
+          font-weight: 800 !important;
+          color: #4ade80 !important;
+        }
+
+        .progressStatOf {
+          font-weight: 600 !important;
+          color: rgba(212, 212, 216, 0.95) !important;
+          font-size: 16px !important;
+        }
+
+        .progressSub {
+          margin: 0 !important;
+          font-size: 12px !important;
+          font-weight: 600 !important;
+          color: #d4d4d8 !important;
+          letter-spacing: 0.03em !important;
+          line-height: 1.35 !important;
+        }
+
+        .progressDonut {
+          width: 74px;
+          height: 74px;
+          border-radius: 50%;
+          flex-shrink: 0;
+          display: grid;
+          place-items: center;
+          box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+        }
+
+        .progressDonutInner {
+          width: 54px;
+          height: 54px;
+          border-radius: 50%;
+          background: linear-gradient(180deg, #18181b 0%, #09090b 100%);
+          display: grid;
+          place-items: center;
+          box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+        }
+
+        .progressDonutValue {
+          font-size: 15px;
+          font-weight: 800;
+          letter-spacing: -0.03em;
+          color: #fafafa;
+          font-variant-numeric: tabular-nums;
+          line-height: 1;
+        }
+
+        .progressDonutPct {
+          font-size: 11px;
+          font-weight: 700;
+          opacity: 0.75;
+        }
+
+        .progressCopy {
+          display: flex;
+          flex-direction: column;
+          gap: 5px;
+          text-align: left;
+          min-width: 0;
+        }
+
         .calendarCard {
-          border-radius: 30px;
-          padding: 18px;
+          border-radius: 20px;
+          padding: clamp(18px, 2.4vw, 26px);
         }
 
         .weekdayGrid,
         .calendarGrid {
           display: grid;
           grid-template-columns: repeat(7, minmax(0, 1fr));
-          gap: 10px;
+          gap: clamp(8px, 1.2vw, 12px);
         }
 
         .weekdayGrid {
-          margin-bottom: 10px;
+          margin-bottom: 14px;
         }
 
-        .weekdayGrid span {
-          color: rgba(255, 255, 255, 0.9);
-          background: rgba(15, 23, 42, 0.92);
-          border-radius: 999px;
-          padding: 8px 10px;
+        .weekdayCell {
           text-align: center;
-          font-size: 12px;
-          font-weight: 800;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          color: #a1a1aa;
+          padding: 10px 6px;
+          border-radius: 12px;
+          background: rgba(24, 24, 27, 0.85);
+          border: 1px solid rgba(255, 255, 255, 0.06);
         }
 
         .dayCell {
           position: relative;
-          min-height: 150px;
+          min-height: 156px;
           overflow: hidden;
-          border-radius: 22px;
-          border: 1px solid rgba(15, 23, 42, 0.1);
-          background: rgba(255, 255, 255, 0.86);
-          box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
-          padding: 14px;
+          border-radius: 14px;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          background: linear-gradient(165deg, rgba(30, 30, 34, 0.95) 0%, rgba(18, 18, 21, 0.98) 100%);
+          box-shadow:
+            0 0 0 1px rgba(255, 255, 255, 0.03) inset,
+            0 12px 32px rgba(0, 0, 0, 0.35);
+          padding: 14px 14px 12px;
           text-align: left;
           cursor: pointer;
           display: flex;
           flex-direction: column;
-          gap: 10px;
-          transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+          gap: 8px;
+          color: #e4e4e7;
+          transition:
+            transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+            box-shadow 0.22s ease,
+            border-color 0.22s ease,
+            background 0.22s ease;
+        }
+
+        .dayCell:focus-visible {
+          outline: none;
+          border-color: rgba(99, 102, 241, 0.55);
+          box-shadow:
+            0 0 0 3px rgba(99, 102, 241, 0.28),
+            0 14px 36px rgba(0, 0, 0, 0.4);
         }
 
         .dayCell:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 20px 38px rgba(15, 23, 42, 0.16);
-          border-color: rgba(15, 23, 42, 0.24);
+          transform: translateY(-3px);
+          border-color: rgba(255, 255, 255, 0.14);
+          box-shadow:
+            0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+            0 20px 44px rgba(0, 0, 0, 0.45);
         }
 
         .dayCell.today {
-          border-color: rgba(59, 130, 246, 0.55);
-          box-shadow: 0 18px 34px rgba(37, 99, 235, 0.18);
+          border-color: rgba(59, 130, 246, 0.45);
+          background: linear-gradient(165deg, rgba(30, 58, 138, 0.22) 0%, rgba(18, 18, 22, 0.96) 55%);
+          box-shadow:
+            0 0 0 1px rgba(96, 165, 250, 0.12) inset,
+            0 12px 36px rgba(37, 99, 235, 0.15);
+        }
+
+        .dayCell.today:hover {
+          border-color: rgba(96, 165, 250, 0.55);
         }
 
         .dayCell.completed {
-          border-color: #e5e5e5;
-          background: linear-gradient(180deg, rgba(245, 245, 245, 0.94), rgba(255, 255, 255, 0.88));
-          box-shadow: none;
+          border-color: rgba(34, 197, 94, 0.35);
+          background: linear-gradient(165deg, rgba(6, 78, 59, 0.28) 0%, rgba(18, 22, 20, 0.96) 60%);
+          box-shadow:
+            0 0 0 1px rgba(52, 211, 153, 0.08) inset,
+            0 12px 32px rgba(16, 185, 129, 0.1);
+        }
+
+        .dayCell.completed:hover {
+          border-color: rgba(52, 211, 153, 0.45);
+        }
+
+        .dayCell.today.completed {
+          border-color: rgba(52, 211, 153, 0.4);
+          background: linear-gradient(165deg, rgba(30, 58, 138, 0.2) 0%, rgba(6, 78, 59, 0.22) 45%, rgba(16, 18, 20, 0.97) 100%);
+        }
+
+        .cellDonePill {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          padding: 5px 9px 5px 7px;
+          border-radius: 999px;
+          font-size: 10px;
+          font-weight: 800;
+          letter-spacing: 0.07em;
+          text-transform: uppercase;
+          color: #86efac;
+          background: rgba(22, 101, 52, 0.45);
+          border: 1px solid rgba(52, 211, 153, 0.35);
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+          flex-shrink: 0;
+          white-space: nowrap;
+        }
+
+        .cellDonePillIcon {
+          color: #4ade80;
+          flex-shrink: 0;
         }
 
         .dayCellEmpty {
           cursor: default;
-          opacity: 0.35;
+          opacity: 0.22;
           pointer-events: none;
-          background: rgba(255, 255, 255, 0.34);
+          background: rgba(24, 24, 27, 0.4);
+          border-style: dashed;
+          border-color: rgba(63, 63, 70, 0.7);
+          box-shadow: none;
         }
 
         .skeleton {
-          min-height: 130px;
-          background: linear-gradient(90deg, rgba(226, 232, 240, 0.75), rgba(248, 250, 252, 0.9), rgba(226, 232, 240, 0.75));
+          min-height: 144px;
+          border-radius: 14px;
+          background: linear-gradient(90deg, rgba(39, 39, 42, 0.5), rgba(63, 63, 70, 0.35), rgba(39, 39, 42, 0.5));
           background-size: 200% 100%;
           animation: shimmer 1.2s ease-in-out infinite;
         }
@@ -592,69 +809,136 @@ export default function BizCalendarPage() {
         .cellTop,
         .cellBottom {
           display: flex;
-          align-items: center;
           justify-content: space-between;
-          gap: 8px;
+          gap: 10px;
+        }
+
+        .cellTop {
+          width: 100%;
+          align-items: flex-start;
+        }
+
+        .cellBottom {
+          align-items: center;
+        }
+
+        .dateBlock {
+          display: flex;
+          flex-direction: column;
+          gap: 3px;
+          min-width: 0;
+          flex: 1 1 0;
+        }
+
+        .cellBadgeGroup {
+          display: inline-flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          justify-content: flex-end;
+          align-items: center;
+          flex: 0 1 auto;
+          max-width: min(148px, 46%);
+        }
+
+        @media (min-width: 1100px) {
+          .cellBadgeGroup {
+            max-width: min(168px, 40%);
+          }
+        }
+
+        .dateWeekday {
+          font-size: 10px;
+          font-weight: 800;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: #71717a;
         }
 
         .dateText {
-          color: #0f172a;
+          color: #fafafa;
           font-size: 13px;
-          font-weight: 900;
+          font-weight: 700;
+          letter-spacing: -0.02em;
         }
 
         .todayBadge {
           border-radius: 999px;
-          background: rgba(37, 99, 235, 0.12);
-          color: #1d4ed8;
-          border: 1px solid rgba(37, 99, 235, 0.22);
-          padding: 4px 7px;
+          background: rgba(37, 99, 235, 0.35);
+          color: #bfdbfe;
+          border: 1px solid rgba(96, 165, 250, 0.45);
+          padding: 5px 10px;
           font-size: 10px;
-          font-weight: 900;
+          font-weight: 800;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          flex-shrink: 0;
+          white-space: nowrap;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .cellDayNum {
+          font-size: 11px;
+          font-weight: 700;
+          color: #a5b4fc;
+          letter-spacing: 0.04em;
         }
 
         .cellTitle {
-          color: #111827;
-          font-size: 14px;
-          line-height: 1.35;
-          font-weight: 800;
+          color: #d4d4d8;
+          font-size: 13px;
+          line-height: 1.45;
+          font-weight: 600;
+          letter-spacing: -0.015em;
           display: -webkit-box;
           -webkit-line-clamp: 2;
           -webkit-box-orient: vertical;
           overflow: hidden;
+          flex: 1;
           min-height: 38px;
+          margin-top: 0;
+          padding-right: 0;
         }
 
-        .statusBadge {
+        .statusPill {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
           width: fit-content;
           border-radius: 999px;
-          padding: 6px 9px;
+          padding: 6px 11px;
           font-size: 11px;
-          font-weight: 900;
+          font-weight: 700;
+          letter-spacing: 0.02em;
           border: 1px solid transparent;
         }
 
-        .statusBadge.done {
-          background: #f5f5f5;
-          border-color: #e5e5e5;
-          color: #111111;
-          box-shadow: none;
+        .statusPill--done {
+          background: rgba(22, 101, 52, 0.35);
+          border-color: rgba(52, 211, 153, 0.28);
+          color: #86efac;
         }
 
-        .statusBadge.pending {
-          background: rgba(148, 163, 184, 0.16);
-          border-color: rgba(148, 163, 184, 0.28);
-          color: #475569;
+        .statusPill--pending {
+          background: rgba(120, 53, 15, 0.35);
+          border-color: rgba(251, 191, 36, 0.25);
+          color: #fde68a;
+        }
+
+        .statusPill--drawer {
+          width: auto;
+          padding: 7px 14px;
+          font-size: 12px;
         }
 
         .posterMini {
-          width: 34px;
-          height: 42px;
+          width: 38px;
+          height: 46px;
           overflow: hidden;
-          border-radius: 9px;
-          border: 1px solid rgba(15, 23, 42, 0.14);
-          background: #fff;
+          border-radius: 10px;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          background: #09090b;
           flex-shrink: 0;
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
         }
 
         .posterMini img {
@@ -664,23 +948,22 @@ export default function BizCalendarPage() {
           display: block;
         }
 
-        .completedWatermark {
-          position: absolute;
-          inset: auto -24px 26px auto;
-          transform: rotate(-28deg);
-          color: rgba(17, 17, 17, 0.12);
-          font-size: 20px;
-          font-weight: 1000;
-          letter-spacing: 0.12em;
-          pointer-events: none;
+        .weekdayStripMobile {
+          display: none;
         }
 
         .emptyState {
-          min-height: 160px;
+          min-height: 176px;
           display: grid;
           place-items: center;
-          color: #64748b;
-          font-weight: 700;
+          text-align: center;
+          padding: 28px 16px;
+          color: #a1a1aa;
+          font-weight: 600;
+          font-size: 15px;
+          line-height: 1.55;
+          max-width: 28rem;
+          margin: 0 auto;
         }
 
         .drawerOverlay,
@@ -688,8 +971,8 @@ export default function BizCalendarPage() {
           position: fixed;
           inset: 0;
           z-index: 80;
-          background: rgba(0, 0, 0, 0.54);
-          backdrop-filter: blur(8px);
+          background: rgba(0, 0, 0, 0.72);
+          backdrop-filter: blur(10px);
           display: flex;
           justify-content: flex-end;
           padding: 16px;
@@ -700,48 +983,78 @@ export default function BizCalendarPage() {
           width: min(100%, 560px);
           max-height: calc(100vh - 32px);
           overflow-y: auto;
-          border-radius: 28px;
-          border: 1px solid rgba(255, 255, 255, 0.28);
-          background: rgba(255, 255, 255, 0.9);
-          box-shadow: 0 30px 80px rgba(0, 0, 0, 0.36);
-          backdrop-filter: blur(20px);
+          border-radius: 20px;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          background: linear-gradient(180deg, rgba(28, 28, 32, 0.98) 0%, rgba(12, 12, 14, 0.99) 100%);
+          box-shadow: 0 32px 80px rgba(0, 0, 0, 0.65);
+          backdrop-filter: blur(24px);
           padding: 24px;
+          color: #e4e4e7;
         }
 
         .closeBtn {
           position: absolute;
           top: 18px;
           right: 18px;
-          width: 34px;
-          height: 34px;
+          width: 38px;
+          height: 38px;
           border-radius: 999px;
-          border: 1px solid rgba(15, 23, 42, 0.12);
-          background: rgba(255, 255, 255, 0.85);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          background: rgba(39, 39, 42, 0.9);
           display: grid;
           place-items: center;
           cursor: pointer;
+          color: #a1a1aa;
+          transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
+        }
+
+        .closeBtn:hover {
+          background: #27272a;
+          border-color: rgba(255, 255, 255, 0.18);
+          color: #fafafa;
         }
 
         .drawerHeader {
-          padding-right: 42px;
-          display: grid;
-          gap: 8px;
+          padding-right: 48px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
         }
 
-        .drawerHeader h2 {
+        .drawerHeader .eyebrow {
+          color: #71717a;
+        }
+
+        .drawerTitleRow {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 12px;
+        }
+
+        .drawerTitleRow h2 {
+          flex: 1;
+          min-width: min(100%, 220px);
           margin: 0;
-          color: #0f172a;
-          font-size: clamp(24px, 4vw, 36px);
-          line-height: 1.05;
+          color: #fafafa;
+          font-size: clamp(22px, 3.6vw, 32px);
+          line-height: 1.12;
           letter-spacing: -0.03em;
+          font-weight: 600;
+        }
+
+        .drawerTitleRow .statusPill {
+          flex-shrink: 0;
+          margin-top: 4px;
         }
 
         .posterPreview {
           margin-top: 18px;
-          border-radius: 22px;
+          border-radius: 16px;
           overflow: hidden;
-          border: 1px solid rgba(15, 23, 42, 0.12);
-          background: #0f172a;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          background: #09090b;
         }
 
         .posterPreview img {
@@ -753,22 +1066,24 @@ export default function BizCalendarPage() {
 
         .drawerSection {
           margin-top: 18px;
-          border-radius: 18px;
-          border: 1px solid rgba(148, 163, 184, 0.24);
-          background: rgba(255, 255, 255, 0.7);
-          padding: 14px;
+          border-radius: 14px;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          background: rgba(24, 24, 27, 0.65);
+          padding: 16px;
         }
 
         .drawerSection h3 {
-          margin: 0 0 8px;
-          color: #0f172a;
-          font-size: 15px;
+          margin: 0 0 10px;
+          color: #fafafa;
+          font-size: 14px;
+          font-weight: 700;
+          letter-spacing: -0.01em;
         }
 
         .drawerSection p {
           margin: 0;
-          color: #334155;
-          line-height: 1.6;
+          color: #a1a1aa;
+          line-height: 1.62;
           font-size: 14px;
         }
 
@@ -777,21 +1092,21 @@ export default function BizCalendarPage() {
           margin: 0;
           padding: 0;
           display: grid;
-          gap: 8px;
+          gap: 10px;
         }
 
         .stepList li {
           display: flex;
-          gap: 8px;
+          gap: 10px;
           align-items: flex-start;
-          color: #334155;
+          color: #d4d4d8;
           font-size: 14px;
           line-height: 1.5;
         }
 
         .stepList svg {
           margin-top: 4px;
-          color: #111111;
+          color: #4ade80;
           flex-shrink: 0;
         }
 
@@ -808,44 +1123,56 @@ export default function BizCalendarPage() {
         .copyBtn,
         .modalBtn {
           border-radius: 12px;
-          padding: 10px 13px;
+          padding: 10px 14px;
           font-size: 13px;
-          font-weight: 800;
+          font-weight: 700;
           cursor: pointer;
-          border: 1px solid rgba(148, 163, 184, 0.36);
+          border: 1px solid rgba(255, 255, 255, 0.12);
           display: inline-flex;
           align-items: center;
-          gap: 7px;
+          gap: 8px;
+          transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
         }
 
         .copyBtn,
         .modalBtn.secondary {
-          background: rgba(255, 255, 255, 0.86);
-          color: #334155;
+          background: rgba(39, 39, 42, 0.9);
+          color: #e4e4e7;
+        }
+
+        .copyBtn:hover,
+        .modalBtn.secondary:hover {
+          background: #3f3f46;
+          border-color: rgba(255, 255, 255, 0.16);
         }
 
         .modalBtn.primary {
-          background: linear-gradient(145deg, #0f172a, #111827);
-          color: #fff;
-          border-color: rgba(15, 23, 42, 0.22);
-          box-shadow: 0 12px 26px rgba(15, 23, 42, 0.22);
+          background: linear-gradient(145deg, #22c55e 0%, #16a34a 100%);
+          color: #052e16;
+          border-color: rgba(34, 197, 94, 0.5);
+          box-shadow: 0 8px 24px rgba(34, 197, 94, 0.25);
+          font-weight: 800;
+        }
+
+        .modalBtn.primary:hover {
+          filter: brightness(1.06);
         }
 
         .modalBtn:disabled {
-          opacity: 0.65;
+          opacity: 0.55;
           cursor: not-allowed;
         }
 
         .captionBox {
           width: 100%;
-          min-height: 118px;
+          min-height: 120px;
           resize: vertical;
-          border-radius: 14px;
-          border: 1px solid rgba(148, 163, 184, 0.34);
-          background: rgba(255, 255, 255, 0.82);
-          color: #0f172a;
+          border-radius: 12px;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          background: rgba(9, 9, 11, 0.85);
+          color: #e4e4e7;
           padding: 12px;
-          line-height: 1.5;
+          line-height: 1.55;
           font: inherit;
         }
 
@@ -857,16 +1184,17 @@ export default function BizCalendarPage() {
 
         .chips span {
           border-radius: 999px;
-          background: rgba(15, 23, 42, 0.08);
-          color: #334155;
-          padding: 7px 10px;
+          background: rgba(39, 39, 42, 0.95);
+          color: #d4d4d8;
+          padding: 7px 11px;
           font-size: 12px;
-          font-weight: 800;
+          font-weight: 700;
+          border: 1px solid rgba(255, 255, 255, 0.06);
         }
 
         .drawerActions {
           justify-content: flex-end;
-          margin-top: 18px;
+          margin-top: 22px;
         }
 
         .modalOverlay {
@@ -876,23 +1204,26 @@ export default function BizCalendarPage() {
 
         .modalCard {
           width: min(100%, 440px);
-          border-radius: 24px;
-          border: 1px solid rgba(255, 255, 255, 0.28);
-          background: rgba(255, 255, 255, 0.92);
-          box-shadow: 0 24px 70px rgba(0, 0, 0, 0.3);
-          backdrop-filter: blur(18px);
-          padding: 22px;
+          border-radius: 20px;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          background: linear-gradient(180deg, rgba(32, 32, 36, 0.98) 0%, rgba(16, 16, 18, 0.99) 100%);
+          box-shadow: 0 28px 64px rgba(0, 0, 0, 0.55);
+          backdrop-filter: blur(20px);
+          padding: 24px;
+          color: #e4e4e7;
         }
 
         .modalCard h3 {
           margin: 0;
-          color: #0f172a;
+          color: #fafafa;
           font-size: 22px;
+          font-weight: 600;
+          letter-spacing: -0.02em;
         }
 
         .modalCard p {
-          margin: 10px 0 18px;
-          color: #475569;
+          margin: 12px 0 20px;
+          color: #a1a1aa;
           line-height: 1.55;
         }
 
@@ -911,8 +1242,16 @@ export default function BizCalendarPage() {
             align-items: stretch;
           }
 
+          .calHeroMain {
+            max-width: 100%;
+            padding-right: 0;
+          }
+
           .progressPanel {
-            text-align: left;
+            width: 100%;
+            justify-content: center;
+            box-sizing: border-box;
+            align-self: stretch;
           }
 
           .weekdayGrid,
@@ -924,8 +1263,34 @@ export default function BizCalendarPage() {
             display: none;
           }
 
+          .weekdayStripMobile {
+            display: flex;
+            justify-content: space-between;
+            gap: 6px;
+            margin-bottom: 14px;
+            padding: 0 2px;
+          }
+
+          .weekdayStripMobile span {
+            flex: 1;
+            text-align: center;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.07em;
+            text-transform: uppercase;
+            color: #a1a1aa;
+            padding: 8px 4px;
+            border-radius: 10px;
+            background: rgba(24, 24, 27, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+          }
+
           .dayCell {
-            min-height: 138px;
+            min-height: 152px;
+          }
+
+          .cellBadgeGroup {
+            max-width: min(160px, 52%);
           }
 
           .drawerOverlay {
@@ -938,8 +1303,20 @@ export default function BizCalendarPage() {
         }
 
         @media (max-width: 560px) {
+          .calPage {
+            padding: 20px 12px 28px;
+          }
+
           .calendarGrid {
             grid-template-columns: 1fr;
+          }
+
+          .weekdayStripMobile {
+            display: none;
+          }
+
+          .cellBadgeGroup {
+            max-width: min(200px, 55%);
           }
 
           .dayDrawer {

@@ -1,21 +1,67 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { FaArrowRight } from "react-icons/fa";
 import { useAuth } from "../../lib/useAuth";
 import { logout } from "../../lib/auth";
 import ConfirmActionModal from "../ui/ConfirmActionModal";
+import BizBoostWordmark from "../brand/BizBoostWordmark";
 import SideMenu from "./SideMenu";
-const NAV_LINKS = [
-    { href: "/", label: "Home", match: (p: string) => p === "/" },
-    { href: "/#features", label: "Features", match: () => false },
-    { href: "/#about", label: "About", match: () => false },
+
+type LandingNavSection = "home" | "features" | "about";
+
+function computeLandingNavSection(): LandingNavSection {
+    if (typeof window === "undefined")
+        return "home";
+    if (window.location.pathname !== "/")
+        return "home";
+    const hash = window.location.hash;
+    if (hash === "#features")
+        return "features";
+    if (hash === "#about")
+        return "about";
+    const features = document.getElementById("features");
+    const about = document.getElementById("about");
+    const vh = window.innerHeight;
+    const band = vh * 0.34;
+    if (features) {
+        const r = features.getBoundingClientRect();
+        if (r.top < band && r.bottom > vh * 0.16)
+            return "features";
+    }
+    if (about) {
+        const r = about.getBoundingClientRect();
+        if (r.top < band && r.bottom > vh * 0.16)
+            return "about";
+    }
+    return "home";
+}
+
+function isPrimaryNavLinkActive(href: string, pathname: string | null, section: LandingNavSection, external?: boolean): boolean {
+    if (external)
+        return false;
+    const p = pathname ?? "";
+    if (href === "/")
+        return p === "/" && section === "home";
+    if (href === "/#features")
+        return p === "/" && section === "features";
+    if (href === "/#about")
+        return p === "/" && section === "about";
+    return p === href;
+}
+
+const NAV_LINKS: ReadonlyArray<{
+    href: string;
+    label: string;
+    external?: boolean;
+}> = [
+    { href: "/", label: "Home" },
+    { href: "/#features", label: "Features" },
+    { href: "/#about", label: "About" },
     {
         href: "https://docs.google.com/forms/d/e/1FAIpQLSdcpfUEm9IjNt_b8HuKxofOL5L4i0OBwukpgiQSHe7P1fsEEg/viewform?usp=publish-editor",
         label: "Contact",
-        match: () => false,
         external: true,
     },
 ];
@@ -31,6 +77,7 @@ export default function Navbar() {
     const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
     const [loggingOut, setLoggingOut] = useState(false);
     const [appMenuOpen, setAppMenuOpen] = useState(false);
+    const [landingSection, setLandingSection] = useState<LandingNavSection>("home");
     const chipRef = useRef<HTMLDivElement | null>(null);
     const mobileRef = useRef<HTMLDivElement | null>(null);
     const isAuthed = !!user;
@@ -63,6 +110,28 @@ export default function Navbar() {
         setMobileOpen(false);
         setProfileOpen(false);
         setAppMenuOpen(false);
+    }, [pathname]);
+    useEffect(() => {
+        if (pathname !== "/" || typeof window === "undefined") {
+            setLandingSection("home");
+            return;
+        }
+        const tick = () => {
+            setLandingSection(computeLandingNavSection());
+        };
+        tick();
+        const onHash = () => tick();
+        const onScroll = () => {
+            window.requestAnimationFrame(tick);
+        };
+        window.addEventListener("hashchange", onHash);
+        window.addEventListener("scroll", onScroll, { passive: true });
+        const t = window.setTimeout(tick, 120);
+        return () => {
+            window.removeEventListener("hashchange", onHash);
+            window.removeEventListener("scroll", onScroll);
+            window.clearTimeout(t);
+        };
     }, [pathname]);
     useEffect(() => {
         if (typeof document === "undefined")
@@ -101,8 +170,8 @@ export default function Navbar() {
             <span className={appMenuOpen ? "navbarToggleBar navbarToggleBar--open" : "navbarToggleBar"}/>
           </button>
 
-          <Link href="/" className="navbarBrand" onClick={() => setMobileOpen(false)}>
-            <Image src="/logo.svg" alt="BizBoost" width={205} height={30} priority className="navbarBrandLogo"/>
+          <Link href="/" className="navbarBrand" aria-label="BizBoost home" onClick={() => setMobileOpen(false)}>
+            <BizBoostWordmark size="nav" className="navbarBrandMark"/>
           </Link>
         </div>
 
@@ -110,7 +179,7 @@ export default function Navbar() {
           <div className="navLinksCluster">
             <div className="navLinks" aria-label="Primary">
               {NAV_LINKS.map((link) => {
-            const isActive = link.match(pathname ?? "");
+            const isActive = isPrimaryNavLinkActive(link.href, pathname ?? "", landingSection, link.external);
             if (link.external) {
                 return (<a key={link.href} href={link.href} target="_blank" rel="noopener noreferrer" className={`navLink${isActive ? " navLink--active" : ""}`}>
                       {link.label}

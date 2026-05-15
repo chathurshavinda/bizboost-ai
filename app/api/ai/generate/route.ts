@@ -128,6 +128,11 @@ type PosterDesign = {
     accentColor: string;
     textColor: string;
     overlay: "light" | "dark" | "none";
+    brandNameColor?: string;
+    headlineColor?: string;
+    subheadlineColor?: string;
+    offerBadgeColor?: string;
+    ctaColor?: string;
 };
 type BusinessDetails = {
     businessName: string;
@@ -670,6 +675,10 @@ function clampHex(input: unknown, fallback: string): string {
     const value = typeof input === "string" ? input.trim() : "";
     return /^#[0-9a-fA-F]{6}$/.test(value) ? value : fallback;
 }
+function optionalHex6(input: unknown): string {
+    const value = typeof input === "string" ? input.trim() : "";
+    return /^#[0-9a-fA-F]{6}$/.test(value) ? value : "";
+}
 function parsePosterDesign(raw: string, details: BusinessDetails): PosterDesign | null {
     const stripped = raw
         .replace(/^```(?:json)?/i, "")
@@ -707,6 +716,11 @@ function parsePosterDesign(raw: string, details: BusinessDetails): PosterDesign 
             accentColor,
             textColor: clampHex(parsed.textColor, "#FFFFFF"),
             overlay,
+            brandNameColor: optionalHex6(parsed.brandNameColor),
+            headlineColor: optionalHex6(parsed.headlineColor),
+            subheadlineColor: optionalHex6(parsed.subheadlineColor),
+            offerBadgeColor: optionalHex6(parsed.offerBadgeColor),
+            ctaColor: optionalHex6(parsed.ctaColor),
         };
     }
     catch (error) {
